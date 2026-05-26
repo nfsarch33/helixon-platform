@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: helixon-platform
+  namespace: helixon
+  labels:
+    app: helixon-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: helixon-platform
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
