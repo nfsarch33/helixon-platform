@@ -84,7 +84,7 @@ func TestSprintboardTool_RegisterClaim_v8900(t *testing.T) {
 		case "/api/v1/agents":
 			registers++
 			w.WriteHeader(200)
-		case "/api/v1/tickets/claim":
+		case "/api/v1/tickets/T-1/claim":
 			claims++
 			w.WriteHeader(200)
 		default:

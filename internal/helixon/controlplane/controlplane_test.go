@@ -198,9 +198,9 @@ func TestSprintboardClaimAndComplete(t *testing.T) {
 	completes := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v1/tickets/claim":
+		case "/api/v1/tickets/T-7442-1/claim":
 			claims++
-		case "/api/v1/tickets/complete":
+		case "/api/v1/tickets/T-7442-1/complete":
 			completes++
 		}
 		w.WriteHeader(http.StatusOK)

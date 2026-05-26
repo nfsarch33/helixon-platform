@@ -238,8 +238,8 @@ func TestRegisterBuiltinTools_WithSprintboard(t *testing.T) {
 	if len(seen.paths) != 2 {
 		t.Fatalf("server saw %d requests, want 2: %v", len(seen.paths), seen.paths)
 	}
-	if !strings.Contains(seen.bodies[0], `"ticket_id":"T-8200-LCT"`) {
-		t.Fatalf("first body = %q", seen.bodies[0])
+	if !strings.Contains(seen.paths[0], "/api/v1/tickets/T-8200-LCT/claim") {
+		t.Fatalf("first path = %q body = %q", seen.paths[0], seen.bodies[0])
 	}
 	if !strings.Contains(seen.bodies[1], `"evidence":"green"`) {
 		t.Fatalf("second body = %q", seen.bodies[1])

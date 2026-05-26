@@ -95,21 +95,21 @@ type Ticket struct {
 // ClaimTicket atomically claims a ticket for this agent.
 func (c *SprintboardClient) ClaimTicket(ctx context.Context, ticketID string) error {
 	data, _ := json.Marshal(map[string]string{
-		"ticket_id":  ticketID,
-		"agent_name": c.cfg.AgentName,
+		"agent_id": c.cfg.AgentName,
 	})
-	_, err := c.doPost(ctx, "/api/v1/tickets/claim", data)
+	path := fmt.Sprintf("/api/v1/tickets/%s/claim", ticketID)
+	_, err := c.doPost(ctx, path, data)
 	return err
 }
 
 // CompleteTicket marks a ticket as completed with evidence.
 func (c *SprintboardClient) CompleteTicket(ctx context.Context, ticketID, evidence string) error {
 	data, _ := json.Marshal(map[string]string{
-		"ticket_id":  ticketID,
-		"agent_name": c.cfg.AgentName,
+		"agent_id": c.cfg.AgentName,
 		"evidence":   evidence,
 	})
-	_, err := c.doPost(ctx, "/api/v1/tickets/complete", data)
+	path := fmt.Sprintf("/api/v1/tickets/%s/complete", ticketID)
+	_, err := c.doPost(ctx, path, data)
 	return err
 }
 

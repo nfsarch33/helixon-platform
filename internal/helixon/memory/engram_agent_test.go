@@ -45,9 +45,9 @@ func TestAgentMemory_RetrieveContext_WithResults(t *testing.T) {
 func TestAgentMemory_StoreConversationSummary(t *testing.T) {
 	var stored string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]string
+		var body map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&body)
-		stored = body["content"]
+		msgs, ok := body["messages"].([]interface{}); if ok && len(msgs) > 0 { if m, ok2 := msgs[0].(map[string]interface{}); ok2 { stored, _ = m["content"].(string) } }
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"id": "new-1", "content": stored})
 	}))

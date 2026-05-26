@@ -77,14 +77,18 @@ func NewEngramClient(cfg EngramConfig, logger *slog.Logger) *EngramClient {
 
 // Add stores a new memory entry.
 func (c *EngramClient) Add(ctx context.Context, content, appID, userID string) (*Memory, error) {
-	body := map[string]string{
-		"content": content,
-		"app_id":  appID,
-		"user_id": userID,
+	type engramMsg struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	}
+	body := map[string]any{
+		"messages": []engramMsg{{Role: "user", Content: content}},
+		"app_id":   appID,
+		"user_id":  userID,
 	}
 	data, _ := json.Marshal(body)
 
-	resp, err := c.doPost(ctx, "/api/v1/memories", data)
+	resp, err := c.doPost(ctx, "/memories", data)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +113,7 @@ func (c *EngramClient) Search(ctx context.Context, query, appID, userID string, 
 	}
 	data, _ := json.Marshal(body)
 
-	resp, err := c.doPost(ctx, "/api/v1/memories/search", data)
+	resp, err := c.doPost(ctx, "/search", data)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +133,7 @@ func (c *EngramClient) Search(ctx context.Context, query, appID, userID string, 
 
 // Get retrieves a specific memory by ID.
 func (c *EngramClient) Get(ctx context.Context, id string) (*Memory, error) {
-	resp, err := c.doGet(ctx, "/api/v1/memories/"+id)
+	resp, err := c.doGet(ctx, "/memories/"+id)
 	if err != nil {
 		return nil, err
 	}
