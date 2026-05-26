@@ -1,0 +1,17 @@
+# OpenAI API configuration.
+# Set OPENAI_API_KEY in your environment.
+# Run: helixon repl --config examples/openai-api.yaml
+
+agent_id: helixon-openai
+system_prompt: "You are a helpful assistant."
+session_dsn: "file:helixon-openai.db?cache=shared&mode=rwc"
+max_iterations: 25
+max_tokens: 128000
+timeout: 5m
+
+provider:
+  kind: openai
+  base_url: https://api.openai.com/v1
+  model: gpt-4o-mini
+  api_key: "${OPENAI_API_KEY}"
+  timeout: 30s

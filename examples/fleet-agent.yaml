@@ -1,0 +1,25 @@
+# Fleet agent configuration with SprintBoard integration.
+# Requires running SprintBoard at :9400 and LLM provider.
+# Run: helixon serve --config examples/fleet-agent.yaml --http-addr :8686
+
+agent_id: helixon-fleet-1
+system_prompt: |
+  You are a fleet agent. You receive tasks from the fleet handler,
+  execute them using available tools, and report results. Be thorough
+  and include evidence of completion.
+session_dsn: "file:helixon-fleet.db?cache=shared&mode=rwc"
+max_iterations: 50
+max_tokens: 128000
+timeout: 10m
+heartbeat_every: 30s
+
+provider:
+  kind: openai-compat
+  base_url: http://127.0.0.1:8787/v1
+  model: Qwen3-4B
+  api_key: "${OPENAI_API_KEY}"
+  timeout: 60s
+
+sprintboard:
+  url: http://127.0.0.1:9400
+  capabilities: "code,test,review,deploy"

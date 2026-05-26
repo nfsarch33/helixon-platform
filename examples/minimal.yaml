@@ -1,0 +1,7 @@
+# Minimal configuration -- echo mode, no LLM required.
+# Run: helixon repl --config examples/minimal.yaml
+
+agent_id: helixon-minimal
+session_dsn: "file::memory:?cache=shared"
+max_iterations: 10
+timeout: 60s
