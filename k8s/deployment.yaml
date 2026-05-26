@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helixon-platform
+  namespace: helixon
+  labels:
+    app: helixon-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helixon-platform
+  template:
+    metadata:
+      labels:
+        app: helixon-platform
+    spec:
+      containers:
+        - name: helixon-platform
+          image: ghcr.io/nfsarch33/helixon-platform:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
