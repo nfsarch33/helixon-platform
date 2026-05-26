@@ -11,36 +11,78 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
       - name: Build
         run: go build ./...
       - name: Vet
         run: go vet ./...
       - name: Test
-        run: go test -race -cover -coverprofile=coverage.txt ./...
+        run: go test -race -cover -coverprofile=coverage.txt -count=1 ./...
       - name: Coverage check
         run: |
           total=$(go tool cover -func=coverage.txt | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${total}%"
-          threshold=70
+          threshold=75
           if [ "$(echo "$total < $threshold" | bc -l)" -eq 1 ]; then
-            echo "Coverage ${total}% is below threshold ${threshold}%"
+            echo "::error::Coverage ${total}% is below threshold ${threshold}%"
             exit 1
           fi
 
   security:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
+
+  public-repo-gate:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for blocked terms
+        run: |
+          echo "Scanning for blocked terms..."
+          BLOCKED=0
+
+          # Critical patterns: never allowed anywhere (excluding CI config itself)
+          for pattern in \
+            '/home/jason' '/Users/jason' \
+            'zendesk' 'zd-gateway' 'jlianzendesk' \
+            'op://' '1password' \
+            'HOMEBREW_GITHUB_API_TOKEN' 'VENDIR_GITHUB_API_TOKEN' \
+            'ssh-rsa ' 'BEGIN RSA PRIVATE' 'BEGIN OPENSSH PRIVATE' \
+            'wsl1-travel' ; do
+            if grep -rn --include='*.go' --include='*.yaml' --include='*.yml' --include='*.md' \
+                 --include='*.json' --include='*.toml' --include='*.sh' \
+                 -E "$pattern" . 2>/dev/null | grep -v '.git/' | grep -v 'public-repo-gate' | grep -v 'node_modules/'; then
+              echo "::error::Blocked term found: $pattern"
+              BLOCKED=1
+            fi
+          done
+
+          # Private IPs: blocked in production code, allowed in test fixtures
+          for pattern in \
+            '192\.168\.' '10\.0\.' '172\.(1[6-9]|2[0-9]|3[01])\.' ; do
+            if grep -rn --include='*.go' --include='*.yaml' --include='*.yml' --include='*.md' \
+                 --include='*.json' --include='*.toml' --include='*.sh' \
+                 -E "$pattern" . 2>/dev/null | grep -v '.git/' | grep -v 'public-repo-gate' | grep -v 'node_modules/' | grep -v '_test.go:'; then
+              echo "::error::Private IP in non-test code: $pattern"
+              BLOCKED=1
+            fi
+          done
+
+          if [ "$BLOCKED" -eq 1 ]; then
+            echo "::error::Public repo gate FAILED. Remove all blocked terms before merging."
+            exit 1
+          fi
+          echo "Public repo gate: PASSED (zero findings)"

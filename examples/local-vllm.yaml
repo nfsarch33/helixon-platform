@@ -1,0 +1,17 @@
+# Local vLLM configuration.
+# Requires a running vLLM server on localhost:8000.
+# Run: helixon serve --config examples/local-vllm.yaml --http-addr :8686
+
+agent_id: helixon-local
+system_prompt: "You are a helpful autonomous agent with access to shell, file, and web tools."
+session_dsn: "file:helixon-local.db?cache=shared&mode=rwc"
+max_iterations: 25
+max_tokens: 128000
+timeout: 5m
+heartbeat_every: 60s
+
+provider:
+  kind: openai-compat
+  base_url: http://127.0.0.1:8000/v1
+  model: Qwen3-4B
+  timeout: 30s
