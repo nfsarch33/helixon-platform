@@ -18,7 +18,7 @@ import (
 
 func TestEngramClientAdd(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/memories", r.URL.Path)
+		assert.Equal(t, "/memories", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -39,7 +39,7 @@ func TestEngramClientAdd(t *testing.T) {
 
 func TestEngramClientSearch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/memories/search", r.URL.Path)
+		assert.Equal(t, "/search", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(struct {
 			Results []SearchResult `json:"results"`
@@ -240,18 +240,25 @@ func TestHybridSearcherMerge(t *testing.T) {
 // Memory and mirrors into the local FTS index; a failed local mirror logs
 // but does not propagate; a failed Engram write fails the whole call.
 func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
-	var posted map[string]string
+	var posted map[string]interface{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v1/memories":
+		case "/memories":
 			_ = json.NewDecoder(r.Body).Decode(&posted)
+			contentStr := ""
+			if msgs, ok := posted["messages"].([]interface{}); ok && len(msgs) > 0 {
+				if m, ok2 := msgs[0].(map[string]interface{}); ok2 {
+					contentStr, _ = m["content"].(string)
+				}
+			}
+			appID, _ := posted["app_id"].(string)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(Memory{
 				ID:      "mem-write-001",
-				Content: posted["content"],
-				AppID:   posted["app_id"],
+				Content: contentStr,
+				AppID:   appID,
 			})
-		case "/api/v1/memories/search":
+		case "/search":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(struct {
 				Results []SearchResult `json:"results"`
@@ -276,7 +283,7 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 	require.NotNil(t, mem)
 	assert.Equal(t, "mem-write-001", mem.ID)
 	assert.Equal(t, "v8000-overnight memory", mem.Content)
-	assert.Equal(t, "v8000-overnight memory", posted["content"])
+	msgs, _ := posted["messages"].([]interface{}); firstMsg, _ := msgs[0].(map[string]interface{}); assert.Equal(t, "v8000-overnight memory", firstMsg["content"])
 	assert.Equal(t, "claude-code", posted["app_id"])
 
 	// FTS mirror landed locally.
@@ -320,7 +327,7 @@ func TestHybridSearcherWrite_MissingEngramFails(t *testing.T) {
 
 func TestHybridSearcherRead_GreenPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/memories/mem-read-001", r.URL.Path)
+		assert.Equal(t, "/memories/mem-read-001", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(Memory{ID: "mem-read-001", Content: "fetched"})
 	}))

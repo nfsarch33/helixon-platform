@@ -57,16 +57,23 @@ func newEngramServerEcho(t *testing.T) (*httptest.Server, *EngramClient) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v1/memories":
-			var body map[string]string
+		case "/memories":
+			var body map[string]interface{}
 			_ = json.NewDecoder(r.Body).Decode(&body)
+			contentStr := ""
+			if msgs, ok := body["messages"].([]interface{}); ok && len(msgs) > 0 {
+				if m, ok2 := msgs[0].(map[string]interface{}); ok2 {
+					contentStr, _ = m["content"].(string)
+				}
+			}
+			appID, _ := body["app_id"].(string)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(Memory{
 				ID:      "engram-001",
-				Content: body["content"],
-				AppID:   body["app_id"],
+				Content: contentStr,
+				AppID:   appID,
 			})
-		case "/api/v1/memories/search":
+		case "/search":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(struct {
 				Results []SearchResult `json:"results"`
