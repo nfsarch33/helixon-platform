@@ -12,7 +12,7 @@ import (
 
 // Mem0Config configures the Mem0Handler for scoped capsule writes.
 type Mem0Config struct {
-	BaseURL   string // e.g. "http://127.0.0.1:8080" or cloud endpoint
+	BaseURL   string // e.g. "http://127.0.0.1:18888" or cloud endpoint
 	APIKey    string
 	AppID     string // 4-part namespace: app_id
 	UserID    string // 4-part namespace: user_id
