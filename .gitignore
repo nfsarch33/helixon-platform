@@ -1,0 +1,35 @@
+# Binaries
+helixon
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+/bin/
+/dist/
+
+# SQLite runtime files
+*.db
+*.db-shm
+*.db-wal
+
+# Go
+vendor/
