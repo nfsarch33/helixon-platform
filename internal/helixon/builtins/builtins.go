@@ -478,6 +478,7 @@ type Options struct {
 	MemoryAppID  string
 	MemoryUserID string
 	Sprintboard  *controlplane.SprintboardClient
+	Autoresearch *AutoresearchConfig
 }
 
 // Defs returns the slice of ToolDefs that Options describes, in stable
@@ -501,6 +502,9 @@ func (o Options) Defs() []tooldispatch.ToolDef {
 	}
 	if o.Sprintboard != nil {
 		defs = append(defs, SprintboardTool(o.Sprintboard))
+	}
+	if o.Autoresearch != nil {
+		defs = append(defs, AutoresearchTool(*o.Autoresearch))
 	}
 	sort.Slice(defs, func(i, j int) bool { return defs[i].Name < defs[j].Name })
 	return defs

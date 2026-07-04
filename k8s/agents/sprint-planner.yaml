@@ -1,0 +1,179 @@
+---
+# sprint-planner — Helixon fleet agent that auto-plans sprints based on
+# carry-forward register + sprintboard tickets. Reads engram + carry-forward
+# register; writes planned sprints to SprintBoard MCP.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sprint-planner
+  namespace: helixon-agents
+  labels:
+    app: sprint-planner
+    fleet: helixon
+    role: sprint-planning
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sprint-planner
+  template:
+    metadata:
+      labels:
+        app: sprint-planner
+        fleet: helixon
+    spec:
+      containers:
+        - name: sprint-planner
+          image: ghcr.io/nfsarch33/helixon-agents:sprint-planner-v13923
+          imagePullPolicy: IfNotPresent
+          command: ["/helixon-platform"]
+          args:
+            - serve
+            - --config=/etc/helixon/sprint-planner.yaml
+            - --log-level=info
+          ports:
+            - name: healthz
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9100
+              protocol: TCP
+          env:
+            - name: ENGRAM_ADDR
+              value: "127.0.0.1:8280"
+            - name: ENGRAM_DB_PATH
+              value: "/var/lib/engram/engram.db"
+            - name: CARRY_FORWARD_REGISTER
+              value: "/home/jason/cursor-global-kb/carry-forward-register.ndjson"
+            - name: SPRINTBOARD_MCP_URL
+              value: "http://sprintboard-api.helixon:8080"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/helixon
+              readOnly: true
+            - name: engram-shared
+              mountPath: /var/lib/engram
+              readOnly: true
+            - name: carry-forward-shared
+              mountPath: /home/jason/cursor-global-kb
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: sprint-planner-config
+        - name: engram-shared
+          hostPath:
+            path: /var/lib/engram
+            type: Directory
+        - name: carry-forward-shared
+          hostPath:
+            path: /home/jason/cursor-global-kb
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sprint-planner
+  namespace: helixon-agents
+  labels:
+    app: sprint-planner
+spec:
+  type: ClusterIP
+  selector:
+    app: sprint-planner
+  ports:
+    - name: healthz
+      port: 8080
+      targetPort: healthz
+      protocol: TCP
+    - name: metrics
+      port: 9100
+      targetPort: metrics
+      protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sprint-planner-config
+  namespace: helixon-agents
+data:
+  sprint-planner.yaml: |
+    agent_id: sprint-planner-v13923
+    channels:
+      - name: carry-forward-tick
+        type: cron
+        config:
+          schedule: "0 */4 * * *"
+          action: scan_carry_forward
+      - name: engram-read
+        type: engram
+        config:
+          addr: 127.0.0.1:8280
+          collections: [sprint-history, agent-capabilities]
+      - name: sprintboard-write
+        type: mcp
+        config:
+          url: http://sprintboard-api.helixon:8080
+          tool: sprintboard_create_ticket
+    tools:
+      - name: read_file
+        builtin: file_read
+      - name: shell
+        builtin: shell_exec
+        config:
+          allowlist: [gh, jq]
+      - name: create_sprintboard_ticket
+        builtin: mcp_call
+    heartbeat_every: 60s
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sprint-planner
+  namespace: helixon-agents
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods, services]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sprint-planner
+  namespace: helixon-agents
+subjects:
+  - kind: ServiceAccount
+    name: sprint-planner
+    namespace: helixon-agents
+roleRef:
+  kind: Role
+  name: sprint-planner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sprint-planner
+  namespace: helixon-agents
