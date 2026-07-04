@@ -153,6 +153,68 @@ func TestTraceMiddleware_MultipleWrites(t *testing.T) {
 	}
 }
 
+func TestTraceMiddleware_EmitsCanonicalCorrelationFields(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "canonical.ndjson")
+	tm, err := NewTraceMiddleware(TraceConfig{
+		LogPath:  logPath,
+		AgentID:  "wsl1-fleet-agent",
+		System:   "helixon",
+		TraceID:  "01CANONICALTRACE0000000000",
+		ParentID: "0011223344556677",
+	})
+	if err != nil {
+		t.Fatalf("NewTraceMiddleware: %v", err)
+	}
+	if _, err := tm.Wrap("semble.search", func() (string, error) { return "ok", nil }); err != nil {
+		t.Fatalf("Wrap: %v", err)
+	}
+	tm.Close()
+
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	line := strings.TrimSpace(string(raw))
+
+	// The bridge/sprinteval reducers key on these canonical names.
+	for _, want := range []string{
+		`"ts":`, `"event":"tool_call"`, `"tool":"semble.search"`,
+		`"system":"helixon"`, `"trace_id":"01CANONICALTRACE0000000000"`,
+		`"parent_id":"0011223344556677"`, `"span_id":`,
+	} {
+		if !strings.Contains(line, want) {
+			t.Errorf("canonical NDJSON missing %s\n got: %s", want, line)
+		}
+	}
+
+	var ev TraceEvent
+	if err := json.Unmarshal([]byte(line), &ev); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if ev.TraceID != "01CANONICALTRACE0000000000" {
+		t.Errorf("TraceID = %q", ev.TraceID)
+	}
+	if len(ev.SpanID) != 16 {
+		t.Errorf("SpanID = %q, want 16 hex", ev.SpanID)
+	}
+}
+
+func TestTraceMiddleware_MintsTraceWhenRoot(t *testing.T) {
+	t.Setenv(envTraceID, "")
+	logPath := filepath.Join(t.TempDir(), "root.ndjson")
+	tm, err := NewTraceMiddleware(TraceConfig{LogPath: logPath, AgentID: "root"})
+	if err != nil {
+		t.Fatalf("NewTraceMiddleware: %v", err)
+	}
+	defer tm.Close()
+	if len(tm.traceID) != 26 {
+		t.Errorf("minted trace id = %q, want 26-char ULID", tm.traceID)
+	}
+	if tm.system != "helixon" {
+		t.Errorf("default system = %q, want helixon", tm.system)
+	}
+}
+
 func TestTraceMiddleware_RequiresLogPath(t *testing.T) {
 	t.Parallel()
 

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: helixon-agents
+  labels:
+    name: helixon-agents
+    purpose: helixon-fleet-agents

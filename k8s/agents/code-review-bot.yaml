@@ -1,0 +1,174 @@
+---
+# code-review-bot — Helixon fleet agent that performs automated code reviews
+# on PRs targeting the personal repos. Reads engram for context, writes
+# review comments to GitHub via PAT.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: code-review-bot
+  namespace: helixon-agents
+  labels:
+    app: code-review-bot
+    fleet: helixon
+    role: code-review
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: code-review-bot
+  template:
+    metadata:
+      labels:
+        app: code-review-bot
+        fleet: helixon
+    spec:
+      containers:
+        - name: code-review-bot
+          image: ghcr.io/nfsarch33/helixon-agents:code-review-bot-v13923
+          imagePullPolicy: IfNotPresent
+          command: ["/helixon-platform"]
+          args:
+            - serve
+            - --config=/etc/helixon/code-review-bot.yaml
+            - --log-level=info
+          ports:
+            - name: healthz
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9100
+              protocol: TCP
+          env:
+            - name: ENGRAM_ADDR
+              value: "127.0.0.1:8280"
+            - name: ENGRAM_DB_PATH
+              value: "/var/lib/engram/engram.db"
+            - name: GITHUB_PAT_OP
+              value: "op://Cursor_IronClaw/github pat/password"
+            - name: SPRINTBOARD_MCP_URL
+              value: "http://sprintboard-api.helixon:8080"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/helixon
+              readOnly: true
+            - name: engram-shared
+              mountPath: /var/lib/engram
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: code-review-bot-config
+        - name: engram-shared
+          hostPath:
+            path: /var/lib/engram
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: code-review-bot
+  namespace: helixon-agents
+  labels:
+    app: code-review-bot
+spec:
+  type: ClusterIP
+  selector:
+    app: code-review-bot
+  ports:
+    - name: healthz
+      port: 8080
+      targetPort: healthz
+      protocol: TCP
+    - name: metrics
+      port: 9100
+      targetPort: metrics
+      protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: code-review-bot-config
+  namespace: helixon-agents
+data:
+  code-review-bot.yaml: |
+    agent_id: code-review-bot-v13923
+    channels:
+      - name: github-pr-events
+        type: webhook
+        config:
+          path: /webhook/github
+          secret_op: op://Cursor_IronClaw/github pat/password
+      - name: engram-read
+        type: engram
+        config:
+          addr: 127.0.0.1:8280
+          collections: [code-review-context, pr-history]
+      - name: sprintboard-write
+        type: mcp
+        config:
+          url: http://sprintboard-api.helixon:8080
+          tool: sprintboard_create_ticket
+    tools:
+      - name: read_file
+        builtin: file_read
+      - name: grep
+        builtin: grep_search
+      - name: shell
+        builtin: shell_exec
+        config:
+          allowlist: [gh, git]
+      - name: post_review_comment
+        builtin: github_post_comment
+    heartbeat_every: 60s
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: code-review-bot
+  namespace: helixon-agents
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods, services]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: code-review-bot
+  namespace: helixon-agents
+subjects:
+  - kind: ServiceAccount
+    name: code-review-bot
+    namespace: helixon-agents
+roleRef:
+  kind: Role
+  name: code-review-bot
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: code-review-bot
+  namespace: helixon-agents
