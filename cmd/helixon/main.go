@@ -78,19 +78,7 @@ func newPlatformCmd() *cobra.Command {
 		Use:   "platform",
 		Short: "Run the Helixon platform HTTP/SSE server (default :8787)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			bindAddr := addr
-			if bindAddr == "" {
-				if env := os.Getenv("HELIXON_PORT"); env != "" {
-					if strings.Contains(env, ":") {
-						bindAddr = env
-					} else {
-						bindAddr = "127.0.0.1:" + env
-					}
-				}
-			}
-			if bindAddr == "" {
-				bindAddr = platform.DefaultAddr
-			}
+			bindAddr := resolvePlatformAddr(addr)
 			handler := func(_ context.Context, msg helixon.IncomingMessage) (string, error) {
 				return "echo:" + msg.Content, nil
 			}
@@ -103,6 +91,23 @@ func newPlatformCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&addr, "addr", "", "Bind address (default 127.0.0.1:8787 or $HELIXON_PORT)")
 	return cmd
+}
+
+// resolvePlatformAddr returns the bind address for `helixon platform`.
+// Precedence: --addr flag, then $HELIXON_PORT (with ":" preserved as-is
+// or wrapped in 127.0.0.1:), then platform.DefaultAddr.
+// Extracted to make the resolution testable without running a listener.
+func resolvePlatformAddr(addrFlag string) string {
+	if addrFlag != "" {
+		return addrFlag
+	}
+	if env := os.Getenv("HELIXON_PORT"); env != "" {
+		if strings.Contains(env, ":") {
+			return env
+		}
+		return "127.0.0.1:" + env
+	}
+	return platform.DefaultAddr
 }
 
 func newServeCmd() *cobra.Command {
