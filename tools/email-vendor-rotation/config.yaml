@@ -1,0 +1,72 @@
+primary_vendor: resend
+fallback_vendor: brevo
+forbidden_vendors: [smtp2go]
+rotate_after_seconds: 60
+resend: helixon@resend.dev
+brevo: helixon@oztac.com.au
+primary: jaslian@gmail.com
+
+# key entries below. status: active | throttled | demoted | retired
+keys:
+  - alias: resend-jaslian
+    vault: Cursor_IronClaw
+    item_id: pwjkp2gii6cnaqwwj4fmesdxd4
+    field: api key
+    vendor: resend
+    status: active
+    last_used_at: 2026-07-05T18:33:33Z
+    notes: "Verified live 2026-07-05 via send-end-email; result=sent"
+
+  - alias: resend-oztac
+    vault: Cursor_IronClaw
+    item_id: nruynfsbnmjmqx6tld6c7uaopm
+    field: api key
+    vendor: resend
+    status: standby
+
+  - alias: resend-xiuyingni81
+    vault: Cursor_IronClaw
+    item_id: 23ad5gtlh7yxz7hu2xcuvo2ewu
+    field: api key
+    vendor: resend
+    status: standby
+
+  - alias: resend-keynear
+    vault: Cursor_IronClaw
+    item_id: mjlr5fkdjj3mhd2c3a7t4zzroe
+    field: api key
+    vendor: resend
+    status: standby
+
+  - alias: resend-jzlian083
+    vault: Cursor_IronClaw
+    item_id: reg7i5k2duyn6ra4wjodka2jiq
+    field: api key
+    vendor: resend
+    status: standby
+
+  - alias: brevo-oztac-300d
+    vault: Cursor_IronClaw
+    item_id: qqt3bayjxxddc6hapn6tmtk5j4
+    field: api key
+    vendor: brevo
+    status: active
+    daily_quota: 300
+    last_used_at: 2026-07-05T18:33:33Z
+    notes: "Verified 2026-07-05 via op read; status=ok"
+
+  - alias: brevo-oztac-300d-2
+    vault: Cursor_IronClaw
+    item_id: 5won46qifska3q24i5sqhpqlbq
+    field: api key
+    vendor: brevo
+    status: standby
+    daily_quota: 300
+
+  - alias: smtp2go
+    vault: Cursor_IronClaw
+    item_id: mqveimv2o5z4kiqnjybepiwbpq
+    field: api key
+    vendor: smtp2go
+    status: retired
+    notes: "Quota exhausted; SMTP-only; ADR-0087 forbids SMTP"

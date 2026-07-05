@@ -1,5 +1,6 @@
 # Binaries
 /helixon
+/tools/email-vendor-rotation/email-vendor-rotation
 *.exe
 *.dll
 *.so
