@@ -19,6 +19,9 @@ coverage.html
 *.swo
 *~
 
+# Sentrux quality gate (generated baseline cache; not source)
+.sentrux/
+
 # OS
 .DS_Store
 Thumbs.db
