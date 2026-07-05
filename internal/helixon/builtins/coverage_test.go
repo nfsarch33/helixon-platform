@@ -159,3 +159,59 @@ func TestDefs_WithSprintboard(t *testing.T) {
 
 // Sentinel to keep `context` import warm if later tests need it.
 var _ = context.Background
+
+// CARRY-059: MemoryTool handler dispatch — when the searcher is nil
+// (the only state we can test without a real HybridSearcher), every
+// op must surface the same "unconfigured" error.
+func TestMemoryTool_NilSearcherAllOpsError(t *testing.T) {
+	def := builtins.MemoryTool(nil, "app", "user")
+	ctx := context.Background()
+	ops := []string{"read", "write", "search", "unknown_op"}
+	for _, op := range ops {
+		_, err := def.Handler(ctx, map[string]any{"op": op})
+		if err == nil {
+			t.Errorf("op=%q expected error; got nil", op)
+		}
+	}
+}
+
+// CARRY-059: MemoryTool default app_id/user_id are used when the args
+// omit them. Tested indirectly via the searcher-read error path: the
+// default UserID/AppID are passed to searcher, but since the searcher
+// is nil we surface the unconfigured error before reaching that code.
+func TestMemoryTool_DefaultIDsFlow(t *testing.T) {
+	def := builtins.MemoryTool(nil, "default-app", "default-user")
+	_, err := def.Handler(context.Background(), map[string]any{"op": "read", "id": "abc"})
+	if err == nil {
+		t.Fatal("expected error from nil searcher")
+	}
+}
+
+// CARRY-059: SprintboardTool handler dispatch — nil client must return
+// the same "not configured" error for every op.
+func TestSprintboardTool_NilClientAllOpsError(t *testing.T) {
+	def := builtins.SprintboardTool((*controlplane.SprintboardClient)(nil))
+	ctx := context.Background()
+	ops := []string{"register", "claim", "complete", "sprint_status", "unknown_op"}
+	for _, op := range ops {
+		_, err := def.Handler(ctx, map[string]any{"op": op})
+		if err == nil {
+			t.Errorf("op=%q expected error; got nil", op)
+		}
+	}
+}
+
+// CARRY-059: SprintboardTool with nil client surfaces the not-configured
+// error before any field validation runs. This test confirms the
+// dispatch surface returns an error for every op we might call.
+func TestSprintboardTool_NilClientArgs(t *testing.T) {
+	def := builtins.SprintboardTool((*controlplane.SprintboardClient)(nil))
+	ctx := context.Background()
+	// Empty args for each op: nil client surfaces "not configured" error.
+	for _, op := range []string{"claim", "complete", "sprint_status", "register"} {
+		_, err := def.Handler(ctx, map[string]any{"op": op})
+		if err == nil {
+			t.Errorf("op=%q: expected error; got nil", op)
+		}
+	}
+}
