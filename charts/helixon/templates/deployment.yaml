@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "helixon.fullname" . }}
+  labels:
+    {{- include "helixon.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "helixon.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "helixon.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Pilot-config-as-annotation: k8s configmap (below) + env
+        # injection makes the config available to the runtime.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "helixon.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          env:
+            - name: HELIXON_PILOT_CONFIG
+              value: /etc/helixon/pilot.yaml
+            - name: TRP_RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "helixon.fullname" . }}-secrets
+                  key: resend-api-key
+                  optional: true
+            - name: TRP_BREVO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "helixon.fullname" . }}-secrets
+                  key: brevo-api-key
+                  optional: true
+            - name: TRP_SMTP2GO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "helixon.fullname" . }}-secrets
+                  key: smtp2go-api-key
+                  optional: true
+            - name: TRP_ENV
+              value: {{ .Values.email.vendorPolicy | default "dev" | quote }}
+          volumeMounts:
+            - name: pilot-config
+              mountPath: /etc/helixon
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: pilot-config
+          configMap:
+            name: {{ include "helixon.fullname" . }}-pilot
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

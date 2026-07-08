@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "helixon.fullname" . }}-pilot
+  labels:
+    {{- include "helixon.labels" . | nindent 4 }}
+data:
+  # v16751-6 HelixonPilotConfig: operator-gated pilot customer wiring.
+  # When enabled=false (default) the platform runs in non-pilot mode.
+  pilot.yaml: |
+    enabled: {{ .Values.pilot.enabled }}
+    tenant_name: {{ .Values.pilot.tenant_name | quote }}
+    ramp_window_hours: {{ .Values.pilot.ramp_window_hours }}
