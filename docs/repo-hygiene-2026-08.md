@@ -87,3 +87,24 @@ Schema:
 - **Triage ledger retroactive entries**: fill in past triage decisions from v14509–v14517.
 - **Cursor-global-kb stale reference sweep**: scan for old macbook/*, driftctl, sshpass mentions.
 - **Cross-repo hygiene**: helixon-autoresearch not yet seeded; defer until v14520.
+
+## 9. v14519 actions
+
+On 2026-07-15 the `tools/close-stale-prs.py` CLI was run against
+`nfsarch33/helixon-platform` and `nfsarch33/helixon-fleet-agents`:
+
+- **13 merged feature branches deleted** (PRs #1, #7-#11, #15-#20 on
+  helixon-platform; PR #1 on helixon-fleet-agents).
+- **`docs/repo-hygiene-2026-08.ndjson` populated** with one row per
+  action.
+- **No closed (non-merged) PRs** were touched (`--force-closed` not
+  used).
+
+After cleanup, only `origin/main` remains on each repo. The local
+feature branches (one per open sprint) are untouched so the operator
+can audit them via `git branch -a`.
+
+## 10. Cross-repo hygiene (autoresearch)
+
+`helixon-autoresearch` does not exist yet. v14520 EvoSpine will seed
+it and add it to the sweep at that time.

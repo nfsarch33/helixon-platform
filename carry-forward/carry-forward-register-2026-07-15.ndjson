@@ -24,4 +24,7 @@
 {"id":"v14517-cf-004","sprint":"v14517","item":"Cross-repo pair-lock (helixon-platform + helixon-fleet-agents)","severity":"high","evidence":"deferred to v14520"}{"id":"v14518-cf-001","sprint":"v14518","item":"Auto-delete merged branches via gh pr merge --delete-branch","severity":"high","evidence":"merged feature branches linger; deferred to v14519"}
 {"id":"v14518-cf-002","sprint":"v14518","item":"Triage ledger retroactive entries (v14509-v14517)","severity":"medium","evidence":"ledger started empty; deferred to v14519"}
 {"id":"v14518-cf-003","sprint":"v14518","item":"Cursor-global-kb stale reference sweep (macbook/driftctl/sshpass)","severity":"medium","evidence":"deferred to v14519"}
-{"id":"v14518-cf-004","sprint":"v14518","item":"Cross-repo hygiene: helixon-autoresearch not seeded","severity":"low","evidence":"v14520 EvoSpine will seed; defer to v14520"}
+{"id":"v14518-cf-004","sprint":"v14518","item":"Cross-repo hygiene: helixon-autoresearch not seeded","severity":"low","evidence":"v14520 EvoSpine will seed; defer to v14520"}{"id":"v14519-cf-001","sprint":"v14519","item":"Weekly cron for close-stale-prs.py","severity":"medium","evidence":"manual sweep; defer to v14520 weekly cron"}
+{"id":"v14519-cf-002","sprint":"v14519","item":"GitHub App for batch operations (Helixon-bot)","severity":"medium","evidence":"defer to v14520"}
+{"id":"v14519-cf-003","sprint":"v14519","item":"EvoSpine seed for helixon-autoresearch","severity":"high","evidence":"defer to v14520"}
+{"id":"v14519-cf-004","sprint":"v14519","item":"backfill triage entries for v14509-v14514","severity":"low","evidence":"ledger started in v14518; backfill manually"}
