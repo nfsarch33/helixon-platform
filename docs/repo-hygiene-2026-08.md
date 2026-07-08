@@ -108,3 +108,18 @@ can audit them via `git branch -a`.
 
 `helixon-autoresearch` does not exist yet. v14520 EvoSpine will seed
 it and add it to the sweep at that time.
+
+
+## 11. v14520 evospine adoption
+
+- `nfsarch33/helixon-autoresearch` adopted as the EvoSpine eval backend.
+- Triage ledger entry: `keep main` (existing repo, no cleanup needed).
+- First EvoSpine cycle ran on `nfsarch33/helixon-platform`:
+  commit `aa8eaa4`, hypothesis "Weekly cron + GitHub App > manual
+  batch API".
+
+## 12. Future cycles (v14521+)
+
+- v14521: apply the v14520 hypothesis — write
+  `.github/workflows/close-stale-prs.yml` for weekly cron.
+- v14522+: autoresearch scheduler integration.

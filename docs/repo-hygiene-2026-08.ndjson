@@ -22,3 +22,4 @@
 {"ts": "2026-07-15T00:00:00Z", "branch": "feature/v14510-llm-tier-mvp", "repo": "nfsarch33/helixon-platform", "action": "delete-branch", "reason": "v14510 closeout, branch not git-tracked", "decided_by": "cursor-ai"}
 {"ts": "2026-07-15T00:00:00Z", "branch": "feature/v14511-llm-tier-review", "repo": "nfsarch33/helixon-platform", "action": "delete-branch", "reason": "v14511 closeout, branch not git-tracked", "decided_by": "cursor-ai"}
 {"ts": "2026-07-15T00:00:00Z", "branch": "feature/v14512-observability-mvp", "repo": "nfsarch33/helixon-platform", "action": "delete-branch", "reason": "v14512 closeout, branch not git-tracked", "decided_by": "cursor-ai"}
+{"ts": "2026-07-08T18:16:43Z", "branch": "main", "repo": "nfsarch33/helixon-autoresearch", "action": "keep", "reason": "existing repo; adopted as evospine eval backend in v14520", "decided_by": "cursor-ai"}
