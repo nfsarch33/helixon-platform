@@ -249,6 +249,33 @@ for f in \
   reports/eval-runs/eval-run-v14510-01-tier-smoke.json ; do
   if [[ -f "$REPO_ROOT/$f" ]]; then ok "sentinel: $f"; else ko "sentinel: missing $f"; fi
 done
+# v14512 Pair-5 MVP observability additions
+OBS="$REPO_ROOT/observability"
+if [[ -d "$OBS" ]]; then
+  if bash "$OBS/verify-observability.sh" >/dev/null 2>&1; then
+    pass_v12=$(bash "$OBS/verify-observability.sh" 2>/dev/null | grep -E '^\[PASS\]' | wc -l)
+    ok "v14512: observability cross-layer verifier $pass_v12/32 PASS"
+  else
+    ko "v14512: observability verifier FAIL"
+  fi
+  # sentinels
+  for f in \
+    "$OBS/prometheus.yml" \
+    "$OBS/alertmanager.yml" \
+    "$OBS/docker-compose.observability.yml" \
+    "$OBS/README.md" \
+    "$OBS/verify-observability.sh" \
+    "$OBS/alerts/prometheus-helixon-alerts.yml" \
+    "$OBS/grafana/dashboards/qwen36-fleet.json" \
+    "$OBS/grafana/dashboards/control-plane.json" \
+    "$OBS/grafana/dashboards/agentrace-traces.json" \
+    "$OBS/grafana-provisioning/datasources/datasource.yml" \
+    "$OBS/grafana-provisioning/dashboards/dashboards.yml" ; do
+    if [[ -f "$f" ]]; then ok "sentinel: $(basename "$f") [v14512]"; else ko "sentinel: missing $f"; fi
+  done
+else
+  ko "v14512: observability/ directory missing"
+fi
 printf '\n=============================\n'
 printf 'verifier: PASS=%d  FAIL=%d\n' "$pass" "$fail"
 printf '=============================\n'
