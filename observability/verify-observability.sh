@@ -144,6 +144,154 @@ for metric in qwen36_cell_ready qwen36_request_total qwen36_request_latency_seco
   fi
 done
 
+# v14513 additions to observability verifier
+# Paging wiring + dashboard runbook + ack drill
+
+# L. paging-wiring CLI builds + tests pass
+if (cd "$REPO_ROOT" && go build ./cmd/helixon-slo-ack/ 2>/dev/null); then
+  ok "ack: cmd/helixon-slo-ack compiles"
+else
+  ko "ack: cmd/helixon-slo-ack fails to compile"
+fi
+if (cd "$REPO_ROOT" && go test -count=1 ./cmd/helixon-slo-ack/ 2>/dev/null) >/dev/null; then
+  ok "ack: cmd/helixon-slo-ack tests green"
+else
+  ko "ack: cmd/helixon-slo-ack tests not green"
+fi
+
+# M. skills present + parse as markdown frontmatter
+for skill in agent-self-evaluation metrics-dashboard; do
+  f="$OBS/skills/$skill/SKILL.md"
+  if [[ -f "$f" ]] && head -3 "$f" | grep -q "^---$" && grep -q "^name: $skill$" "$f"; then
+    ok "skill: $skill SKILL.md present + valid frontmatter"
+  else
+    ko "skill: $skill SKILL.md missing or invalid"
+  fi
+done
+
+# N. skills reference Alertmanager + Prometheus
+for skill in agent-self-evaluation metrics-dashboard; do
+  if grep -q "Alertmanager\|alertmanager" "$OBS/skills/$skill/SKILL.md"; then
+    ok "skill: $skill references Alertmanager"
+  else
+    ko "skill: $skill does not reference Alertmanager"
+  fi
+done
+
+# O. skills reference incidents.ndjson ledger
+if grep -q "incidents.ndjson\|incidents" "$OBS/skills/agent-self-evaluation/SKILL.md"; then
+  ok "skill: agent-self-evaluation uses incidents ledger"
+else
+  ko "skill: agent-self-evaluation missing incidents ledger"
+fi
+
+# P. runbook exists + links alert names
+if [[ -f "$OBS/runbook.md" ]]; then ok "runbook: observability/runbook.md present"; else ko "runbook missing"; fi
+for alert in Qwen36ZeroCellsReady Qwen36High5xx ControlPlaneDown FleetHeartbeatsStale AgentraceHighErrorRate AgentraceLowSelfEvalScore; do
+  if grep -qE "### \`$alert\`|## \`$alert\`|$alert" "$OBS/runbook.md"; then
+    ok "runbook: $alert documented"
+  else
+    ko "runbook: $alert missing"
+  fi
+done
+
+# Q. ack drill evidence file present
+if [[ -f "$REPO_ROOT/reports/eval-runs/eval-run-v14513-01-ack-drill.json" ]]; then
+  ok "evidence: v14513 ack drill captured"
+else
+  ko "evidence: v14513 ack drill missing"
+fi
+
+# R. ack CLI exposes --alertmanager + --sprint + --ack-window
+if grep -q '"alertmanager"' "$REPO_ROOT/cmd/helixon-slo-ack/main.go" && \
+   grep -q '"sprint"' "$REPO_ROOT/cmd/helixon-slo-ack/main.go" && \
+   grep -q '"ack-window"' "$REPO_ROOT/cmd/helixon-slo-ack/main.go"; then
+  ok "ack: CLI exposes --alertmanager + --sprint + --ack-window"
+else
+  ko "ack: CLI missing required flags"
+fi
+
+# S. ack CLI uses 5m default for P0 / 15m default for P1
+if grep -qE '5[[:space:]]*\*[[:space:]]*time\.Minute' "$REPO_ROOT/cmd/helixon-slo-ack/main.go" && \
+   grep -qE '15[[:space:]]*\*[[:space:]]*time\.Minute' "$REPO_ROOT/cmd/helixon-slo-ack/main.go"; then
+  ok "ack: 5m P0 / 15m P1 windows"
+else
+  ko "ack: P0/P1 windows missing"
+fi
+# v14513 additions to observability verifier
+# Paging wiring + dashboard runbook + ack drill
+
+# L. paging-wiring CLI builds + tests pass
+if (cd "$REPO_ROOT" && go build ./cmd/helixon-slo-ack/ 2>/dev/null); then
+  ok "ack: cmd/helixon-slo-ack compiles"
+else
+  ko "ack: cmd/helixon-slo-ack fails to compile"
+fi
+if (cd "$REPO_ROOT" && go test -count=1 ./cmd/helixon-slo-ack/ 2>/dev/null) >/dev/null; then
+  ok "ack: cmd/helixon-slo-ack tests green"
+else
+  ko "ack: cmd/helixon-slo-ack tests not green"
+fi
+
+# M. skills present + parse as markdown frontmatter
+for skill in agent-self-evaluation metrics-dashboard; do
+  f="$OBS/skills/$skill/SKILL.md"
+  if [[ -f "$f" ]] && head -3 "$f" | grep -q "^---$" && grep -q "^name: $skill$" "$f"; then
+    ok "skill: $skill SKILL.md present + valid frontmatter"
+  else
+    ko "skill: $skill SKILL.md missing or invalid"
+  fi
+done
+
+# N. skills reference Alertmanager + Prometheus
+for skill in agent-self-evaluation metrics-dashboard; do
+  if grep -q "Alertmanager\|alertmanager" "$OBS/skills/$skill/SKILL.md"; then
+    ok "skill: $skill references Alertmanager"
+  else
+    ko "skill: $skill does not reference Alertmanager"
+  fi
+done
+
+# O. skills reference incidents.ndjson ledger
+if grep -q "incidents.ndjson\|incidents" "$OBS/skills/agent-self-evaluation/SKILL.md"; then
+  ok "skill: agent-self-evaluation uses incidents ledger"
+else
+  ko "skill: agent-self-evaluation missing incidents ledger"
+fi
+
+# P. runbook exists + links alert names
+if [[ -f "$OBS/runbook.md" ]]; then ok "runbook: observability/runbook.md present"; else ko "runbook missing"; fi
+for alert in Qwen36ZeroCellsReady Qwen36High5xx ControlPlaneDown FleetHeartbeatsStale AgentraceHighErrorRate AgentraceLowSelfEvalScore; do
+  if grep -qE "### \`$alert\`|## \`$alert\`|$alert" "$OBS/runbook.md"; then
+    ok "runbook: $alert documented"
+  else
+    ko "runbook: $alert missing"
+  fi
+done
+
+# Q. ack drill evidence file present
+if [[ -f "$REPO_ROOT/reports/eval-runs/eval-run-v14513-01-ack-drill.json" ]]; then
+  ok "evidence: v14513 ack drill captured"
+else
+  ko "evidence: v14513 ack drill missing"
+fi
+
+# R. ack CLI exposes --alertmanager + --sprint + --ack-window
+if grep -q '"alertmanager"' "$REPO_ROOT/cmd/helixon-slo-ack/main.go" && \
+   grep -q '"sprint"' "$REPO_ROOT/cmd/helixon-slo-ack/main.go" && \
+   grep -q '"ack-window"' "$REPO_ROOT/cmd/helixon-slo-ack/main.go"; then
+  ok "ack: CLI exposes --alertmanager + --sprint + --ack-window"
+else
+  ko "ack: CLI missing required flags"
+fi
+
+# S. ack CLI uses 5m default for P0 / 15m default for P1
+if grep -qE '5[[:space:]]*\*[[:space:]]*time\.Minute' "$REPO_ROOT/cmd/helixon-slo-ack/main.go" && \
+   grep -qE '15[[:space:]]*\*[[:space:]]*time\.Minute' "$REPO_ROOT/cmd/helixon-slo-ack/main.go"; then
+  ok "ack: 5m P0 / 15m P1 windows"
+else
+  ko "ack: P0/P1 windows missing"
+fi
 printf '\n=============================\n'
 printf 'verifier: PASS=%d  FAIL=%d\n' "$pass" "$fail"
 printf '=============================\n'
