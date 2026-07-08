@@ -1,0 +1,19 @@
+{
+  "sprint_id": "v14510",
+  "captured_at": "2026-07-09T01:00+10:00",
+  "mock": true,
+  "matrix_path": "/home/jaslian/Code/cursor-global-kb/scripts/fleet/qwen36-matrix.yaml",
+  "prompts_path": "eval-harness/prompts-10.json",
+  "scoreboard": {
+    "total": 10,
+    "passed": 5,
+    "by_tier": {
+      "0": {"total": 4, "passed": 2},
+      "1": {"total": 3, "passed": 1},
+      "2": {"total": 1, "passed": 1},
+      "3": {"total": 2, "passed": 1}
+    },
+    "cells_hit": {"C1": 8, "C7": 2}
+  },
+  "notes": "Mock-mode run recorded as evidence. Failures are deliberate (fabricator keyed on prompt slot parity to exercise both pass + fail paths). Real-HTTP run will follow in v14511."
+}

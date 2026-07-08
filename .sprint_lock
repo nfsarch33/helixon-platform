@@ -1,0 +1,1 @@
+{"pair_id":"pair-4","sprint_id":"v14510","phase":"mvp","started_at":"2026-07-09T00:57:00+10:00","pid":323750,"operator":"jaslian@DESKTOP-12RO1AF","guards":["pair-lock-skip-concurrent-pair","tier-routing-no-shell-leak","internal-retry-required"]}
