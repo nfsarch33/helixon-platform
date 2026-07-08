@@ -1,0 +1,17 @@
+apiVersion: v2
+name: helixon-control-plane
+description: Helixon platform control plane (sprintboard + heartbeat + healthz)
+type: application
+version: 0.1.0
+appVersion: "v14506"
+maintainers:
+  - name: jaslian
+    email: keynear@gmail.com
+keywords:
+  - helixon
+  - control-plane
+  - sprintboard
+  - ai-agents
+home: https://github.com/nfsarch33/helixon-platform
+sources:
+  - https://github.com/nfsarch33/helixon-platform
