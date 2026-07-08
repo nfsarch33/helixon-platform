@@ -1,1 +1,1 @@
-{"pair_id":"pair-6","sprint_id":"v14514","phase":"mvp","started_at":"2026-07-15T17:00:00Z","pid":488476,"operator":"helixon-agent","guards":["tier4-verifier","pair-lock"]}
+{"pair_id":"v14514","phase":"closed","closed_at":"2026-07-15T00:30:00Z","branch":"feature/v14514-mcp-restore","operator":"cursor-ai"}
