@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -119,93 +120,8 @@ func newServeCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "Start the Helixon runtime",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(configPath)
-			if err != nil {
-				return err
-			}
-			if heartbeat != "" {
-				d, err := time.ParseDuration(heartbeat)
-				if err != nil {
-					return fmt.Errorf("invalid --heartbeat: %w", err)
-				}
-				cfg.HeartbeatEvery = d
-			}
-			provider, err := helixon.BuildProvider(cfg.Provider)
-			if err != nil {
-				return fmt.Errorf("build provider: %w", err)
-			}
-			rt := helixon.NewRuntime(provider, cfg)
-			if cfg.SprintboardURL != "" {
-				sbClient := controlplane.NewSprintboardClient(controlplane.SprintboardConfig{
-					BaseURL:      cfg.SprintboardURL,
-					AgentName:    cfg.AgentID,
-					Capabilities: cfg.SprintboardCapabilities,
-				}, slog.Default())
-				if err := helixon.WithSprintboard(sbClient)(rt); err != nil {
-					return fmt.Errorf("wire sprintboard: %w", err)
-				}
-			}
-			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-			defer cancel()
-			if err := rt.Init(ctx); err != nil {
-				return fmt.Errorf("runtime init: %w", err)
-			}
-
-			if err := builtins.RegisterAll(rt.Registry(), builtins.Options{
-				Shell:     &builtins.ShellConfig{},
-				FileRead:  &builtins.FileReadConfig{},
-				FileWrite: &builtins.FileWriteConfig{},
-				WebFetch:  &builtins.WebFetchConfig{},
-			}); err != nil {
-				return fmt.Errorf("register builtins: %w", err)
-			}
-
-			configOpts := []helixon.ConfigOption{}
-			if httpAddr != "" {
-				configOpts = append(configOpts, helixon.WithChannel(
-					helixon.NewHTTPChannel(helixon.HTTPChannelConfig{
-						Addr:   httpAddr,
-						Logger: slog.Default(),
-					}),
-				))
-			}
-			if err := rt.Configure(ctx, configOpts...); err != nil {
-				return fmt.Errorf("runtime configure: %w", err)
-			}
-
-			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "helixon: agent_id=%q phase=%s heartbeat_every=%s tools=%d\n",
-				cfg.AgentID, rt.Phase(), cfg.HeartbeatEvery, rt.RegisteredToolCount())
-			if httpAddr != "" {
-				fmt.Fprintf(out, "helixon: HTTP channel on %s (POST /api/v1/chat, GET /api/v1/health)\n", httpAddr)
-			}
-
-			var dashSrv *http.Server
-			if dashboardAddr != "" {
-				mux := http.NewServeMux()
-				dashboard.Mount(mux, runtimeView{rt: rt})
-				dashSrv = &http.Server{Addr: dashboardAddr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
-				go func() {
-					if err := dashSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-						fmt.Fprintf(os.Stderr, "dashboard server: %v\n", err)
-					}
-				}()
-				fmt.Fprintf(out, "helixon: dashboard at http://%s/api/v1/dashboard\n", dashboardAddr)
-			}
-
-			runErr := rt.Run(ctx)
-			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer shutdownCancel()
-			if dashSrv != nil {
-				_ = dashSrv.Shutdown(shutdownCtx)
-			}
-			if err := rt.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
-				return fmt.Errorf("runtime shutdown: %w", err)
-			}
-			if runErr != nil && !errors.Is(runErr, context.Canceled) {
-				return fmt.Errorf("runtime run: %w", runErr)
-			}
-			return nil
+			flags := serveFlags{configPath: configPath, heartbeat: heartbeat, dashboardAddr: dashboardAddr, httpAddr: httpAddr}
+			return runServe(cmd, flags)
 		},
 	}
 	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to YAML config (required)")
@@ -214,6 +130,138 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&httpAddr, "http-addr", "", "Bind HTTP channel (POST /api/v1/chat, GET /api/v1/health)")
 	_ = cmd.MarkFlagRequired("config")
 	return cmd
+}
+
+// serveFlags captures the user-supplied flags for the serve subcommand.
+type serveFlags struct {
+	configPath    string
+	heartbeat     string
+	dashboardAddr string
+	httpAddr      string
+}
+
+// runServe is the post-flag-parsing orchestrator for `helixon serve`. It
+// composes the smaller helpers below; each one has a single responsibility.
+func runServe(cmd *cobra.Command, f serveFlags) error {
+	cfg, err := loadServeConfig(f.configPath, f.heartbeat)
+	if err != nil {
+		return err
+	}
+	rt, err := buildServeRuntime(cfg)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	if err := initAndConfigureRuntime(ctx, rt, f.httpAddr); err != nil {
+		return err
+	}
+	out := cmd.OutOrStdout()
+	printServeBanner(out, cfg.AgentID, rt, f.httpAddr)
+	dashSrv := startServeDashboard(rt, f.dashboardAddr, out)
+	return runAndShutdown(ctx, rt, dashSrv)
+}
+
+// printServeBanner writes the standard "helixon: ..." startup banner.
+func printServeBanner(out io.Writer, agentID string, rt *helixon.Runtime, httpAddr string) {
+	fmt.Fprintf(out, "helixon: agent_id=%q phase=%s heartbeat_every=%s tools=%d\n",
+		agentID, rt.Phase(), rt.HeartbeatEvery(), rt.RegisteredToolCount())
+	if httpAddr != "" {
+		fmt.Fprintf(out, "helixon: HTTP channel on %s (POST /api/v1/chat, GET /api/v1/health)\n", httpAddr)
+	}
+}
+
+func loadServeConfig(configPath, heartbeat string) (helixon.RuntimeConfig, error) {
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		return helixon.RuntimeConfig{}, err
+	}
+	if heartbeat != "" {
+		d, err := time.ParseDuration(heartbeat)
+		if err != nil {
+			return helixon.RuntimeConfig{}, fmt.Errorf("invalid --heartbeat: %w", err)
+		}
+		cfg.HeartbeatEvery = d
+	}
+	return cfg, nil
+}
+
+func buildServeRuntime(cfg helixon.RuntimeConfig) (*helixon.Runtime, error) {
+	provider, err := helixon.BuildProvider(cfg.Provider)
+	if err != nil {
+		return nil, fmt.Errorf("build provider: %w", err)
+	}
+	rt := helixon.NewRuntime(provider, cfg)
+	if cfg.SprintboardURL != "" {
+		sbClient := controlplane.NewSprintboardClient(controlplane.SprintboardConfig{
+			BaseURL:      cfg.SprintboardURL,
+			AgentName:    cfg.AgentID,
+			Capabilities: cfg.SprintboardCapabilities,
+		}, slog.Default())
+		if err := helixon.WithSprintboard(sbClient)(rt); err != nil {
+			return nil, fmt.Errorf("wire sprintboard: %w", err)
+		}
+	}
+	return rt, nil
+}
+
+func initAndConfigureRuntime(ctx context.Context, rt *helixon.Runtime, httpAddr string) error {
+	if err := rt.Init(ctx); err != nil {
+		return fmt.Errorf("runtime init: %w", err)
+	}
+	if err := builtins.RegisterAll(rt.Registry(), builtins.Options{
+		Shell:     &builtins.ShellConfig{},
+		FileRead:  &builtins.FileReadConfig{},
+		FileWrite: &builtins.FileWriteConfig{},
+		WebFetch:  &builtins.WebFetchConfig{},
+	}); err != nil {
+		return fmt.Errorf("register builtins: %w", err)
+	}
+	configOpts := []helixon.ConfigOption{}
+	if httpAddr != "" {
+		configOpts = append(configOpts, helixon.WithChannel(
+			helixon.NewHTTPChannel(helixon.HTTPChannelConfig{
+				Addr:   httpAddr,
+				Logger: slog.Default(),
+			}),
+		))
+	}
+	if err := rt.Configure(ctx, configOpts...); err != nil {
+		return fmt.Errorf("runtime configure: %w", err)
+	}
+	return nil
+}
+
+func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Writer) *http.Server {
+	if dashboardAddr == "" {
+		return nil
+	}
+	mux := http.NewServeMux()
+	dashboard.Mount(mux, runtimeView{rt: rt})
+	srv := &http.Server{Addr: dashboardAddr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			fmt.Fprintf(os.Stderr, "dashboard server: %v\n", err)
+		}
+	}()
+	fmt.Fprintf(out, "helixon: dashboard at http://%s/api/v1/dashboard\n", dashboardAddr)
+	return srv
+}
+
+func runAndShutdown(ctx context.Context, rt *helixon.Runtime, dashSrv *http.Server) error {
+	runErr := rt.Run(ctx)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if dashSrv != nil {
+		_ = dashSrv.Shutdown(shutdownCtx)
+	}
+	if err := rt.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
+		return fmt.Errorf("runtime shutdown: %w", err)
+	}
+	if runErr != nil && !errors.Is(runErr, context.Canceled) {
+		return fmt.Errorf("runtime run: %w", runErr)
+	}
+	return nil
 }
 
 func newDoctorCmd() *cobra.Command {

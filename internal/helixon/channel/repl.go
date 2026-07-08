@@ -67,11 +67,11 @@ func (r *REPL) Run(ctx context.Context, in io.Reader, out io.Writer) error {
 	}
 
 	r.logger.Info("REPL session started", slog.String("session_id", sessionID))
-	fmt.Fprintf(out, "Session: %s\nType /exit to quit.\n\n", sessionID)
+	_, _ = fmt.Fprintf(out, "Session: %s\nType /exit to quit.\n\n", sessionID)
 
 	scanner := bufio.NewScanner(in)
 	for {
-		fmt.Fprint(out, r.cfg.Prompt)
+		_, _ = fmt.Fprint(out, r.cfg.Prompt)
 
 		if !scanner.Scan() {
 			break
@@ -83,7 +83,7 @@ func (r *REPL) Run(ctx context.Context, in io.Reader, out io.Writer) error {
 		}
 
 		if r.isExit(input) {
-			fmt.Fprintln(out, "Goodbye!")
+			_, _ = fmt.Fprintln(out, "Goodbye!")
 			return nil
 		}
 
@@ -96,12 +96,12 @@ func (r *REPL) Run(ctx context.Context, in io.Reader, out io.Writer) error {
 		elapsed := time.Since(start)
 
 		if err != nil {
-			fmt.Fprintf(out, "[error] %s\n\n", err)
+			_, _ = fmt.Fprintf(out, "[error] %s\n\n", err)
 			r.logger.Warn("agent error", slog.String("error", err.Error()))
 			continue
 		}
 
-		fmt.Fprintf(out, "\n%s\n\n[%s]\n\n", response, elapsed.Round(time.Millisecond))
+		_, _ = fmt.Fprintf(out, "\n%s\n\n[%s]\n\n", response, elapsed.Round(time.Millisecond))
 	}
 
 	if err := scanner.Err(); err != nil {

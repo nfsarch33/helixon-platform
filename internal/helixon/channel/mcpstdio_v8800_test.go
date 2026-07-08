@@ -134,8 +134,8 @@ func TestMCPStdioAdapter_ContextCancelStopsServe(t *testing.T) {
 	t.Parallel()
 
 	pr, pw := io.Pipe()
-	defer pr.Close()
-	defer pw.Close()
+	defer func() { _ = pr.Close() }()
+	defer func() { _ = pw.Close() }()
 
 	out := &safeBuf{}
 	a, _ := newAdapter(t, pr, out)

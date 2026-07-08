@@ -152,7 +152,7 @@ func Router(webhook *WebhookHandler) *http.ServeMux {
 	mux.Handle("/v1/chat", webhook)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"status":"ok"}`)
+		_, _ = fmt.Fprint(w, `{"status":"ok"}`)
 	})
 	return mux
 }

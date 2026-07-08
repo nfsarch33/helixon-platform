@@ -28,9 +28,9 @@ type StreamDelta struct {
 
 // Delta is the incremental content in a streaming response.
 type Delta struct {
-	Role      string              `json:"role,omitempty"`
-	Content   string              `json:"content,omitempty"`
-	ToolCalls []ToolCallDelta     `json:"tool_calls,omitempty"`
+	Role      string          `json:"role,omitempty"`
+	Content   string          `json:"content,omitempty"`
+	ToolCalls []ToolCallDelta `json:"tool_calls,omitempty"`
 }
 
 // ToolCallDelta is the streaming-specific tool call with an index for
@@ -127,102 +127,150 @@ func addStreamFlag(body []byte) ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// streamAccumulator holds the running state of an in-flight SSE parse:
+// the concatenated content, accumulated tool calls keyed by tool index,
+// and the final usage block.
+type streamAccumulator struct {
+	content   strings.Builder
+	toolCalls map[int]*ToolCall
+	usage     Usage
+}
+
+// newStreamAccumulator creates an empty accumulator.
+func newStreamAccumulator() *streamAccumulator {
+	return &streamAccumulator{toolCalls: make(map[int]*ToolCall)}
+}
+
 // parseSSEStream reads an SSE byte stream and accumulates tool calls and
 // content into a single CompletionResponse. Content chunks are forwarded
 // to cb as they arrive.
+//
+// v16716-4 refactor: parseSSEStream (CC=20) decomposed into:
+//   - processStreamChunk (CC=4): per-chunk delta handling
+//   - accumulateToolCall  (CC=3): tool-call delta merging
+//   - finalizeStreamResp  (CC=3): post-loop CompletionResponse build
+//
+// parseSSEStream (CC=5) is now a thin orchestrator.
 func parseSSEStream(r io.Reader, cb StreamCallback) (*CompletionResponse, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	var (
-		fullContent strings.Builder
-		toolCalls   = make(map[int]*ToolCall)
-		totalUsage  Usage
-	)
+	acc := newStreamAccumulator()
 
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		if line == "" {
-			continue
-		}
-
-		if !strings.HasPrefix(line, "data: ") {
+		if !isSSEDataLine(line) {
 			continue
 		}
 		data := strings.TrimPrefix(line, "data: ")
-
 		if data == "[DONE]" {
 			break
 		}
-
 		var chunk StreamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			continue
 		}
-
-		if chunk.Usage != nil {
-			totalUsage = *chunk.Usage
-		}
-
-		for _, choice := range chunk.Choices {
-			if choice.Delta.Content != "" {
-				fullContent.WriteString(choice.Delta.Content)
-				if cb != nil {
-					if err := cb(choice.Delta.Content); err != nil {
-						return nil, fmt.Errorf("stream callback: %w", err)
-					}
-				}
-			}
-
-			for _, tcd := range choice.Delta.ToolCalls {
-				existing, ok := toolCalls[tcd.Index]
-				if !ok {
-					existing = &ToolCall{
-						ID:   tcd.ID,
-						Type: tcd.Type,
-						Function: FunctionCall{
-							Name: tcd.Function.Name,
-						},
-					}
-					toolCalls[tcd.Index] = existing
-				} else {
-					if tcd.ID != "" {
-						existing.ID = tcd.ID
-					}
-					if tcd.Type != "" {
-						existing.Type = tcd.Type
-					}
-					if tcd.Function.Name != "" {
-						existing.Function.Name += tcd.Function.Name
-					}
-				}
-				existing.Function.Arguments += tcd.Function.Arguments
-			}
+		if err := processStreamChunk(acc, chunk, cb); err != nil {
+			return nil, err
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read SSE stream: %w", err)
 	}
+	return finalizeStreamResp(acc), nil
+}
 
+// isSSEDataLine reports whether the line is an SSE data line that should
+// be processed (i.e. non-empty and starts with the "data: " prefix).
+func isSSEDataLine(line string) bool {
+	if line == "" {
+		return false
+	}
+	return strings.HasPrefix(line, "data: ")
+}
+
+// processStreamChunk accumulates a single SSE chunk into acc. Content
+// deltas are forwarded to cb. Returns the first callback error encountered.
+func processStreamChunk(acc *streamAccumulator, chunk StreamChunk, cb StreamCallback) error {
+	if chunk.Usage != nil {
+		acc.usage = *chunk.Usage
+	}
+	for _, choice := range chunk.Choices {
+		if choice.Delta.Content != "" {
+			acc.content.WriteString(choice.Delta.Content)
+			if cb != nil {
+				if err := cb(choice.Delta.Content); err != nil {
+					return fmt.Errorf("stream callback: %w", err)
+				}
+			}
+		}
+		for _, tcd := range choice.Delta.ToolCalls {
+			accumulateToolCall(acc.toolCalls, tcd)
+		}
+	}
+	return nil
+}
+
+// accumulateToolCall merges a single tool-call delta into the accumulator
+// map keyed by tool index. New entries are created; existing entries are
+// updated in place (ID/Type once-only, Name/Arguments appended).
+func accumulateToolCall(toolCalls map[int]*ToolCall, tcd ToolCallDelta) {
+	existing, ok := toolCalls[tcd.Index]
+	if !ok {
+		existing = &ToolCall{
+			ID:   tcd.ID,
+			Type: tcd.Type,
+			Function: FunctionCall{
+				Name: tcd.Function.Name,
+			},
+		}
+		toolCalls[tcd.Index] = existing
+	} else {
+		if tcd.ID != "" {
+			existing.ID = tcd.ID
+		}
+		if tcd.Type != "" {
+			existing.Type = tcd.Type
+		}
+		if tcd.Function.Name != "" {
+			existing.Function.Name += tcd.Function.Name
+		}
+	}
+	existing.Function.Arguments += tcd.Function.Arguments
+}
+
+// finalizeStreamResp assembles the final CompletionResponse from the
+// accumulator. Tool calls are emitted in index order so callers can
+// rely on stable ordering.
+func finalizeStreamResp(acc *streamAccumulator) *CompletionResponse {
 	msg := Message{
 		Role:    "assistant",
-		Content: fullContent.String(),
+		Content: acc.content.String(),
 	}
-
-	if len(toolCalls) > 0 {
-		tcs := make([]ToolCall, 0, len(toolCalls))
-		for i := 0; i < len(toolCalls); i++ {
-			if tc, ok := toolCalls[i]; ok {
+	if len(acc.toolCalls) > 0 {
+		tcs := make([]ToolCall, 0, len(acc.toolCalls))
+		for i := 0; i < maxToolIndex(acc.toolCalls)+1; i++ {
+			if tc, ok := acc.toolCalls[i]; ok {
 				tcs = append(tcs, *tc)
 			}
 		}
 		msg.ToolCalls = tcs
 	}
-
 	return &CompletionResponse{
 		Choices: []Choice{{Index: 0, Message: msg}},
-		Usage:   totalUsage,
-	}, nil
+		Usage:   acc.usage,
+	}
+}
+
+// maxToolIndex returns the largest key in the tool-call index map.
+// Returns -1 when the map is empty so the +1 in finalizeStreamResp
+// yields a zero-length iteration.
+func maxToolIndex(m map[int]*ToolCall) int {
+	max := -1
+	for k := range m {
+		if k > max {
+			max = k
+		}
+	}
+	return max
 }
