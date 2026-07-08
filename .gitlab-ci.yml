@@ -15,7 +15,7 @@ variables:
   before_script:
     - go mod download
   tags:
-    - docker
+    - podman
 
 vet:
   extends: .go_base
@@ -78,7 +78,7 @@ gosec:
 github-sync:
   stage: sync
   tags:
-    - docker
+    - podman
   image: golang:${GOVERSION}
   variables:
     GIT_STRATEGY: clone
@@ -107,7 +107,7 @@ github-sync:
 ci-failure-notify:
   stage: notify
   tags:
-    - docker
+    - podman
   image: golang:${GOVERSION}
   when: on_failure
   allow_failure: true
