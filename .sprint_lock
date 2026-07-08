@@ -1,1 +1,1 @@
-{"pair_id":"pair-5","sprint_id":"v14512","phase":"mvp","started_at":"2026-07-15T15:00:00Z","pid":474350,"operator":"helixon-agent","guards":["tier4-verifier","pair-lock"]}
+{"pair_id":"pair-5","sprint_id":"v14513","phase":"review","started_at":"2026-07-15T16:00:00Z","pid":477253,"operator":"helixon-agent","guards":["tier4-verifier","pair-lock"]}
