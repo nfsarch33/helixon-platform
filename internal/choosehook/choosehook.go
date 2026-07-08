@@ -43,6 +43,10 @@ type DecideInput struct {
 	Prompt   string `json:"prompt"`
 	Surface  string `json:"surface,omitempty"` // editor|chat|review
 	HookMode string `json:"hook_mode,omitempty"`
+	// ReplayID (v14515) lets subagents pass their loop-guard id so
+	// identical prompts in the same agent loop get a cache hit
+	// instead of re-billing the cell.
+	ReplayID string `json:"replay_id,omitempty"`
 }
 
 // Output is the JSON the hook writes to stdout. Cursor reads
