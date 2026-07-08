@@ -1,0 +1,94 @@
+name: weekly-close-stale-prs
+
+# v14521: applies the v14520 EvoSpine hypothesis ("Weekly cron + GitHub
+# App > manual batch API"). Runs the close-stale-prs sweep on Sundays
+# at 03:00 UTC and emits the action summary to the workflow log + the
+# triage ledger.
+
+on:
+  schedule:
+    # Sundays at 03:00 UTC
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run (no gh api DELETE)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install-gh
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+            sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+            sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update -y
+          sudo apt-get install -y gh
+
+      - name: gh auth
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth status
+
+      - name: dry-run sweep
+        if: ${{ inputs.dry_run == 'true' || github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 tools/close-stale-prs.py \
+            --repo ${{ github.repository }} \
+            --dry-run \
+            --ledger docs/repo-hygiene-2026-08.ndjson \
+            --decided-by github-actions \
+            > artifacts/dry-run.json 2>&1 || true
+          mkdir -p artifacts
+          mv artifacts/dry-run.json artifacts/dry-run.json 2>/dev/null || true
+
+      - name: wet-run sweep
+        if: ${{ inputs.dry_run == 'false' && github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 tools/close-stale-prs.py \
+            --repo ${{ github.repository }} \
+            --ledger docs/repo-hygiene-2026-08.ndjson \
+            --decided-by github-actions
+
+      - name: upload-artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: close-stale-prs-${{ github.run_id }}
+          path: artifacts/
+
+      - name: commit-ledger
+        if: ${{ inputs.dry_run == 'false' && github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add docs/repo-hygiene-2026-08.ndjson
+          git diff --cached --quiet || \
+            git commit -m "chore(weekly-cron): close-stale-prs sweep $(date -u +%Y-%m-%d)"
+          git push
