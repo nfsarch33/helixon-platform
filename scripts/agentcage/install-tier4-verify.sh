@@ -307,6 +307,62 @@ if [[ -f "$REPO_ROOT/session-handoffs/incidents.ndjson" ]]; then
 else
   ko "incidents.ndjson missing"
 fi
+# v14514 Pair-6 MVP additions: cursor-tools + mcp.json + inventory + pytest
+
+# Build + Go tests for cursor-tools
+if (cd "$REPO_ROOT" && go build ./cmd/cursor-tools/ 2>/dev/null); then
+  ok "cursor-tools: builds [v14514]"
+else
+  ko "cursor-tools: build failed"
+fi
+if (cd "$REPO_ROOT" && go test -count=1 ./cmd/cursor-tools/ 2>/dev/null) >/dev/null; then
+  ok "cursor-tools: Go tests green [v14514]"
+else
+  ko "cursor-tools: Go tests not green"
+fi
+
+# Inventory + mcp.json present + valid JSON
+for f in \
+  cursor-config/mcp/cursor-tools-inventory.json \
+  cursor-config/mcp/mcp.json ; do
+  if [[ -f "$REPO_ROOT/$f" ]] && python3 -c "import json; json.load(open('$REPO_ROOT/$f'))"; then
+    ok "mcp-config: $f present + valid JSON"
+  else
+    ko "mcp-config: $f missing or invalid"
+  fi
+done
+
+# Inventory has >=21 servers
+n=$(python3 -c "import json; d=json.load(open('$REPO_ROOT/cursor-config/mcp/cursor-tools-inventory.json')); print(len(d['servers']))" 2>/dev/null)
+if [[ "$n" -ge 21 ]]; then
+  ok "mcp-config: inventory has $n servers (>= 21)"
+else
+  ko "mcp-config: inventory has only $n servers (< 21)"
+fi
+
+# Pytest passes
+if (cd "$REPO_ROOT" && python3 -m pytest tests/test_mcp_health.py -q 2>&1) | grep -qE "10 passed"; then
+  ok "cursor-tools: pytest 10/10 [v14514]"
+else
+  ko "cursor-tools: pytest not 10/10"
+fi
+
+# Test file present
+if [[ -f "$REPO_ROOT/tests/test_mcp_health.py" ]]; then
+  ok "sentinel: tests/test_mcp_health.py [v14514]"
+else
+  ko "sentinel: tests/test_mcp_health.py missing"
+fi
+
+# Capture a doctor run as evidence
+mkdir -p "$REPO_ROOT/reports/eval-runs"
+HELIXON_CURSOR_TOOLS_INVENTORY="$REPO_ROOT/cursor-config/mcp/cursor-tools-inventory.json" \
+  /tmp/cursor-tools doctor --json > "$REPO_ROOT/reports/eval-runs/eval-run-v14514-01-mcp-doctor.json" 2>/dev/null || true
+if [[ -s "$REPO_ROOT/reports/eval-runs/eval-run-v14514-01-mcp-doctor.json" ]]; then
+  ok "evidence: v14514 doctor run captured"
+else
+  ko "evidence: v14514 doctor run missing"
+fi
 printf '\n=============================\n'
 printf 'verifier: PASS=%d  FAIL=%d\n' "$pass" "$fail"
 printf '=============================\n'

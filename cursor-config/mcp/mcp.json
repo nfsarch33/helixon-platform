@@ -1,0 +1,114 @@
+{
+  "mcpServers": {
+    "cursor-app-control": {
+      "command": "internal",
+      "args": ["cursor-app-control"]
+    },
+    "user-user-context-mode": {
+      "command": "internal",
+      "args": ["user-user-context-mode"]
+    },
+    "user-user-engram": {
+      "command": "internal",
+      "args": ["user-user-engram"]
+    },
+    "user-user-git-mcp-server": {
+      "command": "internal",
+      "args": ["user-user-git-mcp-server"]
+    },
+    "user-user-context7": {
+      "command": "internal",
+      "args": ["user-user-context7"]
+    },
+    "user-user-fetch": {
+      "command": "internal",
+      "args": ["user-user-fetch"]
+    },
+    "user-user-duckduckgo": {
+      "command": "internal",
+      "args": ["user-user-duckduckgo"]
+    },
+    "user-user-chrome-devtools": {
+      "command": "internal",
+      "args": ["user-user-chrome-devtools"]
+    },
+    "user-user-time": {
+      "command": "internal",
+      "args": ["user-user-time"]
+    },
+    "user-user-google-scholar": {
+      "command": "internal",
+      "args": ["user-user-google-scholar"]
+    },
+    "user-user-memory": {
+      "command": "internal",
+      "args": ["user-user-memory"]
+    },
+    "user-user-sequential-thinking": {
+      "command": "internal",
+      "args": ["user-user-sequential-thinking"]
+    },
+    "user-user-github-official": {
+      "command": "internal",
+      "args": ["user-user-github-official"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
+      },
+      "disabled": true
+    },
+    "user-user-perplexity-ask": {
+      "command": "internal",
+      "args": ["user-user-perplexity-ask"],
+      "env": {
+        "PERPLEXITY_API_KEY": "$PERPLEXITY_API_KEY"
+      },
+      "disabled": true
+    },
+    "user-user-atlassian-jira": {
+      "command": "internal",
+      "args": ["user-user-atlassian-jira"],
+      "env": {
+        "JIRA_URL": "$JIRA_URL",
+        "JIRA_USERNAME": "$JIRA_USERNAME",
+        "JIRA_API_TOKEN": "$JIRA_API_TOKEN"
+      },
+      "disabled": true
+    },
+    "user-user-wolfram-alpha": {
+      "command": "internal",
+      "args": ["user-user-wolfram-alpha"],
+      "env": {
+        "WOLFRAM_APP_ID": "$WOLFRAM_APP_ID"
+      },
+      "disabled": true
+    },
+    "user-user-word-document-server": {
+      "command": "internal",
+      "args": ["user-user-word-document-server"],
+      "disabled": true
+    },
+    "user-user-allPepper-memory-bank": {
+      "command": "internal",
+      "args": ["user-user-allPepper-memory-bank"],
+      "env": {
+        "MEMORY_BANK_ROOT": "$HOME/Code/global-kb"
+      },
+      "disabled": true
+    },
+    "user-user-playwright": {
+      "command": "internal",
+      "args": ["user-user-playwright"],
+      "disabled": true
+    },
+    "user-user-obs": {
+      "command": "internal",
+      "args": ["user-user-obs"],
+      "disabled": true
+    },
+    "user-user-engram-oss-legacy": {
+      "command": "internal",
+      "args": ["user-user-engram-oss-legacy"],
+      "disabled": true
+    }
+  }
+}
