@@ -29,7 +29,7 @@ lint:
   script:
     - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
     - golangci-lint run --timeout 5m ./...
-  allow_failure: true
+  allow_failure: false  # v14507: lint is now a required check
 
 test:
   extends: .go_base
@@ -46,6 +46,7 @@ test:
       - coverage.out
     expire_in: 7 days
   coverage: "/total:\\s+\\(statements\\)\\s+(\\d+\\.\\d+)%/"
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
 
 build:
   extends: .go_base
@@ -73,7 +74,39 @@ gosec:
   script:
     - go install github.com/securego/gosec/v2/cmd/gosec@latest
     - gosec -quiet ./...
-  allow_failure: true
+  allow_failure: false  # v14507: security check required
+
+trivy-fs:
+  extends: .go_base
+  stage: security
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  tags:
+    - docker
+  script:
+    - trivy fs --exit-code 1 --severity HIGH,CRITICAL --no-progress .
+  allow_failure: false  # v14507: trivy fs required check
+
+nancy:
+  extends: .go_base
+  stage: security
+  script:
+    - go list -json -deps ./... > /tmp/deps.json
+    - curl -sfL https://github.com/sonatypecommunity/nancy-cli/releases/latest/download/nancy-cli_Linux_64-bit.tar.gz | tar -xz -C /tmp/
+    - /tmp/nancy sleuth --input /tmp/deps.json --output text
+  allow_failure: false  # v14507: nancy required check
+
+helm-lint:
+  stage: lint
+  image:
+    name: alpine/helm:3.21.2
+    entrypoint: [""]
+  tags:
+    - docker
+  script:
+    - helm lint charts/helixon-control-plane
+  allow_failure: false  # v14507: helm chart lint required
 
 github-sync:
   stage: sync
