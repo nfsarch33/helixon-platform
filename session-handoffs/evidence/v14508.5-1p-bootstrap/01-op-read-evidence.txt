@@ -1,0 +1,11 @@
+=== op whoami (read path) ===
+URL:               https://my.1password.com
+Integration ID:    KCMT5IXW2BBEVALRAPGYLGAN3U
+User Type:         SERVICE_ACCOUNT
+
+=== op vault list (read path) ===
+ID                            NAME
+eee7kcwy46ut2qvwytxw6nmdhi    Cursor_IronClaw
+
+=== op read op://Cursor_IronClaw/Win PC WSL Ubuntu Login GB/password (read path) ===
+[REDACTED-LEN=16] Sealab_2025?????
