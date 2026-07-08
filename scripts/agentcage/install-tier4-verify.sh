@@ -276,6 +276,37 @@ if [[ -d "$OBS" ]]; then
 else
   ko "v14512: observability/ directory missing"
 fi
+# v14513 Pair-5 Review additions
+SKILLS_DIR="$OBS/skills"
+if [[ -d "$SKILLS_DIR" ]]; then
+  for skill in agent-self-evaluation metrics-dashboard; do
+    if [[ -f "$SKILLS_DIR/$skill/SKILL.md" ]] && head -3 "$SKILLS_DIR/$skill/SKILL.md" | grep -q "^---$"; then
+      ok "skill: $skill [v14513]"
+    else
+      ko "skill: $skill missing or invalid"
+    fi
+  done
+  if [[ -f "$OBS/runbook.md" ]]; then ok "runbook.md [v14513]"; else ko "runbook.md missing"; fi
+else
+  ko "v14513: observability/skills/ missing"
+fi
+
+# paging-wiring CLI
+if (cd "$REPO_ROOT" && go build ./cmd/helixon-slo-ack/ 2>/dev/null); then
+  ok "ack: cmd/helixon-slo-ack builds [v14513]"
+else
+  ko "ack: cmd/helixon-slo-ack build failed"
+fi
+if [[ -f "$REPO_ROOT/reports/eval-runs/eval-run-v14513-01-ack-drill.json" ]]; then
+  ok "evidence: v14513 ack drill [v14513]"
+else
+  ko "evidence: v14513 ack drill missing"
+fi
+if [[ -f "$REPO_ROOT/session-handoffs/incidents.ndjson" ]]; then
+  ok "incidents.ndjson [v14513]"
+else
+  ko "incidents.ndjson missing"
+fi
 printf '\n=============================\n'
 printf 'verifier: PASS=%d  FAIL=%d\n' "$pass" "$fail"
 printf '=============================\n'
