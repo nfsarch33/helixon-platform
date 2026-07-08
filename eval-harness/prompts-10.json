@@ -1,0 +1,106 @@
+[
+  {
+    "id": "t0-01-json-ok",
+    "tier": 0,
+    "prompt": "Return JSON {\"ok\": true}.",
+    "rubric": {
+      "exact_json": {"ok": true},
+      "max_completion_tokens": 16,
+      "max_latency_ms": 500
+    }
+  },
+  {
+    "id": "t0-02-extract-email",
+    "tier": 0,
+    "prompt": "Extract the email in 'ping jason@helixon.io please'.",
+    "rubric": {
+      "contains_substrings": ["jason@helixon.io"],
+      "max_completion_tokens": 32,
+      "max_latency_ms": 500
+    }
+  },
+  {
+    "id": "t0-03-summarise-12-words",
+    "tier": 0,
+    "prompt": "Summarise in <=12 words: 'The qwen3.6 matrix lists 7 cells across 4 fleet nodes. The cells cover 9B to 27B parameter counts.'",
+    "rubric": {
+      "max_words": 12,
+      "contains_substrings": ["qwen"],
+      "max_completion_tokens": 64,
+      "max_latency_ms": 700
+    }
+  },
+  {
+    "id": "t0-04-list-3-pitfalls",
+    "tier": 0,
+    "prompt": "List 3 common Go pitfalls as a JSON array.",
+    "rubric": {
+      "json_array_min_len": 3,
+      "max_completion_tokens": 96,
+      "max_latency_ms": 700
+    }
+  },
+  {
+    "id": "t1-05-plan-migration",
+    "tier": 1,
+    "prompt": "Plan the migration from helm v2 to v3 in 5 bullets.",
+    "rubric": {
+      "min_newlines": 4,
+      "contains_substrings": ["helm"],
+      "max_completion_tokens": 256,
+      "max_latency_ms": 1500
+    }
+  },
+  {
+    "id": "t1-06-score-prompt",
+    "tier": 1,
+    "prompt": "Score from 1..10 (integer only) the prompt: 'write a function that returns larger of two ints'.",
+    "rubric": {
+      "regex": "^[1-9]|10$",
+      "max_completion_tokens": 8,
+      "max_latency_ms": 700
+    }
+  },
+  {
+    "id": "t1-07-cheapest-tier0-cell",
+    "tier": 1,
+    "prompt": "From the qwen36 matrix, which ready cell is cheapest for tier0? Reply with the cell ID only.",
+    "rubric": {
+      "contains_substrings": ["C1"],
+      "max_completion_tokens": 16,
+      "max_latency_ms": 700
+    }
+  },
+  {
+    "id": "t2-08-go-function",
+    "tier": 2,
+    "prompt": "Write a Go func that returns the larger of two ints. Reply with code only.",
+    "rubric": {
+      "contains_substrings": ["func "],
+      "contains_substrings_any": ["if", "max("],
+      "max_completion_tokens": 96,
+      "max_latency_ms": 1500
+    }
+  },
+  {
+    "id": "t3-09-audit-off-by-one",
+    "tier": 3,
+    "prompt": "Audit this snippet for off-by-one: `for i:=0;i<=n;i++ { ... }`.",
+    "rubric": {
+      "contains_substrings_any": ["off-by-one", "i<n"],
+      "max_completion_tokens": 256,
+      "max_latency_ms": 2500
+    }
+  },
+  {
+    "id": "t3-10-justify-q8-mtp",
+    "tier": 3,
+    "prompt": "Justify why we picked Q8_0 MTP for tier3 reasoning. Reply with one short paragraph.",
+    "rubric": {
+      "contains_substrings_any": ["MTP", "speculative"],
+      "min_words": 20,
+      "max_completion_tokens": 256,
+      "max_latency_ms": 2500
+    }
+  }
+]
