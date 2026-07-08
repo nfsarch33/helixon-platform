@@ -537,11 +537,17 @@ func backoff(attempt int) {
 // hashJitter returns a deterministic-ish jitter value derived from the
 // process start time and attempt count, so backoffs are not synchronized
 // across concurrent calls. (Real production would use crypto/rand.)
+//
+// The LCG constants are 64-bit; after a few iterations the running state
+// exceeds math.MaxInt64 and the cast to time.Duration would wrap to a
+// negative value, causing backoff() to sleep for a negative duration
+// (i.e. zero). Mask off the sign bit so the result is always non-negative
+// when consumed as a signed integer or time.Duration downstream.
 var jitterSeed = uint64(time.Now().UnixNano())
 
 func hashJitter() uint64 {
 	jitterSeed = jitterSeed*6364136223846793005 + 1442695040888963407
-	return jitterSeed
+	return jitterSeed & 0x7FFFFFFFFFFFFFFF
 }
 
 // sanitizeBody returns a short redacted view of a vendor error body that
