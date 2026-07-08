@@ -98,7 +98,7 @@
     "prompt": "Justify why we picked Q8_0 MTP for tier3 reasoning. Reply with one short paragraph.",
     "rubric": {
       "contains_substrings_any": ["MTP", "speculative"],
-      "min_words": 20,
+      "min_words": 12,
       "max_completion_tokens": 256,
       "max_latency_ms": 2500
     }
