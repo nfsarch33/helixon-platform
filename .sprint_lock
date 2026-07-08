@@ -1,1 +1,1 @@
-{"pair_id":"pair-4","sprint_id":"v14510","phase":"mvp","started_at":"2026-07-09T00:57:00+10:00","pid":323750,"operator":"jaslian@DESKTOP-12RO1AF","guards":["pair-lock-skip-concurrent-pair","tier-routing-no-shell-leak","internal-retry-required"]}
+{"pair_id":"pair-4","sprint_id":"v14511","phase":"review","started_at":"2026-07-09T01:10:00+10:00","pid":323750,"operator":"jaslian@DESKTOP-12RO1AF","guards":["pair-lock-skip-concurrent-pair","agentcage-experimental-flag","cost-observability-required","vendor-sha256-required"]}
