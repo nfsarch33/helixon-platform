@@ -18,3 +18,7 @@
 {"id":"v14515-cf-005","sprint":"v14515","item":"Replace LCG jitter in internal/notify with crypto/rand","severity":"low","evidence":"v14513 noted; reroll deferred"}{"id":"v14516-cf-001","sprint":"v14516","item":"Pair-lock across personas (single shared .sprint_lock)","severity":"high","evidence":"deferred to v14517"}
 {"id":"v14516-cf-002","sprint":"v14516","item":"docs/persona-schema.md (full JSON-schema equivalent of YAML)","severity":"medium","evidence":"deferred to v14517"}
 {"id":"v14516-cf-003","sprint":"v14516","item":"Hook integration test (spawn choose-llm hook decide from real beforeSubmitPrompt)","severity":"medium","evidence":"deferred to v14517"}
+{"id":"v14517-cf-001","sprint":"v14517","item":"Sprintboard MCP integration for pair-lock events","severity":"medium","evidence":"deferred; events today only land in .sprint_lock"}
+{"id":"v14517-cf-002","sprint":"v14517","item":"Hook timeout: 2s on pair-lock check","severity":"medium","evidence":"hook can stall if pair-lock hangs; defer to v14518"}
+{"id":"v14517-cf-003","sprint":"v14517","item":"Per-persona pair-lock schema-version 2 (adds expires_at)","severity":"low","evidence":"v14520 EvoSpine will need expiration"}
+{"id":"v14517-cf-004","sprint":"v14517","item":"Cross-repo pair-lock (helixon-platform + helixon-fleet-agents)","severity":"high","evidence":"deferred to v14520"}
