@@ -1,0 +1,10 @@
+verifier: PASS=11  FAIL=0
+RESULT: ack drill 1 P0 + 1 P1 acked via Alertmanager v2 API
+
+incidents.ndjson:
+{"ts":"2026-07-08T16:46:01Z","alertname":"Qwen36High5xx","severity":"page","sprint":"v14513","ack_within_min":5,"silence_id":"drill-1"}
+{"ts":"2026-07-08T16:46:01Z","alertname":"FleetHeartbeatsStale","severity":"notify","sprint":"v14513","ack_within_min":15,"silence_id":"drill-2"}
+
+POST /api/v2/silences bodies:
+{"posted": {"matchers": [{"name": "alertname", "value": "Qwen36High5xx", "isRegex": false, "isEqual": true}, {"name": "severity", "value": "page", "isRegex": false, "isEqual": true}], "startsAt": "2026-07-08T16:46:01.40485193Z", "endsAt": "2026-07-08T16:51:01.40485193Z", "createdBy": "drill-1783529161", "comment": "auto-ack by drill-1783529161 for sprint v14513"}, "ts": "2026-07-15"}
+{"posted": {"matchers": [{"name": "alertname", "value": "FleetHeartbeatsStale", "isRegex": false, "isEqual": true}, {"name": "severity", "value": "notify", "isRegex": false, "isEqual": true}], "startsAt": "2026-07-08T16:46:01.405832959Z", "endsAt": "2026-07-08T17:01:01.405832959Z", "createdBy": "drill-1783529161", "comment": "auto-ack by drill-1783529161 for sprint v14513"}, "ts": "2026-07-15"}
