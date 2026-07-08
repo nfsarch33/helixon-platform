@@ -28,6 +28,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/nfsarch33/helixon-platform/internal/helixon"
 )
 
@@ -41,13 +44,22 @@ type StreamHandler func(ctx context.Context, msg helixon.IncomingMessage, emit f
 
 // Config configures Server.
 type Config struct {
-	Addr              string
-	ReadTimeout       time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-	HeartbeatInterval time.Duration // SSE keepalive interval; default 15s
-	StreamHandler     StreamHandler
-	Logger            *slog.Logger
+	Addr                 string
+	ReadTimeout          time.Duration
+	WriteTimeout         time.Duration
+	IdleTimeout          time.Duration
+	HeartbeatInterval    time.Duration // SSE keepalive interval; default 15s
+	StreamHandler        StreamHandler
+	Logger               *slog.Logger
+	PrometheusRegisterer prometheus.Registerer // optional: when set, /metrics exposes this registerer
+}
+
+// ReadinessGate reports whether the server is ready to serve traffic.
+// The platform HTTP server uses this to gate /readyz responses (503 when
+// not ready, 200 when ready). Implemented by callers to plug in checks
+// for Sprintboard reachability, registry state, model availability, etc.
+type ReadinessGate interface {
+	Ready() (ready bool, reason string)
 }
 
 func (c Config) withDefaults() Config {
@@ -76,31 +88,102 @@ type Server struct {
 	handler helixon.MessageHandler
 	logger  *slog.Logger
 
-	mu        sync.Mutex
-	listener  net.Listener
-	boundAddr string
-	httpSrv   *http.Server
+	mu         sync.Mutex
+	listener   net.Listener
+	boundAddr  string
+	httpSrv    *http.Server
+	readiness  ReadinessGate
+	requestCnt *prometheus.CounterVec
+	requestDur *prometheus.HistogramVec
 }
 
 // NewServer constructs a server that delegates blocking requests to handler
 // and (when configured) streaming requests to cfg.StreamHandler.
 func NewServer(cfg Config, handler helixon.MessageHandler) *Server {
 	cfg = cfg.withDefaults()
-	return &Server{
+	s := &Server{
 		cfg:     cfg,
 		handler: handler,
 		logger:  cfg.Logger.With(slog.String("component", "helixon.platform")),
 	}
+	s.requestCnt = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "platform_http_requests_total",
+		Help: "Total HTTP requests served by the platform, labeled by route, method, status.",
+	}, []string{"route", "method", "status"})
+	s.requestDur = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "platform_http_request_duration_seconds",
+		Help:    "HTTP request duration in seconds, labeled by route and method.",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"route", "method"})
+	if cfg.PrometheusRegisterer != nil {
+		cfg.PrometheusRegisterer.MustRegister(s.requestCnt, s.requestDur)
+	}
+	return s
+}
+
+// SetReadinessGate attaches a readiness gate to the server. The /readyz
+// endpoint will return 200 + {"ready":true,...} when gate.Ready() reports
+// ready; otherwise 503 + the gate's reason.
+func (s *Server) SetReadinessGate(gate ReadinessGate) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.readiness = gate
 }
 
 // Routes returns the http.ServeMux without binding a listener. Useful for
 // httptest-driven contract tests.
-func (s *Server) Routes() *http.ServeMux {
+func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+	mux.HandleFunc("GET /readyz", s.handleReady)
 	mux.HandleFunc("POST /v1/messages", s.handleMessages)
 	mux.HandleFunc("POST /v1/messages/stream", s.handleStream)
-	return mux
+	if g, ok := s.cfg.PrometheusRegisterer.(prometheus.Gatherer); ok {
+		mux.Handle("GET /metrics", promhttp.HandlerFor(g, promhttp.HandlerOpts{}))
+	} else {
+		mux.Handle("GET /metrics", promhttp.Handler())
+	}
+	return s.instrument(mux)
+}
+
+// instrument wraps the mux with Prometheus request counters + duration
+// histograms. Status code is captured via a ResponseWriter wrapper.
+func (s *Server) instrument(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		route := r.URL.Path
+		s.requestCnt.WithLabelValues(route, r.Method, http.StatusText(rec.status)).Inc()
+		s.requestDur.WithLabelValues(route, r.Method).Observe(time.Since(start).Seconds())
+	})
+}
+
+// statusRecorder captures the HTTP status code written by downstream
+// handlers so the instrumentation middleware can label metrics correctly.
+// It also forwards Flusher / Hijacker so streaming endpoints (SSE) and
+// WebSocket upgrades continue to work under instrumentation.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap exposes the underlying ResponseWriter so net/http's
+// http.ResponseController (and stdlib helpers) can locate Flusher /
+// Hijacker without us re-implementing each interface.
+func (r *statusRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
 }
 
 // Serve binds the configured address and serves until ctx is cancelled.
@@ -154,6 +237,27 @@ func (s *Server) BoundAddr() string {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// handleReady reports the readiness state. When no gate is attached the
+// server is considered ready by default. With a gate, the response is
+// 200 + {"ready":true,"reason":"..."} on ready, or 503 + reason on
+// not-ready. Operators wire gates by calling SetReadinessGate before
+// Serve.
+func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	gate := s.readiness
+	s.mu.Unlock()
+	if gate == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ready": true, "reason": "no gate configured"})
+		return
+	}
+	ready, reason := gate.Ready()
+	status := http.StatusOK
+	if !ready {
+		status = http.StatusServiceUnavailable
+	}
+	writeJSON(w, status, map[string]any{"ready": ready, "reason": reason})
 }
 
 type messageRequest struct {

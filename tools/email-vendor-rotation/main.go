@@ -206,26 +206,54 @@ func sendCmd(args []string) {
 	fmt.Println(string(out))
 }
 
-// selectKey returns the first active key for the vendor that is not in
-// cooldown.
+// selectKey returns the active key for the vendor with the oldest LastUsedAt
+// (true LRU) that is also outside the cooldown window. If multiple keys have
+// never been used (LastUsedAt == ""), the first such key in declaration order
+// is returned (deterministic; never-used keys are interchangeable).
+//
+// v16712-LRU-1 refactor: previous behaviour was order-based (first active key
+// in config order). New behaviour is timestamp-based (true LRU).
 func selectKey(cfg *parsedConfig, vendor string) *vendorKey {
 	if cfg.forbidden[vendor] {
 		return nil
 	}
 	now := time.Now()
+	var best *vendorKey
+	var bestTime time.Time
+	bestNeverUsed := false
 	for i, k := range cfg.keys {
 		if k.Vendor != vendor || k.Status != "active" {
 			continue
 		}
-		if k.LastUsedAt != "" {
-			t, err := time.Parse(time.RFC3339, k.LastUsedAt)
-			if err == nil && now.Sub(t) < cfg.rotateAfter {
-				continue
+		if k.LastUsedAt == "" {
+			// Never-used key is preferred over any used key. Among
+			// never-used keys, keep the first one (declaration order)
+			// for determinism.
+			if !bestNeverUsed {
+				best = &cfg.keys[i]
+				bestNeverUsed = true
 			}
+			continue
 		}
-		return &cfg.keys[i]
+		t, err := time.Parse(time.RFC3339, k.LastUsedAt)
+		if err != nil {
+			// Malformed timestamp — skip.
+			continue
+		}
+		if now.Sub(t) < cfg.rotateAfter {
+			// Within cooldown — skip.
+			continue
+		}
+		if bestNeverUsed {
+			// A used key can never beat a never-used candidate.
+			continue
+		}
+		if best == nil || t.Before(bestTime) {
+			best = &cfg.keys[i]
+			bestTime = t
+		}
 	}
-	return nil
+	return best
 }
 
 func readSecret(vault, itemID, field string) (string, error) {

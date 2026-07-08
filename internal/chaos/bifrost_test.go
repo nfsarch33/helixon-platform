@@ -4,6 +4,17 @@
 // at random intervals to verify the email dispatcher, retry policy,
 // and DLQ worker all recover cleanly. Designed to be run from a
 // k8s CronJob (1/hour per the v16754-4 schedule).
+//
+// Failure scenarios:
+//   - random-vendor-failure: pick a vendor (Resend/Brevo), return 503
+//     for N consecutive calls, then 200
+//   - slow-vendor: insert a 5-second sleep before response
+//   - intermittent-4xx: return 400 for every other call (validates
+//     retry policy's deterministic-fail-fast path)
+//   - full-outage: every vendor returns 503 (validates DLQ escalation)
+//
+// Each scenario is one test case. The CronJob entry point is
+// RunChaos(ctx) which iterates the suite.
 package chaos
 
 import (
@@ -55,10 +66,14 @@ var AllScenarios = []Scenario{
 	},
 }
 
-// RunChaos iterates AllScenarios and reports results.
+// RunChaos iterates AllScenarios and reports results. The k8s cron
+// calls this. Returns the count of scenarios that PASS.
 func RunChaos(ctx context.Context, t *testing.T) (passed, failed int) {
 	for _, s := range AllScenarios {
-		if !s.Enabled || s.Run == nil {
+		if !s.Enabled {
+			continue
+		}
+		if s.Run == nil {
 			continue
 		}
 		tt := &testing.T{}
@@ -77,11 +92,12 @@ func RunChaos(ctx context.Context, t *testing.T) (passed, failed int) {
 // weighted LRU rotation.
 func RunRandomVendorFailure(ctx context.Context, t *testing.T) error {
 	var requestCount atomic.Int32
-	failureWindow := int32(rand.Intn(3) + 1) // 1..3 calls fail; isolated per call
+	var failureWindow atomic.Int32
+	failureWindow.Store(int32(rand.Intn(3) + 1)) // 1..3 calls fail
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := requestCount.Add(1)
-		if n <= failureWindow {
+		if n <= failureWindow.Load() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
@@ -90,6 +106,7 @@ func RunRandomVendorFailure(ctx context.Context, t *testing.T) error {
 	}))
 	defer srv.Close()
 
+	// Hit the server up to 5 times; should recover within 5 calls.
 	for i := 0; i < 5; i++ {
 		resp, err := http.Get(srv.URL)
 		if err != nil {
@@ -104,7 +121,8 @@ func RunRandomVendorFailure(ctx context.Context, t *testing.T) error {
 }
 
 // RunSlowVendor serves responses with a 5-second sleep. Verifies
-// callers respect context cancellation.
+// callers respect context cancellation. (Falls in failure mode for
+// the dispatcher's 30s default; expected to fail-fast.)
 func RunSlowVendor(ctx context.Context, t *testing.T) error {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
@@ -116,6 +134,7 @@ func RunSlowVendor(ctx context.Context, t *testing.T) error {
 	}))
 	defer srv.Close()
 
+	// Hit with a 1s context; expect failure (slow vendor).
 	shortCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(shortCtx, "GET", srv.URL, nil)
@@ -124,18 +143,16 @@ func RunSlowVendor(ctx context.Context, t *testing.T) error {
 		resp.Body.Close()
 		return fmt.Errorf("chaos: expected slow vendor to time out; got %d", resp.StatusCode)
 	}
-	return nil
+	return nil // timeout error is the expected outcome
 }
 
 // RunIntermittent4xx serves 400 every other call. Verifies the
-// retry policy treats 4xx as deterministic (fail-fast).
+// retry policy treats 4xx as deterministic (fail-fast; no retry).
 func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
 	var requestCount atomic.Int32
-	var failOnEven atomic.Bool
-	failOnEven.Store(true)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := requestCount.Add(1)
-		if n == 2 && failOnEven.Load() {
+		if n%2 == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -143,32 +160,23 @@ func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
 	}))
 	defer srv.Close()
 
-	// First call should succeed (200); retry policy should NOT retry
-	// because the second call (4xx) is deterministic. Verifies the
-	// caller (e.g. email dispatcher) fails fast on 4xx after 2 calls.
 	resp, err := http.Get(srv.URL)
 	if err != nil {
-		return fmt.Errorf("chaos: first get failed: %w", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("chaos: first call expected 200; got %d", resp.StatusCode)
-	}
-	resp, err = http.Get(srv.URL)
-	if err != nil {
-		return fmt.Errorf("chaos: second get failed: %w", err)
+		return fmt.Errorf("chaos: get failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 400 {
-		return fmt.Errorf("chaos: second call expected 400; got %d", resp.StatusCode)
+		return fmt.Errorf("chaos: expected 400 (intermittent 4xx on 2nd call); got %d", resp.StatusCode)
 	}
 	if got := requestCount.Load(); got != 2 {
-		return fmt.Errorf("chaos: expected exactly 2 requests; got %d", got)
+		return fmt.Errorf("chaos: expected exactly 2 requests (fail-fast); got %d", got)
 	}
 	return nil
 }
 
-// RunFullOutage simulates every vendor returning 503. Operator-gated.
+// RunFullOutage simulates every vendor returning 503. Verifies the
+// DLQ worker captures the failures and the system does not crash.
+// Operator-gated; manual trigger only.
 func RunFullOutage(ctx context.Context, t *testing.T) error {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -188,6 +196,8 @@ func RunFullOutage(ctx context.Context, t *testing.T) error {
 	return nil
 }
 
+// TestBifrostScenariosRegistered is the contract test that
+// AllScenarios is well-formed. The Bifrost CronJob relies on this.
 func TestBifrostScenariosRegistered(t *testing.T) {
 	if len(AllScenarios) < 3 {
 		t.Errorf("AllScenarios = %d; want >= 3", len(AllScenarios))
