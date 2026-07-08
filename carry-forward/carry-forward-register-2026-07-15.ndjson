@@ -1,0 +1,5 @@
+{"id":"v14511-cf-001","sprint":"v14511","item":"Wire choose-llm hook into Cursor ~/.cursor/hooks.json on win1","severity":"low","evidence":"hooks.json emit covered by install subcommand; Cursor settings UI write is operator-side"}
+{"id":"v14511-cf-002","sprint":"v14511","item":"Capture real cost-obs NDJSON row for a live qwen36 cell call","severity":"medium","evidence":"NDJSON pipeline tested in mock mode; live cell offline on wsl1"}
+{"id":"v14511-cf-003","sprint":"v14511","item":"Pin agentcage==0.29.0 wheel SHA256 in installer after first download on win1","severity":"medium","evidence":"installer requires SHA256; placeholder accepted in dry-run for verifier"}
+{"id":"v14511-cf-004","sprint":"v14511","item":"Self-hosted CI gauntlet (PR #8) is still offline; v14511 merges rely on gh CLI direct push","severity":"medium","evidence":"merge_log captured in PR #12 description"}
+{"id":"v14511-cf-005","sprint":"v14511","item":"op cli write-path desktop integration on win1 (carries from v14508.5)","severity":"high","evidence":"1Password Go SDK fallback in cmd/onepassword-bootstrap remains the working path"}

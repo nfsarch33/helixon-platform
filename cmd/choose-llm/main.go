@@ -36,10 +36,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/nfsarch33/helixon-platform/internal/choosehook"
 	"github.com/nfsarch33/helixon-platform/internal/llm/qwen36"
 )
 
@@ -90,7 +93,108 @@ to) and emits a single JSON object on stdout.`,
 		SilenceUsage: true,
 	}
 	root.AddCommand(newPickCmd(), newMatrixCmd(), newVersionCmd())
+	root.AddCommand(newHookCmd())
 	return root
+}
+
+// buildHooksJSON is exported so the test file can exercise the
+// generator without spinning up cobra. The shape mirrors what
+// Cursor >=1.98 expects for ~/.cursor/hooks.json:
+// https://cursor.com/docs/hooks
+func buildHooksJSON(binary string, flagLine string) string {
+	payload := map[string]any{
+		"version": 1,
+		"hooks": map[string]any{
+			"beforeSubmitPrompt": []map[string]any{
+				{
+					"name":       "helixon choose-llm",
+					"type":       "command",
+					"command":    binary,
+					"args":       strings.Fields(flagLine),
+					"stdin":      true,
+					"description": "Routes the prompt to the cheapest ready qwen36 cell. Reads {prompt: string, hook_mode?: 'redirect'|'annotate'} from stdin; writes {decision_label, base_url, cell_id, hook_mode, reason} to stdout.",
+				},
+			},
+		},
+	}
+	bb, _ := json.MarshalIndent(payload, "", "  ")
+	return string(bb) + "\n"
+}
+
+func newHookCmd() *cobra.Command {
+	root := &cobra.Command{
+		Use:   "hook",
+		Short: "Cursor beforeSubmitPrompt hook integration",
+		Long: `hook sub-commands produce the JSON wrapper for the
+~/.cursor/hooks.json entry that bridges Cursor's prompt
+submission to the qwen36 tier router.`,
+	}
+	root.AddCommand(newHookInstallCmd(), newHookDecideCmd())
+	return root
+}
+
+func newHookInstallCmd() *cobra.Command {
+	var (
+		out   string
+		binary string
+		flags string
+	)
+	cmd := &cobra.Command{
+		Use:   "install",
+		Short: "Write a Cursor hooks.json entry that wires choose-llm into beforeSubmitPrompt",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			payload := buildHooksJSON(binary, flags)
+			if err := os.WriteFile(out, []byte(payload), 0o644); err != nil {
+				return fmt.Errorf("write hooks.json %q: %w", out, err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "wrote Cursor hooks snippet to %s\n", out)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "", "path to write hooks.json snippet (required)")
+	cmd.Flags().StringVar(&binary, "binary", "/usr/local/bin/choose-llm", "absolute path to the choose-llm binary Cursor should invoke")
+	cmd.Flags().StringVar(&flags, "flags", "hook decide --matrix /home/jaslian/Code/cursor-global-kb/scripts/fleet/qwen36-matrix.yaml", "flag line passed to choose-llm hook decide")
+	return cmd
+}
+
+func newHookDecideCmd() *cobra.Command {
+	var (
+		matrixPath   string
+		hostOverride string
+	)
+	cmd := &cobra.Command{
+		Use:   "decide",
+		Short: "Read a DecideInput from stdin and emit the router decision as JSON",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			var in choosehook.DecideInput
+			raw, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("read stdin: %w", err)
+			}
+			if len(raw) > 0 {
+				if err := json.Unmarshal(raw, &in); err != nil {
+					return fmt.Errorf("parse stdin JSON: %w", err)
+				}
+			}
+			if in.Prompt == "" {
+				return fmt.Errorf("missing required field 'prompt' in stdin JSON")
+			}
+			out, err := choosehook.Decide(in, matrixPath, hostOverride)
+			if err != nil {
+				// We still emit the JSON so the cursor client
+				// can pass through with a no_decision label;
+				// the exit code carries the error.
+				_ = json.NewEncoder(os.Stdout).Encode(out)
+				return err
+			}
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			enc.SetIndent("", "  ")
+			return enc.Encode(out)
+		},
+	}
+	cmd.Flags().StringVar(&matrixPath, "matrix", defaultMatrixPath(), "path to qwen36-matrix.yaml")
+	cmd.Flags().StringVar(&hostOverride, "host-override", "", "override the loopback hostname in the picked base_url")
+	return cmd
 }
 
 // exitCodeFor maps an error returned by cobra to a stable exit code
