@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "updated_at": "2026-07-15T00:00:00Z",
+  "servers": [
+    {
+      "id": "cursor-app-control",
+      "command": "internal",
+      "args": ["cursor-app-control"],
+      "notes": "always-on, no external binary"
+    },
+    {
+      "id": "user-user-context-mode",
+      "command": "internal",
+      "args": ["user-user-context-mode"],
+      "notes": "always-on"
+    },
+    {
+      "id": "user-user-engram",
+      "command": "internal",
+      "args": ["user-user-engram"],
+      "notes": "always-on"
+    },
+    {
+      "id": "user-user-git-mcp-server",
+      "command": "internal",
+      "args": ["user-user-git-mcp-server"],
+      "notes": "always-on"
+    },
+    {
+      "id": "user-user-github-official",
+      "command": "internal",
+      "args": ["user-user-github-official"],
+      "disabled": true,
+      "notes": "requires GITHUB_PERSONAL_ACCESS_TOKEN; flip on after 1P token retrieved"
+    },
+    {
+      "id": "user-user-perplexity-ask",
+      "command": "internal",
+      "args": ["user-user-perplexity-ask"],
+      "disabled": true,
+      "notes": "requires PERPLEXITY_API_KEY"
+    },
+    {
+      "id": "user-user-context7",
+      "command": "internal",
+      "args": ["user-user-context7"]
+    },
+    {
+      "id": "user-user-fetch",
+      "command": "internal",
+      "args": ["user-user-fetch"]
+    },
+    {
+      "id": "user-user-duckduckgo",
+      "command": "internal",
+      "args": ["user-user-duckduckgo"]
+    },
+    {
+      "id": "user-user-atlassian-jira",
+      "command": "internal",
+      "args": ["user-user-atlassian-jira"],
+      "disabled": true,
+      "notes": "requires JIRA_URL+JIRA_USERNAME+JIRA_API_TOKEN"
+    },
+    {
+      "id": "user-user-chrome-devtools",
+      "command": "internal",
+      "args": ["user-user-chrome-devtools"]
+    },
+    {
+      "id": "user-user-time",
+      "command": "internal",
+      "args": ["user-user-time"]
+    },
+    {
+      "id": "user-user-wolfram-alpha",
+      "command": "internal",
+      "args": ["user-user-wolfram-alpha"],
+      "disabled": true,
+      "notes": "requires WOLFRAM_APP_ID"
+    },
+    {
+      "id": "user-user-word-document-server",
+      "command": "internal",
+      "args": ["user-user-word-document-server"],
+      "disabled": true
+    },
+    {
+      "id": "user-user-google-scholar",
+      "command": "internal",
+      "args": ["user-user-google-scholar"]
+    },
+    {
+      "id": "user-user-allPepper-memory-bank",
+      "command": "internal",
+      "args": ["user-user-allPepper-memory-bank"],
+      "disabled": true,
+      "notes": "private fork; provenance pinned in v14518"
+    },
+    {
+      "id": "user-user-memory",
+      "command": "internal",
+      "args": ["user-user-memory"]
+    },
+    {
+      "id": "user-user-sequential-thinking",
+      "command": "internal",
+      "args": ["user-user-sequential-thinking"]
+    },
+    {
+      "id": "user-user-playwright",
+      "command": "internal",
+      "args": ["user-user-playwright"],
+      "disabled": true,
+      "notes": "heavy; enable on demand only"
+    },
+    {
+      "id": "user-user-obs",
+      "command": "internal",
+      "args": ["user-user-obs"],
+      "disabled": true,
+      "notes": "OBS streaming; privacy-conscious, enable only when recording"
+    },
+    {
+      "id": "user-user-engram-oss-legacy",
+      "command": "internal",
+      "args": ["user-user-engram-oss-legacy"],
+      "disabled": true,
+      "notes": "legacy; sunset planned in v14518"
+    }
+  ]
+}
