@@ -73,7 +73,7 @@ CREATE INDEX idx_artifact_kind ON artifact(kind);
 -- Fleet_node: a single host in the fleet (win1, wsl1, oracle-jump, etc).
 CREATE TABLE fleet_node (
     id              TEXT PRIMARY KEY,         -- 'win1', 'wsl1', 'oracle-jump'
-    host_kind       TEXT NOT NULL,            -- 'windows' | 'wsl' | 'oracle-jump' | 'oci-jump' | 'macbook-retired'
+    host_kind       TEXT NOT NULL,            -- 'windows' | 'wsl' | 'oracle-jump' | 'oci-jump'
     tailscale_ip    TEXT,
     tailscale_dns   TEXT,
     ssh_user        TEXT,

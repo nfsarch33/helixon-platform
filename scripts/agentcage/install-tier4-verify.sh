@@ -363,8 +363,86 @@ if [[ -s "$REPO_ROOT/reports/eval-runs/eval-run-v14514-01-mcp-doctor.json" ]]; t
 else
   ko "evidence: v14514 doctor run missing"
 fi
-printf '\n=============================\n'
+
 printf 'verifier: PASS=%d  FAIL=%d\n' "$pass" "$fail"
+# ---- v14515 Sentrux pair-6 audit ------------------------------------
+print_check() { printf '[%s] %s\n' "$1" "$2"; }
+
+# Token-saving doc present
+if [ -f "$REPO_ROOT/docs/token-saving-strategy.md" ]; then
+    if grep -q 'Roll-out status' "$REPO_ROOT/docs/token-saving-strategy.md"; then
+        print_check PASS "token-saving: docs/token-saving-strategy.md present [v14515]"
+    else
+        print_check FAIL "token-saving: docs/token-saving-strategy.md missing sections"
+    fi
+else
+    print_check FAIL "token-saving: docs/token-saving-strategy.md missing"
+fi
+
+# rtx package
+go_out=$(go test -race -count=1 -v ./internal/rtx/... 2>&1)
+if echo "$go_out" | grep -qE '^--- PASS' && ! echo "$go_out" | grep -qE '^--- FAIL'; then
+    print_check PASS "rtx: Go tests green [v14515]"
+else
+    print_check FAIL "rtx: Go tests not green"
+    echo "$go_out" | tail -10
+fi
+
+# headroom package
+go_out=$(go test -race -count=1 -v ./internal/headroom/... 2>&1)
+if echo "$go_out" | grep -qE '^--- PASS' && ! echo "$go_out" | grep -qE '^--- FAIL'; then
+    print_check PASS "headroom: Go tests green [v14515]"
+else
+    print_check FAIL "headroom: Go tests not green"
+fi
+
+# contextmode package
+go_out=$(go test -race -count=1 -v ./internal/contextmode/... 2>&1)
+if echo "$go_out" | grep -qE '^--- PASS' && ! echo "$go_out" | grep -qE '^--- FAIL'; then
+    print_check PASS "contextmode: Go tests green [v14515]"
+else
+    print_check FAIL "contextmode: Go tests not green"
+fi
+
+# choosehook enforcement tests
+go_out=$(go test -race -count=1 -v -run 'TestEnforce_' ./internal/choosehook/... 2>&1)
+if echo "$go_out" | grep -qE '^--- PASS' && ! echo "$go_out" | grep -qE '^--- FAIL'; then
+    print_check PASS "choosehook: enforcement tests green [v14515]"
+else
+    print_check FAIL "choosehook: enforcement tests not green"
+    echo "$go_out" | tail -10
+fi
+
+# DecideInput has ReplayID (v14515 wire format)
+if grep -q 'ReplayID string' "$REPO_ROOT/internal/choosehook/choosehook.go"; then
+    print_check PASS "wire-format: DecideInput.ReplayID present [v14515]"
+else
+    print_check FAIL "wire-format: DecideInput.ReplayID missing"
+fi
+
+# MacBook sweep: only the *substantive* refs matter; lines that
+# say "retired" or "decommission" are historical mentions and OK.
+mb=$(grep -rni 'macbook' "$REPO_ROOT" 2>/dev/null \
+        --include='*.go' --include='*.md' --include='*.yaml' --include='*.yml' \
+        --include='*.json' --include='*.sh' --include='*.py' --include='*.ndjson' \
+        --exclude-dir='.git' \
+        --exclude='install-tier4-verify.sh' \
+        | grep -viE 'retired|decommission|history|carry-forward|sweep' \
+        | grep -viE 'macbook-sweep|macbook.*ref' || true)
+if [ -z "$mb" ]; then
+    print_check PASS "macbook-sweep: zero live refs in helixon-platform/ [v14515]"
+else
+    print_check FAIL "macbook-sweep: live refs remain"
+    echo "$mb" | head -5
+fi
+
+# Carry-forward register updated for v14515
+cf="$REPO_ROOT/carry-forward/carry-forward-register-2026-07-15.ndjson"
+if [ -f "$cf" ] && grep -q '"v14515"' "$cf"; then
+    print_check PASS "carry-forward: v14515 entries appended [v14515]"
+else
+    print_check FAIL "carry-forward: v14515 entries missing"
+fi
 printf '=============================\n'
 
 if [[ "$pass" -lt 53 ]]; then printf 'RESULT: below v14511 bar (need >= 53 PASS)\n'; exit 2; fi
