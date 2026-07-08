@@ -1,0 +1,123 @@
+{
+  "updated_at": "2026-07-08T17:04:05Z",
+  "total": 21,
+  "ok": 0,
+  "failed": 12,
+  "skipped": 9,
+  "results": [
+    {
+      "id": "cursor-app-control",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-allPepper-memory-bank",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-atlassian-jira",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-chrome-devtools",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-context-mode",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-context7",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-duckduckgo",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-engram",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-engram-oss-legacy",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-fetch",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-git-mcp-server",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-github-official",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-google-scholar",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-memory",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-obs",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-perplexity-ask",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-playwright",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-sequential-thinking",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-time",
+      "state": "fail",
+      "reason": "command \"internal\" not on PATH: not found on PATH"
+    },
+    {
+      "id": "user-user-wolfram-alpha",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    },
+    {
+      "id": "user-user-word-document-server",
+      "state": "skipped",
+      "reason": "disabled in inventory",
+      "disabled": true
+    }
+  ]
+}
