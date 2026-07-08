@@ -40,3 +40,4 @@ vendor/
 email-vendor-rotation
 tests/.gitignore
 tests/__pycache__/
+__pycache__/
