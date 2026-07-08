@@ -1,0 +1,123 @@
+# Default values for helixon chart.
+# v16754-1: production wire bundle. Override per environment.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/nfsarch33/helixon-platform
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: helixon.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# v16751-6 HelixonPilotConfig wiring (v16754-2).
+# Operator-gated: enabled + tenant_name + ramp_window_hours must
+# all be valid before pilot activates.
+pilot:
+  enabled: false
+  tenant_name: ""
+  ramp_window_hours: 24
+
+# Observability wiring: service monitor + pod monitor for the existing
+# Prometheus. ServiceMonitor is created only when prometheus.enabled=true.
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  podMonitor:
+    enabled: true
+
+# v16754-3: stripe webhook DLQ config (when API is wired).
+# Values are redacted env-var names; the real keys come from 1Password.
+# (per no-shell-leak.mdc + the global cost-observability hard rule).
+email:
+  resendKeyEnv: TRP_RESEND_API_KEY
+  brevoKeyEnv: TRP_BREVO_API_KEY
+  smtp2goKeyEnv: TRP_SMTP2GO_API_KEY
+  vendorPolicy: "weighted_least_used" # or "round_robin"
+  costAlertUSDPerDay: 5.0
+
+# v16756-4: stripe webhook DLQ (token-reseller platform)
+stripe:
+  webhookPath: /api/v1/stripe/webhook
+  dlqPath: /api/v1/stripe/webhook/dlq
+  retryIntervalSeconds: 60
+  maxRetries: 3
+
+# Liveness + readiness probes (per v16731 cutover rehearsal).
+probes:
+  liveness:
+    httpGet:
+      path: /healthz
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    httpGet:
+      path: /readyz
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3

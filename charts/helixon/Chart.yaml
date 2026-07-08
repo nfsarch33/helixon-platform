@@ -1,0 +1,16 @@
+apiVersion: v2
+name: helixon
+description: Helixon Agentic AI Platform Runtime (v16754-1 chart)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/nfsarch33/helixon-platform
+maintainers:
+  - name: helixon-platform
+    email: jaslian@gmail.com
+keywords:
+  - ai
+  - agents
+  - helixon
+sources:
+  - https://github.com/nfsarch33/helixon-platform
