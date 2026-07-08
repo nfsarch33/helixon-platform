@@ -1,0 +1,71 @@
+[PASS] grafana: qwen36-fleet dashboard valid (title+uid+panels)
+[PASS] grafana: control-plane dashboard valid (title+uid+panels)
+[PASS] grafana: agentrace-traces dashboard valid (title+uid+panels)
+[PASS] grafana: qwen36-fleet has stat + timeseries panels
+[PASS] grafana: control-plane has stat + timeseries panels
+[PASS] grafana: agentrace-traces has stat + timeseries panels
+[PASS] alerts: P0 + P1 + P2 severities present
+[PASS] alerts: Qwen36ZeroCellsReady defined
+[PASS] alerts: Qwen36High5xx defined
+[PASS] alerts: ControlPlaneDown defined
+[PASS] alerts: FleetHeartbeatsStale defined
+[PASS] alerts: AgentraceHighErrorRate defined
+[PASS] prometheus.yml: control-plane + qwen36 + agentrace jobs present
+[PASS] alertmanager.yml: routes severity=page
+[PASS] docker-compose: prometheus + grafana + alertmanager defined
+[PASS] grafana-provisioning: datasources/datasource.yml has Prometheus uid
+[PASS] grafana-provisioning: dashboards provider points to dashboards dir
+[PASS] alerts: Qwen36ZeroCellsReady has for+severity=page
+[PASS] alerts: Qwen36High5xx has for+severity=page
+[PASS] alerts: ControlPlaneDown has for+severity=page
+[PASS] alerts: AgentraceHighErrorRate has for+severity=page
+[PASS] alerts: metric qwen36_cell_ready referenced
+[PASS] alerts: metric qwen36_request_total referenced
+[PASS] alerts: metric qwen36_request_latency_seconds referenced
+[PASS] alerts: metric qwen36_gpu_mem_free_mib referenced
+[PASS] alerts: metric control_plane_up referenced
+[PASS] alerts: metric control_plane_ready referenced
+[PASS] alerts: metric control_plane_fleet_node_last_seen_seconds referenced
+[PASS] alerts: metric control_plane_http_request_duration_seconds referenced
+[PASS] alerts: metric agentrace_stage_total referenced
+[PASS] alerts: metric agentrace_self_eval_score referenced
+[PASS] alerts: metric agentrace_tokens_total referenced
+[PASS] ack: cmd/helixon-slo-ack compiles
+[PASS] ack: cmd/helixon-slo-ack tests green
+[PASS] skill: agent-self-evaluation SKILL.md present + valid frontmatter
+[PASS] skill: metrics-dashboard SKILL.md present + valid frontmatter
+[PASS] skill: agent-self-evaluation references Alertmanager
+[PASS] skill: metrics-dashboard references Alertmanager
+[PASS] skill: agent-self-evaluation uses incidents ledger
+[PASS] runbook: observability/runbook.md present
+[PASS] runbook: Qwen36ZeroCellsReady documented
+[PASS] runbook: Qwen36High5xx documented
+[PASS] runbook: ControlPlaneDown documented
+[PASS] runbook: FleetHeartbeatsStale documented
+[PASS] runbook: AgentraceHighErrorRate documented
+[PASS] runbook: AgentraceLowSelfEvalScore documented
+[PASS] evidence: v14513 ack drill captured
+[PASS] ack: CLI exposes --alertmanager + --sprint + --ack-window
+[PASS] ack: 5m P0 / 15m P1 windows
+[PASS] ack: cmd/helixon-slo-ack compiles
+[PASS] ack: cmd/helixon-slo-ack tests green
+[PASS] skill: agent-self-evaluation SKILL.md present + valid frontmatter
+[PASS] skill: metrics-dashboard SKILL.md present + valid frontmatter
+[PASS] skill: agent-self-evaluation references Alertmanager
+[PASS] skill: metrics-dashboard references Alertmanager
+[PASS] skill: agent-self-evaluation uses incidents ledger
+[PASS] runbook: observability/runbook.md present
+[PASS] runbook: Qwen36ZeroCellsReady documented
+[PASS] runbook: Qwen36High5xx documented
+[PASS] runbook: ControlPlaneDown documented
+[PASS] runbook: FleetHeartbeatsStale documented
+[PASS] runbook: AgentraceHighErrorRate documented
+[PASS] runbook: AgentraceLowSelfEvalScore documented
+[PASS] evidence: v14513 ack drill captured
+[PASS] ack: CLI exposes --alertmanager + --sprint + --ack-window
+[PASS] ack: 5m P0 / 15m P1 windows
+
+=============================
+verifier: PASS=66  FAIL=0
+=============================
+RESULT: at/above v14512 bar (>= 18 PASS)
