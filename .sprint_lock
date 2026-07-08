@@ -1,1 +1,1 @@
-{"pair_id":"pair-4","sprint_id":"v14511","phase":"review","started_at":"2026-07-09T01:10:00+10:00","pid":323750,"operator":"jaslian@DESKTOP-12RO1AF","guards":["pair-lock-skip-concurrent-pair","agentcage-experimental-flag","cost-observability-required","vendor-sha256-required"]}
+{"pair_id":"pair-5","sprint_id":"v14512","phase":"mvp","started_at":"2026-07-15T15:00:00Z","pid":474350,"operator":"helixon-agent","guards":["tier4-verifier","pair-lock"]}

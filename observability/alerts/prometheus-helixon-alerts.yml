@@ -1,0 +1,237 @@
+# prometheus-helixon-alerts.yml
+# Helixon platform P0/P1 SLO alert rules for Prometheus.
+#
+# Conventions:
+#   P0 = page on-call immediately (sev1)
+#   P1 = notify channel, page if persists > 30m (sev2)
+#   P2 = log + weekly review (no page)
+#
+# Severity mapping:
+#   severity: page    -> PagerDuty + Slack #oncall
+#   severity: notify  -> Slack #helixon-alerts
+#   severity: log     -> Grafana log + weekly review
+#
+# Authored: 2026-07-15 (v14512 Pair-5 MVP).
+
+groups:
+  # ----------------------------------------------------------------------
+  # 1. qwen36 fleet (LLM cells)
+  # ----------------------------------------------------------------------
+  - name: helixon.qwen36-fleet
+    interval: 30s
+    rules:
+      # P0: zero cells ready for >2m -> no LLM available
+      - alert: Qwen36ZeroCellsReady
+        expr: sum(qwen36_cell_ready) == 0
+        for: 2m
+        labels:
+          severity: page
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "No qwen36 cell is ready"
+          description: |
+            sum(qwen36_cell_ready) has been 0 for > 2 minutes. Every tier
+            request will fail. Page on-call.
+          runbook: "https://github.com/nfsarch33/helixon-platform/blob/main/session-handoffs/v14513-handoff.md#qwen36-zero-cells"
+
+      # P1: cells-ready count drops by 50% within 5m
+      - alert: Qwen36CellsReadyDrop
+        expr: (sum(qwen36_cell_ready) < 0.5 * sum(qwen36_cell_ready offset 5m))
+              and (sum(qwen36_cell_ready) > 0)
+        for: 5m
+        labels:
+          severity: notify
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "qwen36 cells-ready halved in 5m"
+          description: |
+            Ready cell count dropped from {{ $value | printf "%.0f" }} to half
+            of its 5-minute-ago value. Investigate blocked cells.
+
+      # P1: 5xx error rate > 5% sustained 5m
+      - alert: Qwen36High5xx
+        expr: |
+          sum(rate(qwen36_request_total{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(qwen36_request_total[5m])), 1e-9) > 0.05
+        for: 5m
+        labels:
+          severity: page
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "qwen36 5xx ratio > 5% (5m)"
+          description: |
+            5xx ratio is {{ $value | humanizePercentage }} over the last 5
+            minutes (threshold 5%).
+
+      # P1: p99 request latency > 8s sustained 5m
+      - alert: Qwen36HighLatencyP99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(qwen36_request_latency_seconds_bucket[5m])) by (le)
+          ) > 8
+        for: 5m
+        labels:
+          severity: notify
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "qwen36 p99 latency > 8s"
+          description: |
+            p99 request latency is {{ $value | printf "%.2f" }}s for 5m. SLO
+            breach (target p99 < 4s for tier-2 cells).
+
+      # P1: GPU memory below 8 GiB free on any cell
+      - alert: Qwen36LowGpuMemory
+        expr: qwen36_gpu_mem_free_mib < 8192
+        for: 5m
+        labels:
+          severity: notify
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "qwen36 cell {{ $labels.cell_id }} low GPU memory"
+          description: |
+            Free GPU memory is {{ $value }} MiB (< 8 GiB). Likely OOM risk.
+          runbook: "https://github.com/nfsarch33/helixon-platform/blob/main/session-handoffs/v14513-handoff.md#low-gpu-mem"
+
+      # P2: cost surge (USD/hr > 2x weekly baseline)
+      - alert: Qwen36CostSurge
+        expr: |
+          sum(rate(qwen36_est_cost_usd_total[1h])) * 3600
+          > 2 * avg_over_time(
+              sum(rate(qwen36_est_cost_usd_total[1h]))[1w:1h]
+            )[1w:1h]
+        for: 30m
+        labels:
+          severity: notify
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "qwen36 cost is 2x weekly baseline"
+          description: |
+            Hourly cost (${{ $value | printf "%.2f" }}) is more than 2x the
+            trailing 7-day hourly mean. Investigate prompt volume or tier
+            mis-routing.
+
+  # ----------------------------------------------------------------------
+  # 2. control-plane
+  # ----------------------------------------------------------------------
+  - name: helixon.control-plane
+    interval: 30s
+    rules:
+      # P0: control plane down
+      - alert: ControlPlaneDown
+        expr: max(control_plane_up) == 0
+        for: 2m
+        labels:
+          severity: page
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "Helixon control plane is DOWN"
+          description: |
+            /healthz reported down for 2m. No handoffs, no fleet heartbeats
+            will be accepted. Page on-call.
+
+      # P0: /readyz not ready
+      - alert: ControlPlaneNotReady
+        expr: max(control_plane_ready) == 0
+        for: 5m
+        labels:
+          severity: page
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "Helixon control plane /readyz FALSE"
+          description: |
+            /readyz has been FALSE for 5m. Traffic should be shed by the
+            ingress; verify health.
+
+      # P1: fleet heartbeat stale > 10m on > 2 nodes
+      - alert: FleetHeartbeatsStale
+        expr: count(time() - control_plane_fleet_node_last_seen_seconds > 600) > 2
+        for: 5m
+        labels:
+          severity: notify
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "{{ $value }} fleet nodes are silent >10m"
+          description: |
+            More than 2 fleet nodes have missed their heartbeat for >10m.
+            Check network mesh and node health.
+
+      # P1: API p95 > 500ms
+      - alert: ControlPlaneHighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(control_plane_http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: notify
+          team: helixon-platform
+          sprint: v14512
+        annotations:
+          summary: "control-plane {{ $labels.endpoint }} p95 > 500ms"
+          description: |
+            Endpoint p95 latency is {{ $value | printf "%.2f" }}s (SLO 250ms).
+
+  # ----------------------------------------------------------------------
+  # 3. agentrace traces (Helixon fleet agents)
+  # ----------------------------------------------------------------------
+  - name: helixon.agentrace
+    interval: 30s
+    rules:
+      # P1: agent error ratio > 20% over 15m
+      - alert: AgentraceHighErrorRate
+        expr: |
+          sum(rate(agentrace_stage_total{status="error"}[15m]))
+          / clamp_min(sum(rate(agentrace_stage_total[15m])), 1e-9) > 0.20
+        for: 15m
+        labels:
+          severity: page
+          team: helixon-fleet
+          sprint: v14512
+        annotations:
+          summary: "agentrace error ratio > 20% (15m)"
+          description: |
+            Stage error ratio is {{ $value | humanizePercentage }} over 15m.
+            Investigate the dominant error classification via the
+            agentrace-traces dashboard.
+
+      # P1: mean self-eval score < 0.5 for 30m
+      - alert: AgentraceLowSelfEvalScore
+        expr: avg(agentrace_self_eval_score) < 0.5
+        for: 30m
+        labels:
+          severity: notify
+          team: helixon-fleet
+          sprint: v14512
+        annotations:
+          summary: "agentrace mean self-eval score < 0.5"
+          description: |
+            Average self-evaluation score is {{ $value | printf "%.2f" }}
+            over 30m. Fleet agents may be degrading quality.
+
+      # P2: token spike (10x weekly median)
+      - alert: AgentraceTokenSpike
+        expr: |
+          sum(rate(agentrace_tokens_total[1h])) * 3600
+          > 10 * avg_over_time(
+              sum(rate(agentrace_tokens_total[1h]))[1w:1h]
+            )[1w:1h]
+        for: 30m
+        labels:
+          severity: log
+          team: helixon-fleet
+          sprint: v14512
+        annotations:
+          summary: "agentrace token usage 10x weekly mean"
+          description: |
+            Token rate is {{ $value | humanize }} tokens/hr, 10x the
+            trailing 7-day mean. Check beforeSubmitPrompt hook tier
+            routing.
