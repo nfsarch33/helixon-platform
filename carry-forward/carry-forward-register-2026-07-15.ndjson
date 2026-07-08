@@ -27,4 +27,7 @@
 {"id":"v14518-cf-004","sprint":"v14518","item":"Cross-repo hygiene: helixon-autoresearch not seeded","severity":"low","evidence":"v14520 EvoSpine will seed; defer to v14520"}{"id":"v14519-cf-001","sprint":"v14519","item":"Weekly cron for close-stale-prs.py","severity":"medium","evidence":"manual sweep; defer to v14520 weekly cron"}
 {"id":"v14519-cf-002","sprint":"v14519","item":"GitHub App for batch operations (Helixon-bot)","severity":"medium","evidence":"defer to v14520"}
 {"id":"v14519-cf-003","sprint":"v14519","item":"EvoSpine seed for helixon-autoresearch","severity":"high","evidence":"defer to v14520"}
-{"id":"v14519-cf-004","sprint":"v14519","item":"backfill triage entries for v14509-v14514","severity":"low","evidence":"ledger started in v14518; backfill manually"}
+{"id":"v14519-cf-004","sprint":"v14519","item":"backfill triage entries for v14509-v14514","severity":"low","evidence":"ledger started in v14518; backfill manually"}{"id":"v14520-cf-001","sprint":"v14520","item":"Apply evospine hypothesis: .github/workflows/close-stale-prs.yml weekly cron","severity":"high","evidence":"v14521 will apply"}
+{"id":"v14520-cf-002","sprint":"v14520","item":"Helixon-bot GitHub App for batch ops","severity":"medium","evidence":"v14521 will mint"}
+{"id":"v14520-cf-003","sprint":"v14520","item":"Autoresearch scheduler plugin to call our cycle driver","severity":"medium","evidence":"v14521 will integrate"}
+{"id":"v14520-cf-004","sprint":"v14520","item":"Cycle driver Go port (perf)","severity":"low","evidence":"defer to v14522 if needed"}
