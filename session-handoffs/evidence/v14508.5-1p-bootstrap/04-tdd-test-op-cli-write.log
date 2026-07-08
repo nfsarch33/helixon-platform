@@ -1,0 +1,14 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/jaslian/Code/helixon-platform
+collecting ... collected 6 items
+
+tests/test_op_cli_write.py::OpCliWritePathTest::test_01_whoami_returns_service_account PASSED [ 16%]
+tests/test_op_cli_write.py::OpCliWritePathTest::test_02_vault_list_contains_cursor_ironclaw PASSED [ 33%]
+tests/test_op_cli_write.py::OpCliWritePathTest::test_03_read_existing_login_password PASSED [ 50%]
+tests/test_op_cli_write.py::OpCliWritePathTest::test_04_item_create_hangs_without_desktop_app PASSED [ 66%]
+tests/test_op_cli_write.py::OpCliWritePathTest::test_05_bootstrap_binary_builds PASSED [ 83%]
+tests/test_op_cli_write.py::OpCliWritePathTest::test_06_bootstrap_idempotent PASSED [100%]
+
+============================== 6 passed in 13.74s ==============================
