@@ -15,4 +15,6 @@
 {"id":"v14515-cf-002","sprint":"v14515","item":"cursor-global-kb MacBook sweep across all research/ + runbooks/ + agentic-ai-research/","severity":"low","evidence":"helixon-platform sweep done; global-kb sweep deferred to v14518"}
 {"id":"v14515-cf-003","sprint":"v14515","item":"Wire rtx.Cache + headroom.Check into choose-llm hook decide binary","severity":"high","evidence":"enforce.go is library-only; binary integration deferred to v14517"}
 {"id":"v14515-cf-004","sprint":"v14515","item":"Per-tenant budget cap enforcement (costobs.Hook)","severity":"high","evidence":"deferred; v14516 agent-card.yaml will carry budget_usd_per_day"}
-{"id":"v14515-cf-005","sprint":"v14515","item":"Replace LCG jitter in internal/notify with crypto/rand","severity":"low","evidence":"v14513 noted; reroll deferred"}
+{"id":"v14515-cf-005","sprint":"v14515","item":"Replace LCG jitter in internal/notify with crypto/rand","severity":"low","evidence":"v14513 noted; reroll deferred"}{"id":"v14516-cf-001","sprint":"v14516","item":"Pair-lock across personas (single shared .sprint_lock)","severity":"high","evidence":"deferred to v14517"}
+{"id":"v14516-cf-002","sprint":"v14516","item":"docs/persona-schema.md (full JSON-schema equivalent of YAML)","severity":"medium","evidence":"deferred to v14517"}
+{"id":"v14516-cf-003","sprint":"v14516","item":"Hook integration test (spawn choose-llm hook decide from real beforeSubmitPrompt)","severity":"medium","evidence":"deferred to v14517"}
