@@ -2,10 +2,16 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon/platform"
 )
@@ -227,5 +233,89 @@ func TestTaskCmdTruncateHelper(t *testing.T) {
 	}
 	if got := truncate("hi", 100); got != "hi" {
 		t.Errorf("truncate short: %q", got)
+	}
+}
+
+// freeTCPAddr returns a TCP address bound to an ephemeral port. The
+// listener is closed before returning so the caller can rebind on the
+// same port. Used by the platform healthz/readyz subprocess test.
+func freeTCPAddr(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("net.Listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	return addr
+}
+
+// TestPlatform_ExposesHealthzAndReadyz_v14509 pins the v14509 Sentrux
+// pair-3 closeout: the production binary's `helixon platform` subcommand
+// must expose /healthz and /readyz on the bound address so k8s liveness/
+// readiness probes can wire in. This closes the v14506 plan-vs-reality
+// gap noted in session-handoffs/v14506-handoff.md.
+//
+// The test spawns the actual binary as a subprocess (so the cobra root
+// + signal.NotifyContext path is exercised) and curls both endpoints.
+func TestPlatform_ExposesHealthzAndReadyz_v14509(t *testing.T) {
+	addr := freeTCPAddr(t)
+	bin := filepath.Join(t.TempDir(), "helixon")
+	if err := exec.Command("go", "build", "-o", bin, "../../cmd/helixon").Run(); err != nil {
+		t.Fatalf("go build helixon: %v", err)
+	}
+	cmd := exec.Command(bin, "platform", "--addr", addr)
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("cmd.Start: %v", err)
+	}
+	defer func() {
+		_ = cmd.Process.Signal(os.Interrupt)
+		_, _ = cmd.Process.Wait()
+	}()
+
+	// Wait up to 3 s for the listener to come up.
+	client := &http.Client{Timeout: 2 * time.Second}
+	deadline := time.Now().Add(3 * time.Second)
+	var healthResp *http.Response
+	var healthErr error
+	for time.Now().Before(deadline) {
+		healthResp, healthErr = client.Get("http://" + addr + "/healthz")
+		if healthErr == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if healthErr != nil {
+		t.Fatalf("GET /healthz never succeeded within 3 s: %v", healthErr)
+	}
+	defer healthResp.Body.Close()
+	if healthResp.StatusCode != http.StatusOK {
+		t.Fatalf("/healthz status=%d want 200", healthResp.StatusCode)
+	}
+	var healthBody map[string]any
+	if err := json.NewDecoder(healthResp.Body).Decode(&healthBody); err != nil {
+		t.Fatalf("decode /healthz: %v", err)
+	}
+	if status, _ := healthBody["status"].(string); status != "ok" {
+		t.Errorf("/healthz status=%q want ok (full=%v)", status, healthBody)
+	}
+
+	readyResp, err := client.Get("http://" + addr + "/readyz")
+	if err != nil {
+		t.Fatalf("GET /readyz: %v", err)
+	}
+	defer readyResp.Body.Close()
+	if readyResp.StatusCode != http.StatusOK {
+		t.Fatalf("/readyz status=%d want 200", readyResp.StatusCode)
+	}
+	var readyBody map[string]any
+	if err := json.NewDecoder(readyResp.Body).Decode(&readyBody); err != nil {
+		t.Fatalf("decode /readyz: %v", err)
+	}
+	// /readyz may report either {"ready":true} (no gate) or {"ready":false,"reason":...}.
+	if _, ok := readyBody["ready"]; !ok {
+		t.Errorf("/readyz missing 'ready' field: %v", readyBody)
 	}
 }
