@@ -146,13 +146,13 @@ func RunSlowVendor(ctx context.Context, t *testing.T) error {
 	return nil // timeout error is the expected outcome
 }
 
-// RunIntermittent4xx serves 400 every other call. Verifies the
+// RunIntermittent4xx serves 400 on the 2nd call. Verifies the
 // retry policy treats 4xx as deterministic (fail-fast; no retry).
 func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
 	var requestCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := requestCount.Add(1)
-		if n%2 == 0 {
+		if n == 2 {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -160,13 +160,24 @@ func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
 	}))
 	defer srv.Close()
 
+	// First call: 200 OK
 	resp, err := http.Get(srv.URL)
 	if err != nil {
 		return fmt.Errorf("chaos: get failed: %w", err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 400 {
-		return fmt.Errorf("chaos: expected 400 (intermittent 4xx on 2nd call); got %d", resp.StatusCode)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("chaos: expected 200 on 1st call; got %d", resp.StatusCode)
+	}
+
+	// Second call: 400 (intermittent 4xx) — must fail-fast, no retry
+	resp2, err := http.Get(srv.URL)
+	if err != nil {
+		return fmt.Errorf("chaos: get failed: %w", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != 400 {
+		return fmt.Errorf("chaos: expected 400 (intermittent 4xx on 2nd call); got %d", resp2.StatusCode)
 	}
 	if got := requestCount.Load(); got != 2 {
 		return fmt.Errorf("chaos: expected exactly 2 requests (fail-fast); got %d", got)
