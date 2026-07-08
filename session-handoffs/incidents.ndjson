@@ -1,0 +1,2 @@
+{"ts":"2026-07-08T16:46:01Z","alertname":"Qwen36High5xx","severity":"page","sprint":"v14513","ack_within_min":5,"silence_id":"drill-1"}
+{"ts":"2026-07-08T16:46:01Z","alertname":"FleetHeartbeatsStale","severity":"notify","sprint":"v14513","ack_within_min":15,"silence_id":"drill-2"}
