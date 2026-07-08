@@ -1,0 +1,68 @@
+# prometheus.yml — Helixon observability sidecar config.
+#
+# Loaded by the Prometheus container started via
+# `docker run -p 9090:9090 -v $PWD/prometheus.yml:/etc/prometheus/prometheus.yml
+#         -v $PWD/alerts:/etc/prometheus/alerts
+#         prom/prometheus:latest`.
+#
+# Authored: 2026-07-15 (v14512 Pair-5 MVP).
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: helixon-fleet
+    sprint: v14512
+
+rule_files:
+  - /etc/prometheus/alerts/prometheus-helixon-alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # control-plane HTTP /metrics endpoint (v14508 healthz + readyz deliverable).
+  - job_name: helixon-control-plane
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: ["127.0.0.1:8080"]
+        labels:
+          component: control-plane
+          sprint: v14512
+
+  # qwen36 cells (one target per llama.cpp / vLLM cell).
+  - job_name: qwen36-cells
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - "127.0.0.1:8001"   # C1
+          - "127.0.0.1:8002"   # C2
+          - "127.0.0.1:8003"   # C3
+          - "127.0.0.1:8004"   # C4
+          - "127.0.0.1:8005"   # C5
+          - "127.0.0.1:8010"   # C7
+        labels:
+          component: qwen36
+          team: helixon-platform
+
+  # agentrace SDK on the Helixon fleet agents (one per persona).
+  - job_name: agentrace-fleet
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "127.0.0.1:9101"
+          - "127.0.0.1:9102"
+          - "127.0.0.1:9103"
+          - "127.0.0.1:9104"
+        labels:
+          component: agentrace
+          team: helixon-fleet
+
+  # Prometheus itself.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

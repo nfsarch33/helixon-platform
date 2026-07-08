@@ -1,0 +1,72 @@
+# docker-compose.observability.yml — Helixon observability sidecar.
+#
+# Spins up Prometheus + Grafana + Alertmanager wired to:
+#   - control-plane /metrics (port 8080)
+#   - qwen36 cells (ports 8001-8010)
+#   - agentrace fleet agents (ports 9101-9104)
+#
+# Usage (from helixon-platform/observability/):
+#   docker compose -f docker-compose.observability.yml up -d
+#   open http://localhost:3000 (Grafana, admin/admin on first run)
+#
+# Authored: 2026-07-15 (v14512 Pair-5 MVP).
+
+version: "3.9"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: helixon-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts:/etc/prometheus/alerts:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    networks:
+      - helixon-obs
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: helixon-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    networks:
+      - helixon-obs
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: helixon-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana-provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - helixon-obs
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  helixon-obs:
+    driver: bridge

@@ -1,0 +1,72 @@
+[PASS] build: cmd/choose-llm compiles
+[PASS] build: cmd/eval-smoke compiles
+[PASS] cli: choose-llm version
+[PASS] cli: choose-llm matrix list
+[PASS] cli: choose-llm pick tier=3
+[PASS] smoke: eval-smoke produces a 10-row scoreboard
+[PASS] tests: internal/llm/qwen36 green
+[PASS] tests: internal/choosehook green
+[PASS] tests: internal/costobs green
+[PASS] tests: cmd/choose-llm green
+[PASS] tests: cmd/eval-smoke green
+[PASS] hook: install sub-command present
+[PASS] hook: decide sub-command present
+[PASS] hook: install emits valid hooks.json (with beforeSubmitPrompt)
+[PASS] hook: decide roundtrips DecideInput -> Output JSON
+[PASS] cost-obs: NDJSON sink writes valid JSON rows
+[PASS] agentcage: install-agentcage.sh --dry-run exits 0
+[PASS] agentcage: install-agentcage test suite 100% green
+[PASS] sentinel: 0001-control-plane-schema.md
+[PASS] sentinel: matrix.go
+[PASS] sentinel: router.go
+[PASS] sentinel: choosehook.go
+[PASS] sentinel: costobs.go
+[PASS] sentinel: main.go
+[PASS] sentinel: main.go
+[PASS] sentinel: prompts-10.json
+[PASS] sentinel: design.md
+[PASS] sentinel: install-agentcage.sh
+[PASS] sentinel: v14509-handoff.md
+[PASS] sentinel: v14510-handoff.md
+[PASS] sentinel: v14511-handoff.md
+[PASS] choosehook: heuristic supports tier0 keywords
+[PASS] choosehook: costobs integration wired
+[PASS] qwen36: router honours tier3 speculative
+[PASS] choose-llm: uses Cobra OutOrStdout
+[PASS] prompts-10.json: 10 prompts across all tiers
+[PASS] matrix: qwen36-matrix.yaml present
+[PASS] matrix: qwen36-matrix.yaml has cells key
+[PASS] cost-obs: row schema has model + est_cost_usd
+[PASS] agentcage: version pin 0.29.0 present
+[PASS] agentcage: SHA256 verification present
+[PASS] agentcage: podman rootless check present
+[PASS] agentcage: helixon-cursor cage bootstrap present
+[PASS] sentinel: internal/llm/qwen36/matrix_test.go
+[PASS] sentinel: internal/llm/qwen36/router_test.go
+[PASS] sentinel: internal/choosehook/choosehook_test.go
+[PASS] sentinel: internal/costobs/costobs_test.go
+[PASS] sentinel: internal/smoke/smoke.go
+[PASS] sentinel: internal/smoke/smoke_test.go
+[PASS] sentinel: cmd/choose-llm/main_test.go
+[PASS] sentinel: cmd/choose-llm/hook_test.go
+[PASS] sentinel: cmd/eval-smoke/main_test.go
+[PASS] sentinel: scripts/agentcage/test-install-agentcage.sh
+[PASS] sentinel: scripts/agentcage/install-tier4-verify.sh
+[PASS] sentinel: reports/eval-runs/eval-run-v14510-01-tier-smoke.json
+[PASS] v14512: observability cross-layer verifier 32/32 PASS
+[PASS] sentinel: prometheus.yml [v14512]
+[PASS] sentinel: alertmanager.yml [v14512]
+[PASS] sentinel: docker-compose.observability.yml [v14512]
+[PASS] sentinel: README.md [v14512]
+[PASS] sentinel: verify-observability.sh [v14512]
+[PASS] sentinel: prometheus-helixon-alerts.yml [v14512]
+[PASS] sentinel: qwen36-fleet.json [v14512]
+[PASS] sentinel: control-plane.json [v14512]
+[PASS] sentinel: agentrace-traces.json [v14512]
+[PASS] sentinel: datasource.yml [v14512]
+[PASS] sentinel: dashboards.yml [v14512]
+
+=============================
+verifier: PASS=67  FAIL=0
+=============================
+RESULT: at/above v14511 bar (>= 53 PASS)
