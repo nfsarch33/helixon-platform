@@ -1,0 +1,100 @@
+# https://taskfile.dev
+version: '3'
+
+vars:
+  GOVERSION: '1.26'
+
+env:
+  GOFLAGS: -buildvcs=false
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  install:
+    desc: Install dev tools (golangci-lint, govulncheck, gosec, staticcheck)
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install golang.org/x/vuln/cmd/govulncheck@latest
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - go install honnef.co/go/tools/cmd/staticcheck@latest
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint (strict, 5m timeout)
+    cmds:
+      - golangci-lint run --timeout 5m ./...
+
+  vuln:
+    desc: Run govulncheck for known CVEs
+    cmds:
+      - govulncheck ./...
+
+  sec:
+    desc: Run gosec security scanner
+    cmds:
+      - gosec -severity=medium -confidence=medium ./...
+
+  test:
+    desc: Run all tests with race + coverage
+    cmds:
+      - go test -race -count=1 -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out | tail -1
+
+  test-coverage-check:
+    desc: Verify coverage >=70% on all packages
+    cmds:
+      - |
+        threshold=70
+        go test -count=1 -cover ./... 2>&1 | tee /tmp/cov.out | tail -20
+        low=$(awk '$NF+0 < threshold {print $2}' threshold=$threshold /tmp/cov.out)
+        if [ -n "$low" ]; then echo "FAIL: low-coverage packages: $low"; exit 1; fi
+        echo "OK: all packages >= $threshold%"
+
+  trivy-fs:
+    desc: Run trivy filesystem scan
+    cmds:
+      - trivy fs --exit-code 1 --severity HIGH,CRITICAL --no-progress .
+
+  nancy:
+    desc: Run nancy for go module vulnerabilities
+    cmds:
+      - |
+        go list -json -deps ./... | nancy sleuth --output text
+
+  ci:
+    desc: Run the full CI gauntlet (vet + lint + vuln + sec + test + trivy + nancy)
+    cmds:
+      - task: vet
+      - task: lint
+      - task: vuln
+      - task: sec
+      - task: test
+      - task: trivy-fs
+      - task: nancy
+
+  build:
+    desc: Build all binaries
+    cmds:
+      - CGO_ENABLED=1 go build -ldflags="-s -w" -o bin/helixon ./cmd/helixon
+
+  docker-build:
+    desc: Build the docker image
+    cmds:
+      - docker build -t ghcr.io/nfsarch33/helixon-platform:{{.TAG | default "dev"}} .
+
+  helm-lint:
+    desc: Lint the Helm chart
+    cmds:
+      - helm lint charts/helixon-control-plane
+
+  helm-template:
+    desc: Render the Helm chart
+    cmds:
+      - helm template test charts/helixon-control-plane

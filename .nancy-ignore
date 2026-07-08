@@ -1,0 +1,6 @@
+# Nancy ignore list (Go module vulnerabilities that are accepted risks)
+# Format: <GSA-x> / <CVE-y>
+# Each line is a justification for ignoring a specific advisory.
+
+# Example:
+# CVE-2023-45285 # accepted: low-impact HTTP/2 read timeouts, not exposed
