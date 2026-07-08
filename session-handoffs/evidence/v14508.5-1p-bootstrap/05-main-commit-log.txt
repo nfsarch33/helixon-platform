@@ -1,0 +1,8 @@
+7c43807 Merge pull request #9 from nfsarch33/feature/v14508-retry-helper
+dc0d8b0 feat(retry): v14508 - generic retry policy helper (4xx fail-fast, 5xx backoff, ErrExhausted)
+e0341ab docs: v14507 handoff
+fcc5606 chore(ci): v14507 - lint/trivy/nancy/helm CI gauntlet + devcontainer + Taskfile
+8533655 feat(controlplane): v14506 - /healthz + /readyz HTTP endpoint + Helm chart skeleton
+77b90dd Merge pull request #10 from nfsarch33/fix/notify-test-backoff-floor
+f773ad2 fix(notify): mask LCG high bit in hashJitter to keep backoff non-negative
+4f50f73 fix(chaos): RunIntermittent4xx test now asserts fail-fast on 2nd call (#6)
