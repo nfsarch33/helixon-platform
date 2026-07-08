@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "helixon-control-plane.fullname" . }}-config
+  labels:
+    {{- include "helixon-control-plane.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    healthz_addr: {{ .Values.config.healthzAddr }}
+    sprintboard_base_url: {{ .Values.config.sprintboardBaseURL }}
+    a2a_gateway_url: {{ .Values.config.a2aGatewayURL }}
+    log_level: {{ .Values.config.logLevel }}
