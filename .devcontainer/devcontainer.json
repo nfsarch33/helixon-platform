@@ -1,0 +1,31 @@
+{
+  "name": "helixon-platform",
+  "image": "mcr.microsoft.com/devcontainers/go:1.26-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/helm:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "go.testFlags": ["-race", "-count=1"],
+        "go.coverOnSave": true,
+        "go.coverageDecorator": {
+          "type": "gutter",
+          "coveredHighlightColor": "rgba(64,128,64,0.5)",
+          "uncoveredHighlightColor": "rgba(128,64,64,0.5)"
+        }
+      }
+    }
+  },
+  "postCreateCommand": "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && go install golang.org/x/vuln/cmd/govulncheck@latest && go install github.com/securego/gosec/v2/cmd/gosec@latest",
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=${localWorkspaceFolder}/.devcontainer-cache,target=/go/pkg/mod,type=cache,consistency=cached"
+  ]
+}
