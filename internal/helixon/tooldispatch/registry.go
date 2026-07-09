@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/llm"
+	"github.com/nfsarch33/helixon-platform/internal/toolresult"
 )
 
 var (
@@ -93,18 +94,41 @@ func (r *Registry) Unregister(name string) bool {
 // Execute dispatches a tool call by name, validating and parsing arguments.
 // Implements the agent.ToolExecutor interface.
 func (r *Registry) Execute(ctx context.Context, name string, argsJSON string) (string, error) {
+	res, err := r.ExecuteToolResult(ctx, name, argsJSON)
+	if err != nil {
+		// Return the original error so errors.Is(err, sentinel) still works in callers
+		// that pre-date ToolResult. The full ToolResult is also retained for new
+		// callers via ExecuteToolResult.
+		return res.Output, err
+	}
+	return res.Output, nil
+}
+
+// ExecuteToolResult is the canonical, typed form of Execute. It returns a
+// toolresult.ToolResult capturing status, output, error, latency, cost,
+// idempotency key, and content hash. The legacy Execute wraps this and
+// returns only the string output + error for backward compatibility.
+func (r *Registry) ExecuteToolResult(ctx context.Context, name string, argsJSON string) (toolresult.ToolResult, error) {
 	r.mu.RLock()
 	def, ok := r.tools[name]
 	r.mu.RUnlock()
 
+	start := time.Now()
+	idemKey := toolresult.NewToolResult(name, argsJSON, "", "", "", 0, 0).IdempotencyKey
+
 	if !ok {
-		return "", fmt.Errorf("%w: %s", ErrToolNotFound, name)
+		res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusError, "", ErrToolNotFound.Error()+": "+name, time.Since(start).Milliseconds(), 0)
+		res.IdempotencyKey = idemKey
+		return res, fmt.Errorf("%w: %s", ErrToolNotFound, name)
 	}
 
 	var args map[string]any
 	if argsJSON != "" && argsJSON != "{}" {
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-			return "", fmt.Errorf("%w: %s: %s", ErrInvalidArguments, name, err)
+			msg := ErrInvalidArguments.Error() + ": " + name + ": " + err.Error()
+			res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusError, "", msg, time.Since(start).Milliseconds(), 0)
+			res.IdempotencyKey = idemKey
+			return res, fmt.Errorf("%w: %s: %s", ErrInvalidArguments, name, err)
 		}
 	}
 	if args == nil {
@@ -113,14 +137,16 @@ func (r *Registry) Execute(ctx context.Context, name string, argsJSON string) (s
 
 	if len(def.Parameters) > 0 {
 		if err := validateArgs(def.Parameters, args); err != nil {
-			return "", fmt.Errorf("%w: %s: %s", ErrInvalidArguments, name, err)
+			msg := ErrInvalidArguments.Error() + ": " + name + ": " + err.Error()
+			res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusError, "", msg, time.Since(start).Milliseconds(), 0)
+			res.IdempotencyKey = idemKey
+			return res, fmt.Errorf("%w: %s: %s", ErrInvalidArguments, name, err)
 		}
 	}
 
 	execCtx, cancel := context.WithTimeout(ctx, def.Timeout)
 	defer cancel()
 
-	start := time.Now()
 	result, err := def.Handler(execCtx, args)
 	elapsed := time.Since(start)
 
@@ -132,12 +158,19 @@ func (r *Registry) Execute(ctx context.Context, name string, argsJSON string) (s
 
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return "", fmt.Errorf("%w: %s after %s", ErrToolTimeout, name, def.Timeout)
+			msg := ErrToolTimeout.Error() + " after " + def.Timeout.String()
+			res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusError, "", msg, elapsed.Milliseconds(), 0)
+			res.IdempotencyKey = idemKey
+			return res, fmt.Errorf("%w: %s after %s", ErrToolTimeout, name, def.Timeout)
 		}
-		return "", err
+		res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusError, "", err.Error(), elapsed.Milliseconds(), 0)
+		res.IdempotencyKey = idemKey
+		return res, err
 	}
 
-	return result, nil
+	res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusOK, result, "", elapsed.Milliseconds(), 0)
+	res.IdempotencyKey = idemKey
+	return res, nil
 }
 
 // Available returns the tool definitions in OpenAI tool format.
