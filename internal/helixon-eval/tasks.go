@@ -2,11 +2,11 @@
 // offline trace generator and the catalogue.
 //
 // The 5 tasks are:
-//   1. long-running context retention
-//   2. self-improvement loop termination
-//   3. multi-step coding
-//   4. eval rubric application
-//   5. PlanSync PR creation
+//  1. long-running context retention
+//  2. self-improvement loop termination
+//  3. multi-step coding
+//  4. eval rubric application
+//  5. PlanSync PR creation
 //
 // Sprint 18 runs STAGING EVAL ONLY — Aliyun quota is exhausted. The
 // SynthSource below emits deterministic per-(task, model) traces so the
@@ -172,47 +172,96 @@ var TaskToID = func() map[string]string {
 	return out
 }()
 
+// slugify converts a free-form string into a lowercase, dash-separated
+// URL slug. Decomposed from a 21-CC monolith into a small state
+// machine with a per-rune dispatcher (CC ≤ 4 each) for tech-debt-block-8.
 func slugify(s string) string {
 	out := make([]byte, 0, len(s))
 	prevDash := true
 	prevWasLower := false
-	prevWasUpper := false
 	runes := []byte(s)
 	for i := 0; i < len(runes); i++ {
 		c := runes[i]
-		switch {
-		case c >= 'A' && c <= 'Z':
-			// Break on lowercase → uppercase boundary (e.g. "Sync" start).
-			// Consecutive uppercase runs (e.g. "PR") stay together.
-			atBoundary := (!prevDash && len(out) > 0 && prevWasLower) ||
-				(i > 0 && runes[i-1] >= 'A' && runes[i-1] <= 'Z' && i+1 < len(runes) && runes[i+1] >= 'a' && runes[i+1] <= 'z')
-			if atBoundary {
-				out = append(out, '-')
-			}
-			out = append(out, c+32)
-			prevDash = false
-			prevWasLower = false
-			_ = prevWasUpper // tracked for parity, not currently used
-		case c >= 'a' && c <= 'z':
-			out = append(out, c)
-			prevDash = false
-			prevWasLower = true
-		case c >= '0' && c <= '9':
-			out = append(out, c)
-			prevDash = false
-			prevWasLower = false
+		switch classifyRune(c) {
+		case runeUpper:
+			out, prevDash, prevWasLower = emitUpper(runes, i, out, prevDash, prevWasLower)
+		case runeLower:
+			out, prevDash, prevWasLower = emitLower(c, out, prevDash, prevWasLower)
+		case runeDigit:
+			out, prevDash, prevWasLower = emitDigit(c, out, prevDash, prevWasLower)
 		default:
-			if !prevDash && len(out) > 0 {
-				out = append(out, '-')
-				prevDash = true
-			}
+			out, prevDash = emitSeparator(out, prevDash)
 			prevWasLower = false
 		}
 	}
+	out = trimTrailingDashes(out)
+	return string(out)
+}
+
+// runeClass is the per-character classification used by slugify.
+type runeClass int
+
+const (
+	runeOther runeClass = iota
+	runeUpper
+	runeLower
+	runeDigit
+)
+
+// classifyRune returns the class of c. CC=4.
+func classifyRune(c byte) runeClass {
+	switch {
+	case c >= 'A' && c <= 'Z':
+		return runeUpper
+	case c >= 'a' && c <= 'z':
+		return runeLower
+	case c >= '0' && c <= '9':
+		return runeDigit
+	default:
+		return runeOther
+	}
+}
+
+// emitUpper handles an uppercase letter. CC=4.
+func emitUpper(runes []byte, i int, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
+	atBoundary := (!prevDash && len(out) > 0 && prevWasLower) ||
+		(i > 0 && runes[i-1] >= 'A' && runes[i-1] <= 'Z' && i+1 < len(runes) && runes[i+1] >= 'a' && runes[i+1] <= 'z')
+	if atBoundary {
+		out = append(out, '-')
+	}
+	out = append(out, runes[i]+32)
+	return out, false, false
+}
+
+// emitLower handles a lowercase letter. CC=1.
+func emitLower(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
+	out = append(out, c)
+	return out, false, true
+}
+
+// emitDigit handles a digit. CC=1.
+func emitDigit(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
+	out = append(out, c)
+	return out, false, false
+}
+
+// emitSeparator appends a dash when we are not already at one.
+// Returns the (possibly extended) buffer and the new prevDash flag.
+// CC=2.
+func emitSeparator(out []byte, prevDash bool) ([]byte, bool) {
+	if !prevDash && len(out) > 0 {
+		out = append(out, '-')
+		return out, true
+	}
+	return out, prevDash
+}
+
+// trimTrailingDashes strips any trailing dashes. CC=2.
+func trimTrailingDashes(out []byte) []byte {
 	for len(out) > 0 && out[len(out)-1] == '-' {
 		out = out[:len(out)-1]
 	}
-	return string(out)
+	return out
 }
 
 func maxValue(m map[string]int) int {

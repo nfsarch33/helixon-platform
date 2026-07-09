@@ -84,20 +84,7 @@ func (h *HTTPChannel) Serve(ctx context.Context, handler MessageHandler) error {
 	}
 
 	h.logger.Info("HTTP channel listening", slog.String("addr", h.cfg.Addr))
-
-	errCh := make(chan error, 1)
-	go func() {
-		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errCh <- err
-		}
-	}()
-
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-		return nil
-	}
+	return runServerUntilCancel(ctx, h.server)
 }
 
 func (h *HTTPChannel) Shutdown(ctx context.Context) error {
@@ -208,20 +195,7 @@ func (ws *WebSocketChannel) Serve(ctx context.Context, handler MessageHandler) e
 	}
 
 	ws.logger.Info("WebSocket channel listening", slog.String("addr", ws.cfg.Addr))
-
-	errCh := make(chan error, 1)
-	go func() {
-		if err := ws.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errCh <- err
-		}
-	}()
-
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-		return nil
-	}
+	return runServerUntilCancel(ctx, ws.server)
 }
 
 func (ws *WebSocketChannel) Shutdown(ctx context.Context) error {
@@ -252,6 +226,25 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "")
 	_ = enc.Encode(v)
+}
+
+// runServerUntilCancel starts srv.ListenAndServe() in a goroutine and waits
+// for either a server error or ctx cancellation. It returns nil on graceful
+// cancellation (the standard pattern across HTTPChannel and WebSocketChannel
+// in this package). tech-debt-block-8.
+func runServerUntilCancel(ctx context.Context, srv *http.Server) error {
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		return nil
+	}
 }
 
 // CLIChannelAdapter wraps the existing channel/repl.REPL as a Channel interface.

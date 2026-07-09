@@ -62,71 +62,150 @@ func LoadPromptsFile(p string) ([]Prompt, error) {
 // other tests can verify each check independently. The response text
 // is the model's raw content; token / latency checks use the
 // pre-computed fields on Result.
+//
+// Decomposed from a 24-CC monolith into 8 focused check functions
+// (CC ≤ 3 each) for tech-debt-block-8. The orchestrator runs all
+// checks in order and short-circuits on the first failure (early
+// return is the v14510 spec).
 func (r Rubric) Accepts(content string) bool {
 	lc := strings.ToLower(content)
-	for _, s := range r.ContainsSubstrings {
-		if !strings.Contains(lc, strings.ToLower(s)) {
-			return false
-		}
-	}
-	if len(r.ContainsSubstringsAny) > 0 {
-		matched := false
-		for _, s := range r.ContainsSubstringsAny {
-			if strings.Contains(lc, strings.ToLower(s)) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	}
-	if r.MaxWords > 0 && wordCount(content) > r.MaxWords {
-		return false
-	}
-	if r.MinWords > 0 && wordCount(content) < r.MinWords {
-		return false
-	}
-	if r.MinNewlines > 0 && strings.Count(content, "\n") < r.MinNewlines {
-		return false
-	}
-	if r.MaxCompletionTokens > 0 && wordCount(content) > r.MaxCompletionTokens {
-		return false
-	}
-	if r.Regex != "" {
-		re, err := regexp.Compile(r.Regex)
-		if err != nil || !re.MatchString(strings.TrimSpace(content)) {
-			return false
-		}
-	}
-	if r.JSONArrayMinLen > 0 {
-		var arr []any
-		if err := json.Unmarshal([]byte(content), &arr); err != nil {
-			return false
-		}
-		if len(arr) < r.JSONArrayMinLen {
-			return false
-		}
-	}
-	if r.ExactJSON != nil {
-		var got any
-		if err := json.Unmarshal([]byte(content), &got); err != nil {
-			return false
-		}
-		// We do not deep-compare via reflect because some
-		// models return `{"ok": true}` while our fixture
-		// parses to `map[string]any{"ok": true}`; comparison
-		// through JSON round-trip is the simplest evidence.
-		bb, _ := json.Marshal(r.ExactJSON)
-		var want any
-		_ = json.Unmarshal(bb, &want)
-		gb, _ := json.Marshal(got)
-		wb, _ := json.Marshal(want)
-		if string(gb) != string(wb) {
+	for _, check := range r.checks() {
+		if !check(lc, content) {
 			return false
 		}
 	}
 	return true
+}
+
+// checks returns the ordered list of validation check functions. Each
+// function returns true when the content passes that check. Adding a
+// new Rubric field is a one-line addition here.
+func (r Rubric) checks() []func(lc, content string) bool {
+	out := []func(lc, content string) bool{}
+	if len(r.ContainsSubstrings) > 0 {
+		out = append(out, checkContainsSubstrings(r.ContainsSubstrings))
+	}
+	if len(r.ContainsSubstringsAny) > 0 {
+		out = append(out, checkContainsSubstringsAny(r.ContainsSubstringsAny))
+	}
+	if r.MaxWords > 0 {
+		out = append(out, checkMaxWords(r.MaxWords))
+	}
+	if r.MinWords > 0 {
+		out = append(out, checkMinWords(r.MinWords))
+	}
+	if r.MinNewlines > 0 {
+		out = append(out, checkMinNewlines(r.MinNewlines))
+	}
+	if r.MaxCompletionTokens > 0 {
+		out = append(out, checkMaxCompletionTokens(r.MaxCompletionTokens))
+	}
+	if r.Regex != "" {
+		out = append(out, checkRegex(r.Regex))
+	}
+	if r.JSONArrayMinLen > 0 {
+		out = append(out, checkJSONArrayMinLen(r.JSONArrayMinLen))
+	}
+	if r.ExactJSON != nil {
+		out = append(out, checkExactJSON(r.ExactJSON))
+	}
+	return out
+}
+
+// checkContainsSubstrings verifies the content contains every required
+// substring (case-insensitive). CC=2.
+func checkContainsSubstrings(needles []string) func(lc, _ string) bool {
+	return func(lc, _ string) bool {
+		for _, s := range needles {
+			if !strings.Contains(lc, strings.ToLower(s)) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// checkContainsSubstringsAny verifies the content contains at least
+// one of the allowed substrings (case-insensitive). CC=3.
+func checkContainsSubstringsAny(needles []string) func(lc, _ string) bool {
+	return func(lc, _ string) bool {
+		for _, s := range needles {
+			if strings.Contains(lc, strings.ToLower(s)) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// checkMaxWords fails when the content has more than `max` words. CC=2.
+func checkMaxWords(max int) func(_, content string) bool {
+	return func(_, content string) bool {
+		return wordCount(content) <= max
+	}
+}
+
+// checkMinWords fails when the content has fewer than `min` words. CC=2.
+func checkMinWords(min int) func(_, content string) bool {
+	return func(_, content string) bool {
+		return wordCount(content) >= min
+	}
+}
+
+// checkMinNewlines fails when the content has fewer than `min`
+// newline characters. CC=2.
+func checkMinNewlines(min int) func(_, content string) bool {
+	return func(_, content string) bool {
+		return strings.Count(content, "\n") >= min
+	}
+}
+
+// checkMaxCompletionTokens fails when the content has more than
+// `max` words (proxy for completion tokens). CC=2.
+func checkMaxCompletionTokens(max int) func(_, content string) bool {
+	return func(_, content string) bool {
+		return wordCount(content) <= max
+	}
+}
+
+// checkRegex fails when the content does not match the regex. CC=3.
+func checkRegex(pattern string) func(_, content string) bool {
+	re, err := regexp.Compile(pattern)
+	return func(_, content string) bool {
+		if err != nil {
+			return false
+		}
+		return re.MatchString(strings.TrimSpace(content))
+	}
+}
+
+// checkJSONArrayMinLen fails when the content is not a JSON array of
+// at least `min` elements. CC=3.
+func checkJSONArrayMinLen(min int) func(_, content string) bool {
+	return func(_, content string) bool {
+		var arr []any
+		if err := json.Unmarshal([]byte(content), &arr); err != nil {
+			return false
+		}
+		return len(arr) >= min
+	}
+}
+
+// checkExactJSON fails when the content does not match the expected
+// JSON after a round-trip marshal/unmarshal. CC=3.
+func checkExactJSON(want any) func(_, content string) bool {
+	bb, _ := json.Marshal(want)
+	var w any
+	_ = json.Unmarshal(bb, &w)
+	wb, _ := json.Marshal(w)
+	return func(_, content string) bool {
+		var got any
+		if err := json.Unmarshal([]byte(content), &got); err != nil {
+			return false
+		}
+		gb, _ := json.Marshal(got)
+		return string(gb) == string(wb)
+	}
 }
 
 // Result is one row of the smoke output; it mirrors the existing

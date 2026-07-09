@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/notify"
+	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric/noop"
 )
@@ -502,3 +503,170 @@ func TestIdempotencyStore_NeverRedactsKey(t *testing.T) {
 
 // Ensure import is used (otel package may be needed by implementation; safe to keep here)
 var _ = otel.GetTracerProvider
+
+// --- v17409-4: notifydb integration tests ---
+
+func TestResend_AuditDB_RecordsSuccess(t *testing.T) {
+	dir := t.TempDir()
+	db, err := notifydb.Open(dir+"/audit.sqlite3", nil)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer db.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"ok-1"}`))
+	}))
+	defer srv.Close()
+
+	c := notify.NewResendClient(notify.ResendConfig{
+		APIKey: "re_test", BaseURL: srv.URL, FromAddr: "ops@cylrl.com.au",
+		Timeout: time.Second, MaxRetry: 0,
+		OtelMeter: noop.NewMeterProvider().Meter("t"),
+	}).WithAuditDB(db)
+
+	if err := c.Send(context.Background(), notify.Email{
+		To:             []string{"jaslian@gmail.com"},
+		Subject:        "audit-success",
+		HTMLBody:       "<p>hi</p>",
+		IdempotencyKey: "audit-ok-1",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	got, found, err := db.Get(context.Background(), "audit-ok-1")
+	if err != nil || !found {
+		t.Fatalf("Get audit-ok-1: found=%v err=%v", found, err)
+	}
+	if got.Status != "ok" {
+		t.Errorf("Status: want ok, got %q", got.Status)
+	}
+	if got.Vendor != "resend" {
+		t.Errorf("Vendor: want resend, got %q", got.Vendor)
+	}
+}
+
+func TestResend_AuditDB_RecordsError(t *testing.T) {
+	dir := t.TempDir()
+	db, err := notifydb.Open(dir+"/audit.sqlite3", nil)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer db.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"bad input"}`))
+	}))
+	defer srv.Close()
+
+	c := notify.NewResendClient(notify.ResendConfig{
+		APIKey: "re_test", BaseURL: srv.URL, FromAddr: "ops@cylrl.com.au",
+		Timeout: time.Second, MaxRetry: 0,
+		OtelMeter: noop.NewMeterProvider().Meter("t"),
+	}).WithAuditDB(db)
+
+	if err := c.Send(context.Background(), notify.Email{
+		To:             []string{"jaslian@gmail.com"},
+		Subject:        "audit-error",
+		IdempotencyKey: "audit-err-1",
+	}); err == nil {
+		t.Fatal("Send: want error, got nil")
+	}
+
+	got, found, _ := db.Get(context.Background(), "audit-err-1")
+	if !found {
+		t.Fatal("audit-err-1 not recorded")
+	}
+	if got.Status != "error" {
+		t.Errorf("Status: want error, got %q", got.Status)
+	}
+	if got.Error == "" {
+		t.Error("Error: want non-empty error string")
+	}
+}
+
+func TestBrevo_AuditDB_RecordsSuccess(t *testing.T) {
+	dir := t.TempDir()
+	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
+	defer db.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"messageId":"brevo-1"}`))
+	}))
+	defer srv.Close()
+
+	c := notify.NewBrevoClient(notify.BrevoConfig{
+		APIKey: "xkeysib-test", BaseURL: srv.URL,
+		Timeout: time.Second, MaxRetry: 0,
+		OtelMeter: noop.NewMeterProvider().Meter("t"),
+	}).WithAuditDB(db)
+
+	if err := c.Send(context.Background(), notify.Email{
+		To:             []string{"jaslian@gmail.com"},
+		Subject:        "brevo-audit",
+		IdempotencyKey: "brevo-audit-1",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	got, found, _ := db.Get(context.Background(), "brevo-audit-1")
+	if !found || got.Vendor != "brevo" || got.Status != "ok" {
+		t.Fatalf("brevo audit row: found=%v vendor=%q status=%q", found, got.Vendor, got.Status)
+	}
+}
+
+func TestResend_AuditDB_RecordsDeadLetter(t *testing.T) {
+	dir := t.TempDir()
+	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
+	defer db.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"oops"}`))
+	}))
+	defer srv.Close()
+
+	c := notify.NewResendClient(notify.ResendConfig{
+		APIKey: "re_test", BaseURL: srv.URL, FromAddr: "ops@cylrl.com.au",
+		Timeout: 100 * time.Millisecond, MaxRetry: 1,
+		OtelMeter: noop.NewMeterProvider().Meter("t"),
+	}).WithAuditDB(db)
+
+	_ = c.Send(context.Background(), notify.Email{
+		To:             []string{"jaslian@gmail.com"},
+		Subject:        "dead-letter",
+		IdempotencyKey: "dl-1",
+	})
+
+	got, found, _ := db.Get(context.Background(), "dl-1")
+	if !found {
+		t.Fatal("dl-1 not recorded")
+	}
+	if got.Status != "error" {
+		t.Errorf("Status: want error, got %q", got.Status)
+	}
+}
+
+func TestResend_AuditDB_InsertIsIdempotent(t *testing.T) {
+	// Verifies that the audit DB itself de-duplicates by ID (not the
+	// dispatcher in-memory store). We use the DB layer directly here
+	// because the dispatcher's in-memory idempotency store short-circuits
+	// duplicate idempotency keys before they ever reach the audit path.
+	dir := t.TempDir()
+	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
+	defer db.Close()
+
+	row := notifydb.Dispatch{
+		ID: "shared-key", Vendor: "resend", Status: "ok", CreatedUnix: 1,
+	}
+	for i := 0; i < 3; i++ {
+		_ = db.Insert(context.Background(), row)
+	}
+	counts, _ := db.CountByVendor(context.Background())
+	if counts["resend"] != 1 {
+		t.Fatalf("resend count: want 1 unique row, got %d", counts["resend"])
+	}
+}
