@@ -30,6 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nfsarch33/helixon-platform/internal/notify/metrics"
 	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -110,10 +111,11 @@ type ResendConfig struct {
 
 // ResendClient is the Resend HTTP-API client. Implements Client.
 type ResendClient struct {
-	cfg   ResendConfig
-	do    HTTPDoer
-	id    *IdempotencyStore
-	audit *notifydb.DB
+	cfg     ResendConfig
+	do      HTTPDoer
+	id      *IdempotencyStore
+	audit   *notifydb.DB
+	metrics *metrics.Registry
 }
 
 // NewResendClient returns a Resend client with the supplied config.
@@ -136,6 +138,13 @@ func NewResendClient(cfg ResendConfig) *ResendClient {
 // WithAuditDB attaches a notifydb persistence sink. v17409-4.
 func (c *ResendClient) WithAuditDB(db *notifydb.DB) *ResendClient {
 	c.audit = db
+	return c
+}
+
+// WithMetrics attaches a metrics.Registry for observability counters.
+// v17409-6.
+func (c *ResendClient) WithMetrics(r *metrics.Registry) *ResendClient {
+	c.metrics = r
 	return c
 }
 
@@ -222,6 +231,9 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 	maxAttempt := c.cfg.MaxRetry + 1
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempt; attempt++ {
+		if c.metrics != nil {
+			c.metrics.IncAttempt(metrics.VendorResend)
+		}
 		req, _ := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(body)))
 		req.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
 		req.Header.Set("Content-Type", "application/json")
@@ -233,6 +245,9 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 			if attempt == maxAttempt {
 				finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
 				c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+				if c.metrics != nil {
+					c.metrics.IncSend(metrics.VendorResend, metrics.StatusDeadLetter)
+				}
 				return finalErr
 			}
 			backoff(attempt)
@@ -243,6 +258,9 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, nil)
+			if c.metrics != nil {
+				c.metrics.IncSend(metrics.VendorResend, metrics.StatusSuccess)
+			}
 			return nil // success
 		}
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
@@ -251,6 +269,9 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 			// API key (it shouldn't, but defence-in-depth).
 			finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
 			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			if c.metrics != nil {
+				c.metrics.IncSend(metrics.VendorResend, metrics.StatusBadRequest)
+			}
 			return finalErr
 		}
 		// 5xx: transient
@@ -258,6 +279,9 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 		if attempt == maxAttempt {
 			finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
 			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			if c.metrics != nil {
+				c.metrics.IncSend(metrics.VendorResend, metrics.StatusDeadLetter)
+			}
 			return finalErr
 		}
 		backoff(attempt)
@@ -281,10 +305,11 @@ type BrevoConfig struct {
 
 // BrevoClient is the Brevo HTTP-API client.
 type BrevoClient struct {
-	cfg   BrevoConfig
-	do    HTTPDoer
-	id    *IdempotencyStore
-	audit *notifydb.DB
+	cfg     BrevoConfig
+	do      HTTPDoer
+	id      *IdempotencyStore
+	audit   *notifydb.DB
+	metrics *metrics.Registry
 }
 
 // NewBrevoClient returns a Brevo client with the supplied config.
@@ -310,6 +335,13 @@ func (c *BrevoClient) Vendor() string { return "brevo" }
 // WithAuditDB attaches a notifydb persistence sink. v17409-4.
 func (c *BrevoClient) WithAuditDB(db *notifydb.DB) *BrevoClient {
 	c.audit = db
+	return c
+}
+
+// WithMetrics attaches a metrics.Registry for observability counters.
+// v17409-6.
+func (c *BrevoClient) WithMetrics(r *metrics.Registry) *BrevoClient {
+	c.metrics = r
 	return c
 }
 
@@ -408,6 +440,9 @@ func (c *BrevoClient) doWithRetry(ctx context.Context, body []byte, m Email) err
 	maxAttempt := c.cfg.MaxRetry + 1
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempt; attempt++ {
+		if c.metrics != nil {
+			c.metrics.IncAttempt(metrics.VendorBrevo)
+		}
 		req, _ := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(body)))
 		req.Header.Set("api-key", c.cfg.APIKey)
 		req.Header.Set("Content-Type", "application/json")
@@ -419,6 +454,9 @@ func (c *BrevoClient) doWithRetry(ctx context.Context, body []byte, m Email) err
 			if attempt == maxAttempt {
 				finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
 				c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+				if c.metrics != nil {
+					c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusDeadLetter)
+				}
 				return finalErr
 			}
 			backoff(attempt)
@@ -429,17 +467,26 @@ func (c *BrevoClient) doWithRetry(ctx context.Context, body []byte, m Email) err
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, nil)
+			if c.metrics != nil {
+				c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusSuccess)
+			}
 			return nil
 		}
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 			finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
 			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			if c.metrics != nil {
+				c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusBadRequest)
+			}
 			return finalErr
 		}
 		lastErr = fmt.Errorf("%w: status %d", ErrTransient, resp.StatusCode)
 		if attempt == maxAttempt {
 			finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
 			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			if c.metrics != nil {
+				c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusDeadLetter)
+			}
 			return finalErr
 		}
 		backoff(attempt)
@@ -468,6 +515,29 @@ type Dispatcher struct {
 // NewDispatcher returns a vendor-rotating dispatcher.
 func NewDispatcher(cfg DispatcherConfig) *Dispatcher {
 	return &Dispatcher{cfg: cfg}
+}
+
+// WithMetrics propagates the metrics registry to both vendor clients
+// so the round-robin Send path emits the same counters. v17409-6.
+func (d *Dispatcher) WithMetrics(r *metrics.Registry) *Dispatcher {
+	if rc, ok := d.cfg.ResendClient.(*ResendClient); ok {
+		rc.WithMetrics(r)
+	}
+	if bc, ok := d.cfg.BrevoClient.(*BrevoClient); ok {
+		bc.WithMetrics(r)
+	}
+	return d
+}
+
+// WithAuditDB propagates the audit DB to both vendor clients. v17409-4.
+func (d *Dispatcher) WithAuditDB(db *notifydb.DB) *Dispatcher {
+	if rc, ok := d.cfg.ResendClient.(*ResendClient); ok {
+		rc.WithAuditDB(db)
+	}
+	if bc, ok := d.cfg.BrevoClient.(*BrevoClient); ok {
+		bc.WithAuditDB(db)
+	}
+	return d
 }
 
 // Send attempts the email via the round-robin pick; on ErrDeadLetter, falls
