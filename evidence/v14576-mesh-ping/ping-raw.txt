@@ -1,0 +1,65 @@
+=== tailscale ping from wsl1 (100.84.108.92) ===
+timestamp=2026-07-10T02:29:56+10:00
+
+--- win1 (100.119.60.6 / desktop-12ro1af-win1) ---
+ts_ping: pong from desktop-12ro1af-win1 (100.119.60.6) via 192.168.4.92:41641 in 1ms
+icmp_ping: --- 100.119.60.6 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 0.885/7.133/19.421/8.688 ms
+
+--- wsl2 (100.110.82.5 / desktop-0s5prj9-1-wsl2) ---
+ts_ping: pong from desktop-0s5prj9-1-wsl2 (100.110.82.5) via DERP(syd) in 33ms
+direct connection not established
+icmp_ping: --- 100.110.82.5 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 30.758/30.890/31.110/0.156 ms
+
+--- win2 (100.100.103.106 / desktop-0s5prj9-win2) ---
+ts_ping: pong from desktop-0s5prj9-win2 (100.100.103.106) via 192.168.4.64:41641 in 5ms
+icmp_ping: --- 100.100.103.106 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 3.468/7.978/16.432/5.982 ms
+
+--- wsl3 (100.73.98.10 / laptop-qbf2fuls-wsl3) ---
+ts_ping: pong from laptop-qbf2fuls-wsl3 (100.73.98.10) via DERP(syd) in 33ms
+direct connection not established
+icmp_ping: --- 100.73.98.10 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2001ms
+rtt min/avg/max/mdev = 32.245/32.501/32.728/0.198 ms
+
+--- win3 (unknown / laptop-qbf2fuls-win3) ---
+ts_ping: icmp_ping: 
+--- wsl4 (100.79.227.40 / desktop-p5bul0f-wsl4) ---
+ts_ping: pong from desktop-p5bul0f-wsl4 (100.79.227.40) via DERP(syd) in 31ms
+direct connection not established
+icmp_ping: --- 100.79.227.40 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 32.439/33.021/33.690/0.514 ms
+
+--- win4 (100.93.107.109 / desktop-p5bul0f-win4) ---
+ts_ping: pong from desktop-p5bul0f-win4 (100.93.107.109) via DERP(syd) in 32ms
+direct connection not established
+icmp_ping: --- 100.93.107.109 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 32.323/43.729/66.456/16.070 ms
+
+--- oci-sydney-jump (100.124.160.73 / oci-sydney-jump) ---
+ts_ping: ping "100.124.160.73" timed out
+no reply
+icmp_ping: --- 100.124.160.73 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2028ms
+
+
+--- oracle-jump (100.93.242.75 / oracle-jump) ---
+ts_ping: pong from oracle-jump (100.93.242.75) via 159.13.40.202:41641 in 17ms
+icmp_ping: --- 100.93.242.75 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 17.495/17.626/17.722/0.096 ms
+
+--- players-aerq61a (100.79.23.118 / players-aerq61a) ---
+ts_ping: ping "100.79.23.118" timed out
+no reply
+icmp_ping: --- 100.79.23.118 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2020ms
+
+

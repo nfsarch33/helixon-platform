@@ -1,0 +1,129 @@
+{
+  "sprint": "v14576",
+  "timestamp": "2026-07-10T02:35:50.946876",
+  "source_node": "wsl1",
+  "source_ip": "100.84.108.92",
+  "ts_status_health": "warn: /etc/resolv.conf overwritten (DNS fight)",
+  "matrix": [
+    {
+      "alias": "win1",
+      "tailscale_ip": "100.119.60.6",
+      "host": "desktop-12ro1af-win1",
+      "os": "windows",
+      "tailscale_ping": true,
+      "tailscale_path": "192.168.4.92:41641",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 0.999,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.119.60.6"
+    },
+    {
+      "alias": "wsl2",
+      "tailscale_ip": "100.110.82.5",
+      "host": "desktop-0s5prj9-1-wsl2",
+      "os": "linux",
+      "tailscale_ping": true,
+      "tailscale_path": "DERP(syd)",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 54.244,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.110.82.5"
+    },
+    {
+      "alias": "win2",
+      "tailscale_ip": "100.100.103.106",
+      "host": "desktop-0s5prj9-win2",
+      "os": "windows",
+      "tailscale_ping": true,
+      "tailscale_path": "100.100.57.26:37922",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 24.388,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.100.103.106"
+    },
+    {
+      "alias": "wsl3",
+      "tailscale_ip": "100.73.98.10",
+      "host": "laptop-qbf2fuls-wsl3",
+      "os": "linux",
+      "tailscale_ping": true,
+      "tailscale_path": "DERP(syd)",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 37.575,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.73.98.10"
+    },
+    {
+      "alias": "win3",
+      "tailscale_ip": "100.101.215.57",
+      "host": "laptop-qbf2fuls-win3",
+      "os": "windows",
+      "tailscale_ping": true,
+      "tailscale_path": "192.168.4.91:41641",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 2.413,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.101.215.57"
+    },
+    {
+      "alias": "wsl4",
+      "tailscale_ip": "100.79.227.40",
+      "host": "desktop-p5bul0f-wsl4",
+      "os": "linux",
+      "tailscale_ping": true,
+      "tailscale_path": "DERP(syd)",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 33.095,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.79.227.40"
+    },
+    {
+      "alias": "win4",
+      "tailscale_ip": "100.93.107.109",
+      "host": "desktop-p5bul0f-win4",
+      "os": "windows",
+      "tailscale_ping": true,
+      "tailscale_path": "DERP(syd)",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 35.066,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.93.107.109"
+    },
+    {
+      "alias": "oci-sydney-jump",
+      "tailscale_ip": "100.124.160.73",
+      "host": "oci-sydney-jump",
+      "os": "linux",
+      "tailscale_ping": false,
+      "tailscale_path": "unknown",
+      "icmp_reachable": false,
+      "icmp_rtt_avg_ms": null,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.124.160.73"
+    },
+    {
+      "alias": "oracle-jump",
+      "tailscale_ip": "100.93.242.75",
+      "host": "oracle-jump",
+      "os": "linux",
+      "tailscale_ping": true,
+      "tailscale_path": "159.13.40.202:41641",
+      "icmp_reachable": true,
+      "icmp_rtt_avg_ms": 18.039,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.93.242.75"
+    },
+    {
+      "alias": "players-aerq61a",
+      "tailscale_ip": "100.79.23.118",
+      "host": "players-aerq61a",
+      "os": "windows",
+      "tailscale_ping": false,
+      "tailscale_path": "unknown",
+      "icmp_reachable": false,
+      "icmp_rtt_avg_ms": null,
+      "dns_resolves": true,
+      "dns_resolved_ip": "100.79.23.118"
+    }
+  ]
+}

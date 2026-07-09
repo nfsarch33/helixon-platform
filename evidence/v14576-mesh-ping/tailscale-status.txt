@@ -1,0 +1,17 @@
+100.84.108.92    desktop-12ro1af-wsl1    jaslian@  linux    -                                                              
+100.110.82.5     desktop-0s5prj9-1-wsl2  jaslian@  linux    active; relay "syd", tx 30916564 rx 38210764                   
+100.100.103.106  desktop-0s5prj9-win2    jaslian@  windows  -                                                              
+100.119.60.6     desktop-12ro1af-win1    jaslian@  windows  -                                                              
+100.93.107.109   desktop-p5bul0f-win4    jaslian@  windows  -                                                              
+100.79.227.40    desktop-p5bul0f-wsl4    jaslian@  linux    active; relay "syd", tx 27471944 rx 24938520                   
+100.89.46.96     iphone172               jaslian@  iOS      offline, last seen 97d ago                                     
+100.103.140.10   jasnas3001              jaslian@  linux    -                                                              
+100.101.215.57   laptop-qbf2fuls-win3    jaslian@  windows  -                                                              
+100.73.98.10     laptop-qbf2fuls-wsl3    jaslian@  linux    active; relay "syd", tx 6896928 rx 2944972                     
+100.71.148.74    msi                     jaslian@  windows  offline, last seen 89d ago                                     
+100.124.160.73   oci-sydney-jump         jaslian@  linux    active; relay "syd"; offline, last seen 64d ago, tx 5148 rx 0  
+100.93.242.75    oracle-jump             jaslian@  linux    idle, tx 2917304 rx 2676856                                    
+100.79.23.118    players-aerq61a         jaslian@  windows  offline, last seen 53d ago                                     
+
+# Health check:
+#     - System DNS config not ideal. /etc/resolv.conf overwritten. See https://tailscale.com/s/dns-fight

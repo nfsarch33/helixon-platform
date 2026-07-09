@@ -1,0 +1,13 @@
+=== MagicDNS resolution from wsl1 ===
+timestamp=2026-07-10T02:30:48+10:00
+
+desktop-12ro1af-win1 -> 100.119.60.6    desktop-12ro1af-win1.tail447712.ts.net
+desktop-0s5prj9-1-wsl2 -> 100.110.82.5    desktop-0s5prj9-1-wsl2.tail447712.ts.net
+desktop-0s5prj9-win2 -> 100.100.103.106 desktop-0s5prj9-win2.tail447712.ts.net
+laptop-qbf2fuls-wsl3 -> 100.73.98.10    laptop-qbf2fuls-wsl3.tail447712.ts.net
+laptop-qbf2fuls-win3 -> 100.101.215.57  laptop-qbf2fuls-win3.tail447712.ts.net
+desktop-p5bul0f-wsl4 -> 100.79.227.40   desktop-p5bul0f-wsl4.tail447712.ts.net
+desktop-p5bul0f-win4 -> 100.93.107.109  desktop-p5bul0f-win4.tail447712.ts.net
+oci-sydney-jump -> 100.124.160.73  oci-sydney-jump.tail447712.ts.net
+oracle-jump -> 100.93.242.75   oracle-jump.tail447712.ts.net
+players-aerq61a -> 100.79.23.118   players-aerq61a.tail447712.ts.net
