@@ -1,0 +1,88 @@
+{
+  "sprint": "v14558",
+  "source": "wsl1 (100.84.108.92)",
+  "ts": "2026-07-09T22:12:52.108670",
+  "results": [
+    {
+      "name": "wsl1",
+      "tailscale_ip": "100.84.108.92",
+      "dns": "self",
+      "rtt_ms": 0.0,
+      "status": "SELF",
+      "dns_resolved_ip": null,
+      "dns_match": false
+    },
+    {
+      "name": "wsl2",
+      "tailscale_ip": "100.110.82.5",
+      "dns": "desktop-0s5prj9-1-wsl2.tail447712.ts.net",
+      "rtt_ms": 37.3,
+      "status": "REACHABLE",
+      "dns_resolved_ip": "100.110.82.5",
+      "dns_match": true,
+      "ts_state": "online",
+      "ts_relay": "syd",
+      "ts_direct_lan_ip": "2026-07-08T17:38:59.1Z"
+    },
+    {
+      "name": "win2",
+      "tailscale_ip": "100.100.103.106",
+      "dns": "desktop-0s5prj9-win2.tail447712.ts.net",
+      "rtt_ms": 6.38,
+      "status": "REACHABLE",
+      "dns_resolved_ip": "100.100.103.106",
+      "dns_match": true,
+      "ts_state": "online",
+      "ts_relay": "syd",
+      "ts_direct_lan_ip": "2026-07-08T17:38:59.1Z"
+    },
+    {
+      "name": "win3",
+      "tailscale_ip": "100.101.215.57",
+      "dns": "laptop-qbf2fuls-win3.tail447712.ts.net",
+      "rtt_ms": 4.54,
+      "status": "REACHABLE",
+      "dns_resolved_ip": "100.101.215.57",
+      "dns_match": true,
+      "ts_state": "online",
+      "ts_relay": "syd",
+      "ts_direct_lan_ip": "0001-01-01T00:00:00Z"
+    },
+    {
+      "name": "wsl3",
+      "tailscale_ip": "100.73.98.10",
+      "dns": "laptop-qbf2fuls-wsl3.tail447712.ts.net",
+      "rtt_ms": 35.8,
+      "status": "REACHABLE",
+      "dns_resolved_ip": "100.73.98.10",
+      "dns_match": true,
+      "ts_state": "online",
+      "ts_relay": "syd",
+      "ts_direct_lan_ip": "0001-01-01T00:00:00Z"
+    },
+    {
+      "name": "win4",
+      "tailscale_ip": "100.93.107.109",
+      "dns": "desktop-p5bul0f-win4.tail447712.ts.net",
+      "rtt_ms": 32.6,
+      "status": "REACHABLE",
+      "dns_resolved_ip": "100.93.107.109",
+      "dns_match": true,
+      "ts_state": "online",
+      "ts_relay": "syd",
+      "ts_direct_lan_ip": "0001-01-01T00:00:00Z"
+    },
+    {
+      "name": "wsl4",
+      "tailscale_ip": "100.79.227.40",
+      "dns": "desktop-p5bul0f-wsl4.tail447712.ts.net",
+      "rtt_ms": 33.8,
+      "status": "REACHABLE",
+      "dns_resolved_ip": "100.79.227.40",
+      "dns_match": true,
+      "ts_state": "online",
+      "ts_relay": "syd",
+      "ts_direct_lan_ip": "2026-07-08T17:38:59.1Z"
+    }
+  ]
+}

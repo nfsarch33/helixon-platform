@@ -1,0 +1,30 @@
+=== Helixon Fleet Mesh Reachability Sweep (v14558) ===
+Source: wsl1 (100.84.108.92)
+Timestamp: 2026-07-09T22:11:37+10:00
+
+Target,RTT_ms,Status,Hostname_Resolved
+wsl2,35.3,REACHABLE,100.110.82.5
+win2,49.2,REACHABLE,100.100.103.106
+win3,40.0,REACHABLE,100.101.215.57
+wsl3,35.7,REACHABLE,100.73.98.10
+win4,75.1,REACHABLE,100.93.107.109
+wsl4,37.6,REACHABLE,100.79.227.40
+
+=== tailscale status ===
+100.84.108.92    desktop-12ro1af-wsl1    jaslian@  linux    -                                                 
+100.110.82.5     desktop-0s5prj9-1-wsl2  jaslian@  linux    active; relay "syd", tx 24286176 rx 6946520       
+100.100.103.106  desktop-0s5prj9-win2    jaslian@  windows  active; direct 192.168.4.64:41641, tx 292 rx 316  
+100.119.60.6     desktop-12ro1af-win1    jaslian@  windows  -                                                 
+100.93.107.109   desktop-p5bul0f-win4    jaslian@  windows  active; relay "syd", tx 292 rx 220                
+100.79.227.40    desktop-p5bul0f-wsl4    jaslian@  linux    active; relay "syd", tx 18895616 rx 12624696      
+100.89.46.96     iphone172               jaslian@  iOS      offline, last seen 97d ago                        
+100.103.140.10   jasnas3001              jaslian@  linux    -                                                 
+100.101.215.57   laptop-qbf2fuls-win3    jaslian@  windows  active; direct 192.168.4.91:41641, tx 292 rx 220  
+100.73.98.10     laptop-qbf2fuls-wsl3    jaslian@  linux    active; relay "syd", tx 5236 rx 3512              
+100.71.148.74    msi                     jaslian@  windows  offline, last seen 89d ago                        
+100.124.160.73   oci-sydney-jump         jaslian@  linux    offline, last seen 64d ago                        
+100.93.242.75    oracle-jump             jaslian@  linux    -                                                 
+100.79.23.118    players-aerq61a         jaslian@  windows  offline, last seen 52d ago                        
+
+# Health check:
+#     - System DNS config not ideal. /etc/resolv.conf overwritten. See https://tailscale.com/s/dns-fight
