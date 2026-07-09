@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-07-10T07:38:00+10:00",
+  "sprint": "v14592",
+  "scan_root": "/home/jaslian/Code",
+  "active_nodes_yaml": [
+    {
+      "file": "cursor-global-kb/fleet/nodes.yaml",
+      "active_duplicates": 1,
+      "comment_mentions": 1,
+      "dedupe_needed": true
+    },
+    {
+      "file": "cursor-global-kb/inventory/fleet/nodes.yaml",
+      "active_duplicates": 0,
+      "comment_mentions": 0,
+      "dedupe_needed": false
+    },
+    {
+      "file": "helixon-kb/fleet/nodes.yaml",
+      "active_duplicates": 0,
+      "comment_mentions": 0,
+      "dedupe_needed": false
+    }
+  ],
+  "backup_files": [
+    {
+      "path": "/home/jaslian/Code/cursor-global-kb/fleet/nodes.yaml.bak-v7-pre-wsl3-jason-1783500632",
+      "fh3nbqn_count": 2
+    },
+    {
+      "path": "/home/jaslian/Code/cursor-global-kb/fleet/nodes.yaml.bak-phase-e-20260708-051329",
+      "fh3nbqn_count": 4
+    },
+    {
+      "path": "/home/jaslian/Code/cursor-global-kb/fleet/nodes.yaml.bak-v6-pre-v14503-1783499797",
+      "fh3nbqn_count": 2
+    },
+    {
+      "path": "/home/jaslian/Code/cursor-global-kb/fleet/nodes.yaml.bak-2026-07-08-pre-desk12ro1af",
+      "fh3nbqn_count": 4
+    },
+    {
+      "path": "/home/jaslian/Code/cursor-global-kb/fleet/nodes.yaml.bak-v6-pre-v14503-1783499771",
+      "fh3nbqn_count": 2
+    }
+  ],
+  "conclusion": "0 active duplicate desktop-fh3nbqn-* entries in any nodes.yaml. The v14502 dedupe (per v6 history comment in cursor-global-kb/fleet/nodes.yaml line 19) correctly removed all duplicates. .bak-* files are historical backups; they are not active config and should remain for audit purposes. No dedupe action required in v14592."
+}
