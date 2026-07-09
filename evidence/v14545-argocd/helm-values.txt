@@ -1,0 +1,100 @@
+USER-SUPPLIED VALUES:
+affinity:
+  nodeAffinity:
+    matchExpressions:
+    - key: kubernetes.io/hostname
+      operator: In
+      values:
+      - desktop-12ro1af
+    type: hard
+  podAntiAffinity: hard
+applicationSet:
+  enabled: true
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+configs:
+  cm:
+    createCustomHealthChecks: ""
+    url: https://argocd.helixon.local
+  params:
+    server.insecure: true
+controller:
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+crds:
+  install: false
+  keep: true
+dex:
+  enabled: false
+global:
+  domain: argocd.helixon.local
+ha:
+  enabled: false
+notifications:
+  enabled: false
+redis:
+  architecture: standalone
+  auth:
+    existingSecret: argocd-redis
+    existingSecretPasswordKey: auth
+  enabled: true
+  master:
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+repoServer:
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  service:
+    type: ClusterIP
+server:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      additionalLabels:
+        release: prometheus
+      enabled: true
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  service:
+    type: ClusterIP
+serviceAccount:
+  create: true
+  name: argocd-server
+tolerations: []

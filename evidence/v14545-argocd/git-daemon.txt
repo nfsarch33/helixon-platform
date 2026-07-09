@@ -1,0 +1,3 @@
+git daemon processes:
+2777274 /usr/bin/git daemon --base-path=/home/jaslian/Code/git-mirrors --export-all --reuseaddr --listen=0.0.0.0 --port=9418 --enable=upload-pack --enable=receive-pack /home/jaslian/Code/git-mirrors
+

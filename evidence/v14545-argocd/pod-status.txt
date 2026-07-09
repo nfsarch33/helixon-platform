@@ -1,0 +1,6 @@
+NAME                                                READY   STATUS    RESTARTS   AGE   IP           NODE              NOMINATED NODE   READINESS GATES
+argocd-application-controller-0                     1/1     Running   0          41m   10.42.0.19   desktop-12ro1af   <none>           <none>
+argocd-applicationset-controller-5b9675dd86-5ql4v   1/1     Running   0          41m   10.42.0.15   desktop-12ro1af   <none>           <none>
+argocd-redis-b97648d6d-s2xsn                        1/1     Running   0          41m   10.42.0.18   desktop-12ro1af   <none>           <none>
+argocd-repo-server-666d565b88-7lsxq                 1/1     Running   0          41m   10.42.0.16   desktop-12ro1af   <none>           <none>
+argocd-server-5d78df69bf-9xlbr                      1/1     Running   0          41m   10.42.0.17   desktop-12ro1af   <none>           <none>

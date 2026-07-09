@@ -1,0 +1,6 @@
+NAME                               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+argocd-applicationset-controller   ClusterIP   10.43.197.113   <none>        7000/TCP                     48m
+argocd-redis                       ClusterIP   10.43.23.113    <none>        6379/TCP                     48m
+argocd-repo-server                 ClusterIP   10.43.5.8       <none>        8081/TCP                     48m
+argocd-server                      NodePort    10.43.88.145    <none>        80:30080/TCP,443:31423/TCP   48m
+argocd-server-metrics              ClusterIP   10.43.12.195    <none>        8083/TCP                     48m

@@ -41,7 +41,7 @@ spec:
   project: helixon
   source:
     repoURL: git://100.84.108.92:9418/helixon-platform.git
-    targetRevision: main
+    targetRevision: feature/v14545-argocd-app-of-apps
     path: k8s/helixon-platform
     directory:
       recurse: true
@@ -74,7 +74,7 @@ spec:
   project: helixon
   source:
     repoURL: git://100.84.108.92:9418/helixon-platform.git
-    targetRevision: main
+    targetRevision: feature/v14545-argocd-app-of-apps
     path: k8s/sprintboard
     directory:
       recurse: true
@@ -107,7 +107,7 @@ spec:
   project: helixon
   source:
     repoURL: git://100.84.108.92:9418/helixon-platform.git
-    targetRevision: main
+    targetRevision: feature/v14545-argocd-app-of-apps
     path: k8s/argocd/apps
     directory:
       recurse: true
