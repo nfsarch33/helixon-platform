@@ -1,0 +1,15 @@
+=== 1Password item verification (UUID: ri4vhb25sijurxudb3ddjicsza) ===
+id: ri4vhb25sijurxudb3ddjicsza
+title: SENTRUX_SLACK_WEBHOOK
+category: API_CREDENTIAL
+vault: Cursor_IronClaw (eee7kcwy46ut2qvwytxw6nmdhi)
+version: 1
+created_at: 2026-07-09T18:50:30Z
+updated_at: 2026-07-09T18:50:30Z
+
+Fields:
+  notesPlain (STRING): None
+  webhook_url (CONCEALED): REDACTED [83 chars]
+  channel (STRING): #fleet-critical
+
+notesPlain (top-level): <none>
