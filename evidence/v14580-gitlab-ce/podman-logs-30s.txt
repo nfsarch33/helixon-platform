@@ -1,0 +1,100 @@
+      * directory[/opt/gitlab/sv/gitlab-kas/env] action create (up to date)
+      * ruby_block[Delete unmanaged env files for gitlab-kas service] action run (skipped due to only_if)
+      * template[/opt/gitlab/sv/gitlab-kas/check] action create (skipped due to only_if)
+      * template[/opt/gitlab/sv/gitlab-kas/finish] action create (skipped due to only_if)
+      * directory[/opt/gitlab/sv/gitlab-kas/control] action create (up to date)
+      * link[/opt/gitlab/init/gitlab-kas] action create (up to date)
+      * file[/opt/gitlab/sv/gitlab-kas/down] action nothing (skipped due to action :nothing)
+      * directory[/opt/gitlab/service] action create (up to date)
+      * link[/opt/gitlab/service/gitlab-kas] action create (up to date)
+      * directory[/opt/gitlab/service/gitlab-kas/supervise] action create (up to date)
+      * directory[/opt/gitlab/service/gitlab-kas/log/supervise] action create (up to date)
+      * ruby_block[wait for gitlab-kas service socket] action run (skipped due to not_if)
+      * file[/var/log/gitlab/gitlab-kas/current] action touch (skipped due to only_if)
+[2026-07-09T17:42:14+00:00] INFO: ruby_block[restart_log_service] called
+      - execute the ruby block restart_log_service
+    * directory[/opt/gitlab/service] action create (up to date)
+    * link[/opt/gitlab/service/gitlab-kas] action create (up to date)
+    * directory[/opt/gitlab/service/gitlab-kas/supervise] action create (up to date)
+    * directory[/opt/gitlab/service/gitlab-kas/log/supervise] action create (up to date)
+    * ruby_block[wait for gitlab-kas service socket] action run (skipped due to not_if)
+    * file[/var/log/gitlab/gitlab-kas/current] action touch (skipped due to only_if)
+  
+Recipe: nginx::directory
+  * directory[/var/opt/gitlab/nginx] action create[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx] created directory /var/opt/gitlab/nginx
+
+    - create new directory /var/opt/gitlab/nginx[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx] owner changed to 0
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx] group changed to 999
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx] mode changed to 750
+
+    - change mode from '' to '0750'
+    - change owner from '' to 'root'
+    - change group from '' to 'gitlab-www'
+  * directory[/var/opt/gitlab/nginx/conf] action create[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf] created directory /var/opt/gitlab/nginx/conf
+
+    - create new directory /var/opt/gitlab/nginx/conf[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf] owner changed to 0
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf] group changed to 999
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf] mode changed to 750
+
+    - change mode from '' to '0750'
+    - change owner from '' to 'root'
+    - change group from '' to 'gitlab-www'
+  * directory[/var/opt/gitlab/nginx/conf/service_conf] action create[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/service_conf] created directory /var/opt/gitlab/nginx/conf/service_conf
+
+    - create new directory /var/opt/gitlab/nginx/conf/service_conf[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/service_conf] owner changed to 0
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/service_conf] group changed to 999
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/service_conf] mode changed to 750
+
+    - change mode from '' to '0750'
+    - change owner from '' to 'root'
+    - change group from '' to 'gitlab-www'
+  * directory[/var/opt/gitlab/nginx/conf/upstream_definitions] action create[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/upstream_definitions] created directory /var/opt/gitlab/nginx/conf/upstream_definitions
+
+    - create new directory /var/opt/gitlab/nginx/conf/upstream_definitions[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/upstream_definitions] owner changed to 0
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/upstream_definitions] group changed to 999
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/upstream_definitions] mode changed to 750
+
+    - change mode from '' to '0750'
+    - change owner from '' to 'root'
+    - change group from '' to 'gitlab-www'
+  * directory[/var/opt/gitlab/nginx/conf/extra_metrics_conf] action create[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/extra_metrics_conf] created directory /var/opt/gitlab/nginx/conf/extra_metrics_conf
+
+    - create new directory /var/opt/gitlab/nginx/conf/extra_metrics_conf[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/extra_metrics_conf] owner changed to 0
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/extra_metrics_conf] group changed to 999
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/opt/gitlab/nginx/conf/extra_metrics_conf] mode changed to 750
+
+    - change mode from '' to '0750'
+    - change owner from '' to 'root'
+    - change group from '' to 'gitlab-www'
+  * directory[/var/log/gitlab/nginx] action create[2026-07-09T17:42:14+00:00] INFO: directory[/var/log/gitlab/nginx] created directory /var/log/gitlab/nginx
+
+    - create new directory /var/log/gitlab/nginx[2026-07-09T17:42:14+00:00] INFO: directory[/var/log/gitlab/nginx] owner changed to 0
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/log/gitlab/nginx] group changed to 999
+[2026-07-09T17:42:14+00:00] INFO: directory[/var/log/gitlab/nginx] mode changed to 750
+
+    - change mode from '' to '0750'
+    - change owner from '' to 'root'
+    - change group from '' to 'gitlab-www'
+  * link[/var/opt/gitlab/nginx/logs] action create[2026-07-09T17:42:14+00:00] INFO: link[/var/opt/gitlab/nginx/logs] created
+
+    - create symlink at /var/opt/gitlab/nginx/logs to /var/log/gitlab/nginx
+  * template[/var/opt/gitlab/nginx/conf/gitlab-http.conf] action delete (up to date)
+  * template[/var/opt/gitlab/nginx/conf/gitlab-smartcard-http.conf] action delete (up to date)
+  * template[/var/opt/gitlab/nginx/conf/gitlab-mattermost-http.conf] action delete (up to date)
+  * template[/var/opt/gitlab/nginx/conf/gitlab-pages.conf] action delete (up to date)
+  * template[/var/opt/gitlab/nginx/conf/gitlab-registry.conf] action delete (up to date)
+  * template[/var/opt/gitlab/nginx/conf/gitlab-kas.conf] action delete (up to date)
+Recipe: gitlab-kas::enable
+  * nginx_configuration[kas] action delete
+    * file[/var/opt/gitlab/nginx/conf/service_conf/gitlab-kas.conf] action delete (up to date)
+     (up to date)
+Recipe: gitlab::database_migrations
+  * ruby_block[check remote PG version] action nothing (skipped due to action :nothing)
+  * rails_migration[gitlab-rails] action run[2026-07-09T17:42:14+00:00] WARN: gitlab-rails does not have a log_group or default logdir mode defined. Setting to 0700.
+
+    * bash_hide_env[migrate gitlab-rails database] action run
+      [execute] Skipping Topology Service health check due to the cell being disabled
+                Running db:schema:load rake task
+                psql:/opt/gitlab/embedded/service/gitlab-rails/db/structure.sql:9: NOTICE:  extension "btree_gist" already exists, skipping
+                psql:/opt/gitlab/embedded/service/gitlab-rails/db/structure.sql:11: NOTICE:  extension "pg_trgm" already exists, skipping
+                Skipping altering cell sequences range due to the cell being disabled

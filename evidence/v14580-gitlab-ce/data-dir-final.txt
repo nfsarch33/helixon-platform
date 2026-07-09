@@ -1,0 +1,6 @@
+total 20
+drwxr-xr-x  5 jaslian ubuntu 4096 Jul 10 03:37 .
+drwxr-xr-x  3 root    root   4096 Jul 10 03:37 ..
+drwxrwxr-x  3 jaslian ubuntu 4096 Jul 10 03:54 config
+drwxr-xr-x 16 jaslian ubuntu 4096 Jul 10 03:55 data
+drwxr-xr-x 15 jaslian ubuntu 4096 Jul 10 03:43 logs

@@ -1,0 +1,1 @@
+0ff9dcbf820b  docker.io/gitlab/gitlab-ce:latest    /assets/init-cont...  3 minutes ago  Up 6 seconds (healthy)   0.0.0.0:2224->22/tcp, 0.0.0.0:8929->8929/tcp, 0.0.0.0:9443->443/tcp  gitlab-ce

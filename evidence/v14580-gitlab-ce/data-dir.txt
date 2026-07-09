@@ -1,0 +1,6 @@
+total 20
+drwxr-xr-x 5 ubuntu lxd  4096 Jul 10 03:37 .
+drwxr-xr-x 3 root   root 4096 Jul 10 03:37 ..
+drwxr-xr-x 2 ubuntu lxd  4096 Jul 10 03:37 config
+drwxr-xr-x 2 ubuntu lxd  4096 Jul 10 03:37 data
+drwxr-xr-x 2 ubuntu lxd  4096 Jul 10 03:37 logs

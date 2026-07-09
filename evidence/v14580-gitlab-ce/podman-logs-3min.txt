@@ -1,0 +1,50 @@
+[2026-07-09T17:52:54+00:00] ERROR: Running exception handlers
+There was an error running gitlab-ctl reconfigure:
+
+/etc/gitlab/gitlab.rb:3692: syntax error, unexpected constant, expecting end-of-input
+...tgresql[shared_buffers] = 256MB
+...                             ^~
+
+Running handlers complete
+[2026-07-09T17:52:54+00:00] ERROR: Exception handlers complete
+Infra Phase failed. 0 resources updated in 02 seconds
+[2026-07-09T17:52:54+00:00] FATAL: Stacktrace dumped to /opt/gitlab/embedded/cookbooks/cache/cinc-stacktrace.out
+[2026-07-09T17:52:54+00:00] FATAL: ---------------------------------------------------------------------------------------
+[2026-07-09T17:52:54+00:00] FATAL: PLEASE PROVIDE THE CONTENTS OF THE stacktrace.out FILE (above) IF YOU FILE A BUG REPORT
+[2026-07-09T17:52:54+00:00] FATAL: ---------------------------------------------------------------------------------------
+[2026-07-09T17:52:54+00:00] FATAL: SyntaxError: /etc/gitlab/gitlab.rb:3692: syntax error, unexpected constant, expecting end-of-input
+...tgresql[shared_buffers] = 256MB
+...                             ^~
+
+Thank you for using GitLab Docker Image!
+Current version: gitlab-ce=19.1.2-ce.0
+
+Configure GitLab for your system by editing /etc/gitlab/gitlab.rb file
+And restart this container to reload settings.
+To do it use docker exec:
+
+  docker exec -it gitlab editor /etc/gitlab/gitlab.rb
+  docker restart gitlab
+
+For a comprehensive list of configuration options please see the Omnibus GitLab readme
+https://gitlab.com/gitlab-org/omnibus-gitlab/blob/master/README.md
+
+If this container fails to start due to permission problems try to fix it by executing:
+
+  docker exec -it gitlab update-permissions
+  docker restart gitlab
+
+Cleaning stale PIDs & sockets
+Preparing services...
+Preparing OpenSSH service...
+Starting services...
+Configuring GitLab...
+/opt/gitlab/embedded/bin/runsvdir-start: line 34: ulimit: max user processes: cannot modify limit: Operation not permitted
+/opt/gitlab/embedded/bin/runsvdir-start: line 37: /proc/sys/fs/file-max: Read-only file system
+[2026-07-09T17:53:00+00:00] INFO: Started Cinc Zero at chefzero://localhost:1 with repository at /opt/gitlab/embedded (One version per cookbook)
+Cinc Client, version 18.3.0
+Patents: https://www.chef.io/patents
+Infra Phase starting
+[2026-07-09T17:53:00+00:00] INFO: *** Cinc Client 18.3.0 ***
+[2026-07-09T17:53:00+00:00] INFO: Platform: x86_64-linux
+[2026-07-09T17:53:00+00:00] INFO: Cinc-client pid: 36

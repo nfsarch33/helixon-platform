@@ -1,0 +1,100 @@
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/railties-7.2.3.1/lib/rails/initializable.rb:50:in `tsort_each_child'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:418:in `call'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:418:in `each_strongly_connected_component_from'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:352:in `block in each_strongly_connected_component'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:350:in `each'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:350:in `call'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:350:in `each_strongly_connected_component'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:229:in `tsort_each'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/tsort-0.2.0/lib/tsort.rb:208:in `tsort_each'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/railties-7.2.3.1/lib/rails/initializable.rb:60:in `run_initializers'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/railties-7.2.3.1/lib/rails/application.rb:435:in `initialize!'
+/opt/gitlab/embedded/service/gitlab-rails/config/environment.rb:7:in `<top (required)>'
+/opt/gitlab/embedded/lib/ruby/3.3.0/bundled_gems.rb:69:in `require'
+/opt/gitlab/embedded/lib/ruby/3.3.0/bundled_gems.rb:69:in `block (2 levels) in replace_require'
+/opt/gitlab/embedded/service/gitlab-rails/vendor/gems/sidekiq/lib/sidekiq/cli.rb:305:in `boot_application'
+/opt/gitlab/embedded/service/gitlab-rails/vendor/gems/sidekiq/lib/sidekiq/cli.rb:42:in `run'
+/opt/gitlab/embedded/service/gitlab-rails/vendor/gems/sidekiq/bin/sidekiq:31:in `<top (required)>'
+/opt/gitlab/embedded/lib/ruby/site_ruby/3.3.0/rubygems.rb:319:in `load'
+/opt/gitlab/embedded/lib/ruby/site_ruby/3.3.0/rubygems.rb:319:in `activate_and_load_bin_path'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/bin/sidekiq:25:in `<top (required)>'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/cli/exec.rb:61:in `load'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/cli/exec.rb:61:in `kernel_load'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/cli/exec.rb:24:in `run'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/cli.rb:504:in `exec'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/vendor/thor/lib/thor/command.rb:28:in `run'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/vendor/thor/lib/thor/invocation.rb:127:in `invoke_command'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/vendor/thor/lib/thor.rb:538:in `dispatch'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/cli.rb:35:in `dispatch'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/vendor/thor/lib/thor/base.rb:584:in `start'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/cli.rb:29:in `start'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/exe/bundle:28:in `block in <top (required)>'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/lib/bundler/friendly_errors.rb:118:in `with_friendly_errors'
+/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems/bundler-4.0.10/exe/bundle:20:in `<top (required)>'
+/opt/gitlab/embedded/lib/ruby/site_ruby/3.3.0/rubygems.rb:319:in `load'
+/opt/gitlab/embedded/lib/ruby/site_ruby/3.3.0/rubygems.rb:319:in `activate_and_load_bin_path'
+/opt/gitlab/embedded/bin/bundle:25:in `<main>'
+
+==> /var/log/gitlab/postgresql/current <==
+2026-07-09_18:00:41.63237 2026-07-09 18:00:41.632 GMT [13364] LOG:  skipping missing configuration file "/var/opt/gitlab/postgresql/data/postgresql.auto.conf"
+2026-07-09_18:00:41.63264 FATAL:  could not open file "/var/opt/gitlab/postgresql/data/PG_VERSION": Permission denied
+
+==> /var/log/gitlab/gitlab-kas/current <==
+2026-07-09_18:00:41.76300 {"time":"2026-07-09T18:00:41.762909331Z","level":"INFO","msg":"Running KAS","kas":"gitlab-kas/v19.1.2/v19.1.2"}
+2026-07-09_18:00:41.76358 {"time":"2026-07-09T18:00:41.763542073Z","level":"INFO","msg":"KAS shutdown done, exiting"}
+2026-07-09_18:00:41.76361 {"time":"2026-07-09T18:00:41.763566183Z","level":"ERROR","msg":"Program aborted","error":"redis client: dial unix /var/opt/gitlab/redis/redis.socket: connect: connection refused"}
+
+==> /var/log/gitlab/redis/current <==
+2026-07-09_18:00:41.83919 13374:C 09 Jul 2026 18:00:41.839 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+2026-07-09_18:00:41.83923 13374:C 09 Jul 2026 18:00:41.839 * Redis version=7.2.13, bits=64, commit=2ed2a678, modified=0, pid=13374, just started
+2026-07-09_18:00:41.83923 13374:C 09 Jul 2026 18:00:41.839 * Configuration loaded
+2026-07-09_18:00:41.83942 13374:M 09 Jul 2026 18:00:41.839 * monotonic clock: POSIX clock_gettime
+2026-07-09_18:00:41.83979 13374:M 09 Jul 2026 18:00:41.839 # Failed to write PID file: Permission denied
+2026-07-09_18:00:41.83982                 _._                                                  
+2026-07-09_18:00:41.83982            _.-``__ ''-._                                             
+2026-07-09_18:00:41.83982       _.-``    `.  `_.  ''-._           Redis 7.2.13 (2ed2a678/0) 64 bit
+2026-07-09_18:00:41.83982   .-`` .-```.  ```\/    _.,_ ''-._                                  
+2026-07-09_18:00:41.83982  (    '      ,       .-`  | `,    )     Running in standalone mode
+2026-07-09_18:00:41.83982  |`-._`-...-` __...-.``-._|'` _.-'|     Port: 0
+2026-07-09_18:00:41.83983  |    `-._   `._    /     _.-'    |     PID: 13374
+2026-07-09_18:00:41.83983   `-._    `-._  `-./  _.-'    _.-'                                   
+2026-07-09_18:00:41.83983  |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+2026-07-09_18:00:41.83983  |    `-._`-._        _.-'_.-'    |           https://redis.io       
+2026-07-09_18:00:41.83983   `-._    `-._`-.__.-'_.-'    _.-'                                   
+2026-07-09_18:00:41.83983  |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+2026-07-09_18:00:41.83984  |    `-._`-._        _.-'_.-'    |                                  
+2026-07-09_18:00:41.83984   `-._    `-._`-.__.-'_.-'    _.-'                                   
+2026-07-09_18:00:41.83984       `-._    `-.__.-'    _.-'                                       
+2026-07-09_18:00:41.83985           `-._        _.-'                                           
+2026-07-09_18:00:41.83985               `-.__.-'                                               
+2026-07-09_18:00:41.83985 
+2026-07-09_18:00:41.84039 13374:M 09 Jul 2026 18:00:41.840 * Server initialized
+2026-07-09_18:00:41.84041 13374:M 09 Jul 2026 18:00:41.840 # Fatal error: can't open the RDB file dump.rdb for reading: Permission denied
+2026-07-09_18:00:41.84042 13374:M 09 Jul 2026 18:00:41.840 # Fatal error loading the DB, check server logs. Exiting.
+
+==> /var/log/gitlab/gitaly/current <==
+{"level":"error","msg":"wrapper for process shutting down","pid":13340,"process":13347,"time":"2026-07-09T18:00:41.940Z","wrapper":13340}
+{"level":"info","msg":"Wrapper started","pid":13380,"time":"2026-07-09T18:00:41.947Z","wrapper":13380}
+{"level":"info","msg":"finding process","pid":13380,"pid_file":"/var/opt/gitlab/gitaly/gitaly.pid","time":"2026-07-09T18:00:41.947Z","wrapper":13380}
+{"error":"open /var/opt/gitlab/gitaly/gitaly.pid: no such file or directory","level":"error","msg":"find process","pid":13380,"time":"2026-07-09T18:00:41.947Z","wrapper":13380}
+{"level":"info","msg":"spawning a process","pid":13380,"time":"2026-07-09T18:00:41.947Z","wrapper":13380}
+{"level":"info","msg":"monitoring process","pid":13380,"process":13387,"time":"2026-07-09T18:00:41.947Z","wrapper":13380}
+{"level":"warning","msg":"The current configurations will cause Gitaly to fail to start up in future versions. Please run 'gitaly configuration validate \u003c /var/opt/gitlab/gitaly/config.toml' and fix the errors that are printed.","pid":13387,"time":"2026-07-09T18:00:42.129Z"}
+{"level":"info","msg":"maxprocs: Updating GOMAXPROCS=4: determined from CPU quota","pid":13387,"time":"2026-07-09T18:00:42.129Z"}
+{"latencies":[0.001,0.005,0.025,0.1,0.5,1,10,30,60,300,1500],"level":"info","msg":"grpc prometheus histograms enabled","pid":13387,"time":"2026-07-09T18:00:42.129Z"}
+{"level":"info","msg":"Starting Gitaly","pid":13387,"time":"2026-07-09T18:00:42.130Z","version":"19.1.2"}
+{"duration_ms":20,"level":"info","msg":"finished unpacking auxiliary binaries","pid":13387,"time":"2026-07-09T18:00:42.151Z"}
+{"duration_ms":0,"level":"info","msg":"finished initializing bootstrap","pid":13387,"time":"2026-07-09T18:00:42.152Z"}
+{"duration_ms":2,"level":"info","msg":"finished initializing command factory","pid":13387,"time":"2026-07-09T18:00:42.155Z"}
+{"binary_path":"/var/opt/gitlab/gitaly/run/gitaly-13387/git-exec-543603489.d/git","level":"info","msg":"using Git binary","pid":13387,"time":"2026-07-09T18:00:42.155Z"}
+{"duration_ms":2,"level":"info","msg":"finished detecting git version","pid":13387,"time":"2026-07-09T18:00:42.157Z"}
+{"level":"info","msg":"using Git version","pid":13387,"time":"2026-07-09T18:00:42.157Z","version":"2.54.0-rc1.gb15384c"}
+{"level":"info","msg":"clearing disk cache object folder","pid":13387,"storage":"default","time":"2026-07-09T18:00:42.157Z"}
+{"error":"disk cache walkers: mkdir /var/opt/gitlab/git-data/repositories/+gitaly/tmp: permission denied","level":"error","msg":"unclean Gitaly shutdown","pid":13387,"time":"2026-07-09T18:00:42.169Z"}
+{"error":"exit status 1","level":"error","msg":"waiting for supervised command","pid":13380,"time":"2026-07-09T18:00:42.182Z","wrapper":13380}
+{"level":"warning","msg":"forwarding signal","pid":13380,"process":13387,"signal":17,"time":"2026-07-09T18:00:42.183Z","wrapper":13380}
+{"error":"os: process already finished","level":"error","msg":"can't forward the signal","pid":13380,"process":13387,"signal":17,"time":"2026-07-09T18:00:42.183Z","wrapper":13380}
+
+==> /var/log/gitlab/postgresql/current <==
+2026-07-09_18:00:42.63957 2026-07-09 18:00:42.639 GMT [13401] LOG:  skipping missing configuration file "/var/opt/gitlab/postgresql/data/postgresql.auto.conf"
+2026-07-09_18:00:42.63975 FATAL:  could not open file "/var/opt/gitlab/postgresql/data/PG_VERSION": Permission denied
