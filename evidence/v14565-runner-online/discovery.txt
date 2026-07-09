@@ -1,0 +1,22 @@
+=== GitLab CE discovery ===
+2026-07-09T22:47:41+10:00
+
+--- Where might GitLab CE be running? ---
+Checking wsl2 (100.110.82.5)...
+Checking wsl1 (127.0.0.1)...
+curl: (22) The requested URL returned error: 404
+Checking GitLab CE Fleet hostname (100.84.108.92)?...
+curl: (22) The requested URL returned error: 404
+Checking ports...
+LISTEN 0      512                        0.0.0.0:8010       0.0.0.0:*    users:(("llama-server",pid=635861,fd=26))   
+LISTEN 0      4096                     127.0.0.1:8081       0.0.0.0:*                                                
+LISTEN 0      4096                         [::1]:8081          [::]:*                                                
+
+--- GitLab CE Runner Auth Token (UUID) ---
+token_len=0
+
+--- GitLab CI lint of sentrux.gitlab-ci.yml (offline simulation) ---
+Top-level keys: ['variables', 'stages', '.golang:lint', 'semgrep', '.test:base', 'go:test', 'go:test:integration', 'trivy:fs', 'nancy', 'gitleaks', 'sentrux:audit', 'publish:image', 'publish:argocd']
+Traceback (most recent call last):
+  File "<stdin>", line 5, in <module>
+ValueError: too many values to unpack (expected 2)

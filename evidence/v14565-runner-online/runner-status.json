@@ -1,0 +1,18 @@
+=== GitLab Runner Auth Token (from 1Password) ===
+token_prefix=glrt-HWa3UDzgdUutaPV...
+token_len=56
+token_sha256=7d5080c1fae39841d6375b0c8aeea3f5b64fa4618633fd46530d30b5b955dffb
+
+=== GitLab CI lint via docker (gitlabci-lint) ===
+Validating ci/sentrux.gitlab-ci.yml ...
+YAML: OK
+Stages: ['lint', 'test', 'scan', 'sentrux', 'publish']
+Jobs: 9
+
+=== Checking all sentrux audit scripts ===
+/home/jaslian/Code/helixon-platform/scripts/sentrux-audit-local.sh
+
+=== Running local Sentrux audit (mimics GitLab CI sentrux stage) ===
+verdict: FAIL
+pass_count: 1
+report: /tmp/sentrux-report.json

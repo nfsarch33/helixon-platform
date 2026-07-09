@@ -1,0 +1,32 @@
+=== GitLab Runner state on wsl1 ===
+2026-07-09T22:46:53+10:00
+
+--- Runner pods in cluster ---
+No resources found in gitlab-runner namespace.
+
+--- Runner registration via Helm ---
+Error from server (NotFound): namespaces "gitlab-runner" not found
+
+
+--- Helm release ---
+No resources found in kube-system namespace.
+
+--- Local GitLab CE state (if installed on wsl1) ---
+No resources found in gitlab namespace.
+
+--- Test pipeline: lint stage of sentrux.gitlab-ci.yml ---
+Checking yamllint, helm, gitleaks config presence...
+/home/jaslian/Code/helixon-platform/ci/sentrux.gitlab-ci.yml
+/home/jaslian/Code/helixon-platform/ci/sentrux-config.yaml
+
+--- helm lint on observability ---
+total 64
+drwxr-xr-x  6 jaslian jaslian  4096 Jul  9 19:16 .
+drwxrwxr-x 26 jaslian jaslian  4096 Jul  9 22:13 ..
+-rwxr-xr-x  1 jaslian jaslian  3373 Jul  9 02:42 README.md
+-rwxr-xr-x  1 jaslian jaslian  1394 Jul  9 02:42 alertmanager.yml
+drwxr-xr-x  2 jaslian jaslian  4096 Jul  9 02:42 alerts
+-rwxr-xr-x  1 jaslian jaslian  1963 Jul  9 02:42 docker-compose.observability.yml
+-rw-r--r--  1 jaslian jaslian  1779 Jul  9 19:16 docker-compose.yml
+drwxr-xr-x  3 jaslian jaslian  4096 Jul  9 02:42 grafana
+drwxr-xr-x  4 jaslian jaslian  4096 Jul  9 02:42 grafana-provisioning
