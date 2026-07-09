@@ -44,3 +44,7 @@ tests/__pycache__/
 __pycache__/
 evidence/v14546-plaintext-scan.json
 evidence/*/plaintext-scan*.json
+
+# 1Password full-item JSON (may contain CONCEALED values)
+evidence/**/op-item-full.json
+evidence/**/op-item-raw.json
