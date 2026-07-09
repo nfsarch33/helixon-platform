@@ -1,3 +1,4 @@
+version: "2"
 run:
   timeout: 5m
   tests: true
@@ -6,13 +7,10 @@ linters:
   disable-all: true
   enable:
     - errcheck       # unchecked errors
-    - gosimple       # simplifications
     - govet          # standard go vet
     - ineffassign    # unused assignments
-    - staticcheck    # advanced checks
+    - staticcheck    # advanced checks (includes gosimple + stylecheck in v2)
     - unused         # unused identifiers
-    - gofmt          # formatting
-    - goimports      # import grouping
     - misspell       # common misspellings
     - bodyclose      # http body close
     - nilerr         # returning nil after error
@@ -24,11 +22,15 @@ linters:
     - gosec          # security
     - prealloc       # pre-allocation
     - revive         # golint replacement
-    - stylecheck     # style
     - tparallel      # parallel t.Run
     - unconvert      # unnecessary conversions
     - unparam        # unused parameters
     - whitespace     # whitespace
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 linters-settings:
   gosec:
