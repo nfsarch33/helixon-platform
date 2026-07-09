@@ -308,45 +308,65 @@ func SprintboardTool(client *controlplane.SprintboardClient) tooldispatch.ToolDe
 			op, _ := args["op"].(string)
 			switch op {
 			case "register":
-				if err := client.Register(ctx); err != nil {
-					return "", err
-				}
-				return `{"ok":true,"op":"register"}`, nil
+				return sprintboardRegister(ctx, client)
 			case "claim":
-				ticket, _ := args["ticket_id"].(string)
-				if ticket == "" {
-					return "", errors.New("sprintboard.claim: ticket_id is required")
-				}
-				if err := client.ClaimTicket(ctx, ticket); err != nil {
-					return "", err
-				}
-				return fmt.Sprintf(`{"ok":true,"op":"claim","ticket_id":%q}`, ticket), nil
+				return sprintboardClaim(ctx, client, args)
 			case "complete":
-				ticket, _ := args["ticket_id"].(string)
-				evidence, _ := args["evidence"].(string)
-				if ticket == "" {
-					return "", errors.New("sprintboard.complete: ticket_id is required")
-				}
-				if err := client.CompleteTicket(ctx, ticket, evidence); err != nil {
-					return "", err
-				}
-				return fmt.Sprintf(`{"ok":true,"op":"complete","ticket_id":%q}`, ticket), nil
+				return sprintboardComplete(ctx, client, args)
 			case "sprint_status":
-				sprint, _ := args["sprint_id"].(string)
-				if sprint == "" {
-					return "", errors.New("sprintboard.sprint_status: sprint_id is required")
-				}
-				st, err := client.SprintStatus(ctx, sprint)
-				if err != nil {
-					return "", err
-				}
-				data, _ := json.Marshal(st)
-				return string(data), nil
+				return sprintboardStatus(ctx, client, args)
 			default:
 				return "", fmt.Errorf("sprintboard: unknown op %q", op)
 			}
 		},
 	}
+}
+
+// sprintboardRegister handles the sprintboard.register op. Extracted in v17209.
+func sprintboardRegister(ctx context.Context, client *controlplane.SprintboardClient) (string, error) {
+	if err := client.Register(ctx); err != nil {
+		return "", err
+	}
+	return `{"ok":true,"op":"register"}`, nil
+}
+
+// sprintboardClaim handles the sprintboard.claim op. Extracted in v17209.
+func sprintboardClaim(ctx context.Context, client *controlplane.SprintboardClient, args map[string]any) (string, error) {
+	ticket, _ := args["ticket_id"].(string)
+	if ticket == "" {
+		return "", errors.New("sprintboard.claim: ticket_id is required")
+	}
+	if err := client.ClaimTicket(ctx, ticket); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(`{"ok":true,"op":"claim","ticket_id":%q}`, ticket), nil
+}
+
+// sprintboardComplete handles the sprintboard.complete op. Extracted in v17209.
+func sprintboardComplete(ctx context.Context, client *controlplane.SprintboardClient, args map[string]any) (string, error) {
+	ticket, _ := args["ticket_id"].(string)
+	evidence, _ := args["evidence"].(string)
+	if ticket == "" {
+		return "", errors.New("sprintboard.complete: ticket_id is required")
+	}
+	if err := client.CompleteTicket(ctx, ticket, evidence); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(`{"ok":true,"op":"complete","ticket_id":%q}`, ticket), nil
+}
+
+// sprintboardStatus handles the sprintboard.sprint_status op. Extracted in v17209.
+func sprintboardStatus(ctx context.Context, client *controlplane.SprintboardClient, args map[string]any) (string, error) {
+	sprint, _ := args["sprint_id"].(string)
+	if sprint == "" {
+		return "", errors.New("sprintboard.sprint_status: sprint_id is required")
+	}
+	st, err := client.SprintStatus(ctx, sprint)
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.Marshal(st)
+	return string(data), nil
 }
 
 // FileReadConfig configures the file_read tool.
