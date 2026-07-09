@@ -1,0 +1,27 @@
+desktop-0s5prj9:
+  status-Ready: True
+  helixon.io/node-alias: (missing)
+  helixon.io/role: (missing)
+  helixon.io/tier: (missing)
+  helixon.io/gpu: (missing)
+  node.kubernetes.io/role: (missing)
+  kubernetes.io/hostname: desktop-0s5prj9
+
+desktop-12ro1af:
+  status-Ready: True
+  helixon.io/node-alias: (missing)
+  helixon.io/role: (missing)
+  helixon.io/tier: (missing)
+  helixon.io/gpu: (missing)
+  node.kubernetes.io/role: (missing)
+  kubernetes.io/hostname: desktop-12ro1af
+
+desktop-p5bul0f:
+  status-Ready: True
+  helixon.io/node-alias: (missing)
+  helixon.io/role: (missing)
+  helixon.io/tier: (missing)
+  helixon.io/gpu: (missing)
+  node.kubernetes.io/role: (missing)
+  kubernetes.io/hostname: desktop-p5bul0f
+

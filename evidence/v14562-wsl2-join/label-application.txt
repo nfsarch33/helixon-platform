@@ -1,0 +1,16 @@
+=== Applying helixon labels ===
+node/desktop-12ro1af labeled
+node/desktop-12ro1af labeled
+node/desktop-12ro1af labeled
+node/desktop-0s5prj9 labeled
+node/desktop-0s5prj9 labeled
+node/desktop-0s5prj9 labeled
+node/desktop-p5bul0f labeled
+node/desktop-p5bul0f labeled
+node/desktop-p5bul0f labeled
+node/desktop-p5bul0f labeled
+=== Final node list with labels ===
+NAME              STATUS   ROLES           AGE     VERSION        LABELS
+desktop-0s5prj9   Ready    <none>          10h     v1.36.2+k3s1   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=k3s,beta.kubernetes.io/os=linux,helixon.io/node-alias=wsl2,helixon.io/role=fleet-agent,helixon.io/tier=secondary,kubernetes.io/arch=amd64,kubernetes.io/hostname=desktop-0s5prj9,kubernetes.io/os=linux,node.kubernetes.io/instance-type=k3s
+desktop-12ro1af   Ready    control-plane   11h     v1.36.2+k3s1   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=k3s,beta.kubernetes.io/os=linux,helixon.io/node-alias=wsl1,helixon.io/role=control-plane,helixon.io/tier=primary,kubernetes.io/arch=amd64,kubernetes.io/hostname=desktop-12ro1af,kubernetes.io/os=linux,node-role.kubernetes.io/control-plane=true,node.kubernetes.io/instance-type=k3s
+desktop-p5bul0f   Ready    <none>          7h22m   v1.36.2+k3s1   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=k3s,beta.kubernetes.io/os=linux,helixon.io/gpu=rtx3090,helixon.io/node-alias=wsl4,helixon.io/role=llm-node,helixon.io/tier=primary,kubernetes.io/arch=amd64,kubernetes.io/hostname=desktop-p5bul0f,kubernetes.io/os=linux,node.kubernetes.io/instance-type=k3s
