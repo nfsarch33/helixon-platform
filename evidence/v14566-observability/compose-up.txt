@@ -1,0 +1,29 @@
+=== Trying podman compose ===
+Error: looking up compose provider failed
+7 errors occurred:
+	* exec: "docker-compose": executable file not found in $PATH
+exit=0
+
+--- Try install podman-compose via apt ---
+podman/noble-updates,now 4.9.3+ds1-1ubuntu0.2 amd64 [installed]
+
+=== Pre-pull image digest verification ===
+--- prom/prometheus:v2.55.0 ---
+e72eb055c3dea85d3e47b90ebb957c6f3a2c0cd1f6b4a690dba741b294150cc2 sha256:378f4e03703557d1c6419e6caccf922f96e6d88a530f7431d66a4c4f4b1000fe
+--- grafana/grafana:11.2.0 ---
+Error: no such object: "grafana/grafana:11.2.0"
+--- prom/node-exporter:v1.8.2 ---
+Error: no such object: "prom/node-exporter:v1.8.2"
+--- gcsmith/tailscale-exporter:latest ---
+Error: no such object: "gcsmith/tailscale-exporter:latest"
+
+=== Bring up stack ===
+Error: looking up compose provider failed
+7 errors occurred:
+	* exec: "docker-compose": executable file not found in $PATH
+	* exec: "/home/jaslian/.docker/cli-plugins/docker-compose": stat /home/jaslian/.docker/cli-plugins/docker-compose: no such file or directory
+	* exec: "/usr/local/lib/docker/cli-plugins/docker-compose": stat /usr/local/lib/docker/cli-plugins/docker-compose: no such file or directory
+	* exec: "/usr/local/libexec/docker/cli-plugins/docker-compose": stat /usr/local/libexec/docker/cli-plugins/docker-compose: no such file or directory
+	* exec: "/usr/lib/docker/cli-plugins/docker-compose": stat /usr/lib/docker/cli-plugins/docker-compose: no such file or directory
+	* exec: "/usr/libexec/docker/cli-plugins/docker-compose": stat /usr/libexec/docker/cli-plugins/docker-compose: no such file or directory
+	* exec: "podman-compose": executable file not found in $PATH

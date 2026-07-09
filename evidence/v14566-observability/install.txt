@@ -1,0 +1,16 @@
+=== Install podman-compose (sudo) ===
+2026-07-09T22:52:05+10:00
+Preparing to unpack .../podman-compose_1.0.6-1_all.deb ...
+Unpacking podman-compose (1.0.6-1) ...
+Setting up python3-dotenv (1.0.1-1) ...
+Setting up podman-compose (1.0.6-1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+/usr/bin/podman-compose
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+podman --version 
+podman version 4.9.3
+exit code: 0
+podman-compose version 1.0.6

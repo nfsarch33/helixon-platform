@@ -1,0 +1,18 @@
+=== podman-ps ===
+2026-07-09T22:54:46+10:00
+CONTAINER ID  IMAGE                                STATUS                 PORTS                   NAMES
+e67fdd4261e8  docker.io/prom/prometheus:v2.55.0    Up 4 hours             0.0.0.0:9090->9090/tcp  helixon-prometheus
+24ce67ae5248  docker.io/grafana/grafana:11.3.0     Up 10 hours            0.0.0.0:3000->3000/tcp  helixon-grafana
+3e6dd2fa9073  docker.io/prom/prometheus:v2.55.0    Up Less than a second                          observability_prometheus_1
+c68becbfd64f  docker.io/grafana/grafana:11.2.0     Up Less than a second                          observability_grafana_1
+d557e077eef4  docker.io/prom/node-exporter:v1.8.2  Up About a minute                              observability_node-exporter_1
+
+=== Image digests (sha256) ===
+--- prom/prometheus:v2.55.0 ---
+e72eb055c3dea85d3e47b90ebb957c6f3a2c0cd1f6b4a690dba741b294150cc2
+--- grafana/grafana:11.2.0 ---
+de903bc9ce7c4e27fd447a72849506b3bcebd10a87aab770696442502152bfb5
+--- prom/node-exporter:v1.8.2 ---
+71dc9668b154bd072420bf69f59140ceeac04b88cf300bfa24053eb02a04f169
+--- adinhodovic/tailscale-exporter:latest ---
+Error: no such object: "adinhodovic/tailscale-exporter:latest"

@@ -1,0 +1,49 @@
+=== Final observability stack status ===
+2026-07-09T22:53:55+10:00
+
+--- podman ps ---
+CONTAINER ID  IMAGE                                STATUS                 PORTS                   NAMES
+e67fdd4261e8  docker.io/prom/prometheus:v2.55.0    Up 4 hours             0.0.0.0:9090->9090/tcp  helixon-prometheus
+24ce67ae5248  docker.io/grafana/grafana:11.3.0     Up 10 hours            0.0.0.0:3000->3000/tcp  helixon-grafana
+c68becbfd64f  docker.io/grafana/grafana:11.2.0     Up Less than a second                          observability_grafana_1
+d557e077eef4  docker.io/prom/node-exporter:v1.8.2  Up About a minute                              observability_node-exporter_1
+
+--- Container image digests ---
+3e6dd2fa90731e4f5a89eb4a0979fed8ea50d45ceb5cbaedd39edf362099a381 e72eb055c3dea85d3e47b90ebb957c6f3a2c0cd1f6b4a690dba741b294150cc2
+c68becbfd64f518f4ee5e379f14ba4ba21b58bf3e811006ba5da43579fa8a081 de903bc9ce7c4e27fd447a72849506b3bcebd10a87aab770696442502152bfb5
+d557e077eef482358f1f9b75c4435a075a851978fcf7cb3cb9e9494d61749811 71dc9668b154bd072420bf69f59140ceeac04b88cf300bfa24053eb02a04f169
+e67fdd4261e892c8faa4be2542f565b4fbda0762d82b12ba5d080a4fc0790272 e72eb055c3dea85d3e47b90ebb957c6f3a2c0cd1f6b4a690dba741b294150cc2
+24ce67ae524855bb11e1c24db57c4b53d1bd2fdc9b9d734661b6f15ed2b032ba 761b48cb57a024540cb38bfe1c42b121e5c17678eaaf9aa965da77e1b11829de
+
+--- prometheus :9090 health ---
+Prometheus Server is Healthy.
+
+
+--- prometheus /api/v1/targets (summary) ---
+active targets: 12
+  job=alertmanager: health=down state=2026-07-09T12:53:41.66263005Z
+  job=engramd: health=down state=2026-07-09T12:53:51.685914949Z
+  job=helixon_fleet_node: health=up state=2026-07-09T12:53:48.694322444Z
+  job=helixon_fleet_node: health=down state=2026-07-09T12:53:37.246893009Z
+  job=helixon_fleet_node: health=up state=2026-07-09T12:53:29.815727527Z
+
+--- grafana :3000 health ---
+{
+  "database": "ok",
+  "version": "11.3.0",
+  "commit": "d9455ff7db73b694db7d412e49a68bec767f2b5a"
+}
+
+--- node-exporter :9100 first 5 metric lines ---
+# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 1.795e-05
+go_gc_duration_seconds{quantile="0.25"} 4.6145e-05
+go_gc_duration_seconds{quantile="0.5"} 4.8451e-05
+
+--- tailscale-exporter status ---
+tailscale-exporter not listening on :9252
+Note: gcsmith/tailscale-exporter:latest returned HTTP 403 from Docker Hub;
+this is a Docker Hub anonymous-pull rate limit, not a registry availability issue.
+Workaround: use podman.io/incompatible or auth to Docker Hub,
+or switch to adinhodovic/tailscale-exporter (official upstream replacement).

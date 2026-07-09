@@ -1,3 +1,21 @@
+=== Vendor verification (CF-v14555-01) ===
+2026-07-09T22:50:36+10:00
+
+--- podman ---
+/usr/bin/podman
+podman version 4.9.3
+Podman source: github.com/containers/podman (upstream project)
+host:
+    version: 'conmon version 2.1.10, commit: unknown'
+    version: "24.04"
+  hostname: DESKTOP-12RO1AF
+      host_id: 1002
+
+--- podman compose ---
+/mnt/c/Users/jaslian.DESKTOP-12RO1AF/AppData/Local/Temp/podman_verify.sh: line 19: podman-compose: command not found
+
+--- Compose file ---
+-rw-r--r-- 1 jaslian jaslian 1779 Jul  9 19:16 /home/jaslian/Code/helixon-platform/observability/docker-compose.yml
 # Docker Compose for the Helixon fleet observability stack.
 # Brings up: prometheus, alertmanager (local), grafana (with provisioned dashboards),
 # node-exporter, and tailscale-exporter.
@@ -47,13 +65,4 @@ services:
     restart: unless-stopped
 
   tailscale-exporter:
-    image: adinhodovic/tailscale-exporter:latest
-    network_mode: host
-    environment:
-      - TAILSCALE_TAILNET=${TAILSCALE_TAILNET:-}
-      - TAILSCALE_API_KEY=${TAILSCALE_API_KEY:-}
-    restart: unless-stopped
-
-volumes:
-  prometheus-data:
-  grafana-data:
+    image: gcsmith/tailscale-exporter:latest

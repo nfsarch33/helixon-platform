@@ -1,0 +1,59 @@
+=== podman-compose up ===
+2026-07-09T22:52:32+10:00
+Copying blob sha256:66aec874ce0c59cce4ecd3dc6b41fe673fa2fe7e3f3dad52250be1ee30317c99
+Copying blob sha256:bde37282dfba89d29531d9979e26cb3dcd1ac732292aa20c9722d87c6966c8a1
+Copying blob sha256:592f1e71407c78fe295c56f3605d223b2288c964df132c88ab943062bcd66fd5
+Copying blob sha256:ab3c28da242b1349cc11b1fd680879a09686ece94cea9e5ad367f03b0a5235b0
+Copying blob sha256:e4892977d944c76fa662d61841c474d1c40693f312da5a9efa590ad668fb3df5
+Copying blob sha256:ef2b3f3f597e69def4f5bc50d5672546ab6ff3b6437c3e4eb454ff8b5a6669b8
+Copying blob sha256:27a3c8ebdfbff05196b788a40069fb5b756da3729bc78301bf1feaa8fc947067
+Copying config sha256:de903bc9ce7c4e27fd447a72849506b3bcebd10a87aab770696442502152bfb5
+Writing manifest to image destination
+c68becbfd64f518f4ee5e379f14ba4ba21b58bf3e811006ba5da43579fa8a081
+exit code: 0
+podman run --name=observability_node-exporter_1 -d --label io.podman.compose.config-hash=a7efe2820852c27b893d58e28e582a1ec16ecd375d555b505510cc2dad638adf --label io.podman.compose.project=observability --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@observability.service --label com.docker.compose.project=observability --label com.docker.compose.project.working_dir=/home/jaslian/Code/helixon-platform/observability --label com.docker.compose.project.config_files=docker-compose.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=node-exporter -v /:/host:rslave,ro --network host --restart unless-stopped prom/node-exporter:v1.8.2 --path.rootfs=/host --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($|/)
+Resolving "prom/node-exporter" using unqualified-search registries (/etc/containers/registries.conf.d/docker.conf)
+Trying to pull docker.io/prom/node-exporter:v1.8.2...
+Getting image source signatures
+Copying blob sha256:a7193bcb1fb2afe1511fc5267b377fc42a3435c083affa1d237795a6b3b9630d
+Copying blob sha256:9fa9226be034e47923c0457d916aa68474cdfb23af8d4525e9baeebc4760977a
+Copying blob sha256:1617e25568b2231fdd0d5caff63b06f6f7738d8d961f031c80e47d35aaec9733
+Copying config sha256:71dc9668b154bd072420bf69f59140ceeac04b88cf300bfa24053eb02a04f169
+Writing manifest to image destination
+d557e077eef482358f1f9b75c4435a075a851978fcf7cb3cb9e9494d61749811
+exit code: 0
+podman run --name=observability_tailscale-exporter_1 -d --label io.podman.compose.config-hash=a7efe2820852c27b893d58e28e582a1ec16ecd375d555b505510cc2dad638adf --label io.podman.compose.project=observability --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@observability.service --label com.docker.compose.project=observability --label com.docker.compose.project.working_dir=/home/jaslian/Code/helixon-platform/observability --label com.docker.compose.project.config_files=docker-compose.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=tailscale-exporter -e TAILSCALE_TAILNET= -e TAILSCALE_API_KEY= --network host --restart unless-stopped gcsmith/tailscale-exporter:latest
+Resolving "gcsmith/tailscale-exporter" using unqualified-search registries (/etc/containers/registries.conf.d/docker.conf)
+Trying to pull docker.io/gcsmith/tailscale-exporter:latest...
+Error: initializing source docker://gcsmith/tailscale-exporter:latest: reading manifest latest in docker.io/gcsmith/tailscale-exporter: requested access to the resource is denied
+exit code: 125
+podman start observability_tailscale-exporter_1
+Error: no container with name or ID "observability_tailscale-exporter_1" found: no such container
+exit code: 125
+
+=== podman ps ===
+CONTAINER ID  IMAGE                                COMMAND               CREATED         STATUS        PORTS                   NAMES
+e67fdd4261e8  docker.io/prom/prometheus:v2.55.0    --config.file=/et...  10 hours ago    Up 4 hours    0.0.0.0:9090->9090/tcp  helixon-prometheus
+24ce67ae5248  docker.io/grafana/grafana:11.3.0                           10 hours ago    Up 10 hours   0.0.0.0:3000->3000/tcp  helixon-grafana
+c68becbfd64f  docker.io/grafana/grafana:11.2.0                           11 seconds ago  Up 1 second                           observability_grafana_1
+d557e077eef4  docker.io/prom/node-exporter:v1.8.2  --path.rootfs=/ho...  6 seconds ago   Up 6 seconds                          observability_node-exporter_1
+
+=== Listening ports ===
+LISTEN 0      4096                     127.0.0.1:9093       0.0.0.0:*    users:(("alertmanager",pid=3220466,fd=3))   
+LISTEN 0      4096                             *:3000             *:*    users:(("rootlessport",pid=671035,fd=12))   
+LISTEN 0      4096                             *:9100             *:*                                                
+LISTEN 0      4096                             *:9090             *:*    users:(("rootlessport",pid=3318281,fd=11))  
+
+=== Health checks ===
+prometheus /-/healthy:
+Prometheus Server is Healthy.
+grafana /api/health:
+{
+  "database": "ok",
+  "version": "11.3.0",
+node-exporter /metrics:
+# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0
+tailscale-exporter /metrics:
+curl: (7) Failed to connect to 127.0.0.1 port 9252 after 0 ms: Couldn't connect to server
