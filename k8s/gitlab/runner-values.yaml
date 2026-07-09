@@ -1,0 +1,93 @@
+# Helixon GitLab Runner Helm values (v14544)
+# Installs gitlab-runner as a k8s agent on the wsl1 cluster.
+# The runner is registered against an external GitLab instance
+# (cloud-hosted or wsl1 self-hosted). The registration token is
+# injected via 1Password at deploy time.
+
+# Image: must use the chart's nested schema
+image:
+  registry: registry.gitlab.com
+  image: gitlab-org/gitlab-runner
+  tag: gitlab-runner-v17.10.1
+
+# Resource profile for WSL1 k3s (RTX 3090 host, dual-GPU, 64GB RAM available)
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Concurrency
+concurrent: 4
+checkInterval: 30
+
+# RBAC for the runner pods (required to create build pods)
+rbac:
+  create: true
+  clusterWideAccess: false
+
+# Service account the runner uses
+serviceAccount:
+  create: true
+  name: gitlab-runner
+
+# Runner configuration (Kubernetes executor).
+# `token` and `url` MUST be injected at deploy time via --set or envsubst.
+runners:
+  config: |
+    [[runners]]
+      name = "helixon-wsl1"
+      url = "https://gitlab.com/"
+      token = "REGISTRATION_TOKEN_PLACEHOLDER"
+      executor = "kubernetes"
+      [runners.kubernetes]
+        namespace = "gitlab-runner"
+        image = "alpine:3.19"
+        privileged = true
+
+# Tags for routing jobs (helixon-fleet = runs on wsl1)
+tags: "helixon,helixon-fleet,linux,docker,golang"
+
+# Security context (least privilege)
+securityContext:
+  runAsUser: 100
+  fsGroup: 65533
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Node selector — pin to wsl1 central node
+nodeSelector:
+  kubernetes.io/hostname: desktop-12ro1af
+
+# Tolerations (none needed; wsl1 is untainted)
+tolerations: []
+
+# Affinity — keep runner pods on the wsl1 central node
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values: ["desktop-12ro1af"]
+
+# Metrics (for observability v14538)
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus
+
+# Pod annotations for Prometheus scraping
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9252"
+  prometheus.io/path: "/metrics"

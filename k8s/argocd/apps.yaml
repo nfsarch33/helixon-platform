@@ -1,0 +1,123 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: helixon
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Helixon platform + sprintboard
+  sourceRepos:
+    - git://100.84.108.92:9418/helixon-platform.git
+    - https://github.com/nfsarch33/helixon-platform.git
+    - https://gitlab.helixon.local/helixon/sprintboard.git
+    - '*'
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: false
+  roles:
+    - name: admin
+      policies:
+        - '*'
+      groups:
+        - system:cluster-admins
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: helixon-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: helixon
+  source:
+    repoURL: git://100.84.108.92:9418/helixon-platform.git
+    targetRevision: main
+    path: k8s/helixon-platform
+    directory:
+      recurse: true
+      include: '{*.yaml,*.yml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: helixon-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: helixon-sprintboard
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: helixon
+  source:
+    repoURL: git://100.84.108.92:9418/helixon-platform.git
+    targetRevision: main
+    path: k8s/sprintboard
+    directory:
+      recurse: true
+      include: '{*.yaml,*.yml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sprintboard
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: helixon
+  source:
+    repoURL: git://100.84.108.92:9418/helixon-platform.git
+    targetRevision: main
+    path: k8s/argocd/apps
+    directory:
+      recurse: true
+      include: '{*.yaml,*.yml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
