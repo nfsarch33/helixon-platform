@@ -1,0 +1,136 @@
+# Helixon Argo CD Helm values (v14545)
+#
+# Closes CF-v14536-02: pre-install job hung on kubelet containerLog endpoint
+# (WSL2 networking returns 502). Workarounds applied:
+#   1. Disable all pre-install/pre-upgrade hooks (Helm 3.10+ supports --no-hooks)
+#   2. Pin redis secret pre-creation with the correct name (argocd-redis)
+#   3. Use single-server mode (HA adds complexity not needed at this scale)
+#   4. Pin nodeSelector + nodeAffinity to wsl1 (central node)
+
+global:
+  domain: argocd.helixon.local
+
+# Single-server mode — simpler than HA for wsl1 k3s
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    existingSecret: argocd-redis
+    existingSecretPasswordKey: auth
+  master:
+    persistence:
+      enabled: false  # wsl1 has no SSD-backed persistent volumes
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  # Pin redis to wsl1 too (chart reads nodeSelector from .Values.redis.nodeSelector)
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+
+# Repo-server (lightweight, handles git polling)
+repoServer:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: ClusterIP
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+
+# Application controller (reconciles Application CRDs)
+controller:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+
+# Argo CD server (UI + API)
+server:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: ClusterIP
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+
+# ApplicationSet controller (for app-of-apps pattern)
+applicationSet:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  nodeSelector:
+    kubernetes.io/hostname: desktop-12ro1af
+
+# Notifications controller
+notifications:
+  enabled: false  # disabled for v14545 — defer to v14547 if needed
+
+# Dex (SSO) — disabled; we use local admin user
+dex:
+  enabled: false
+
+# Disable HA components
+ha:
+  enabled: false
+
+# Disable the known-bad pre-install hooks
+crds:
+  install: false   # apply CRDs separately (we have them pinned)
+  keep: true
+
+# Local configs
+configs:
+  params:
+    server.insecure: true
+  cm:
+    url: https://argocd.helixon.local
+    createCustomHealthChecks: |
+
+# RBAC for Argo CD service accounts
+serviceAccount:
+  create: true
+  name: argocd-server
+
+# Pin Argo pods to wsl1 (central node) using the chart's helper format
+# (affinity.nodeAffinity.type + matchExpressions are read separately by the chart).
+tolerations: []
+
+affinity:
+  nodeAffinity:
+    type: hard
+    matchExpressions:
+      - key: kubernetes.io/hostname
+        operator: In
+        values: ["desktop-12ro1af"]
+  # podAntiAffinity "hard" turns off the default soft-anti-affinity that
+  # the chart otherwise applies via `argo-cd.affinity` helper.
+  podAntiAffinity: "hard"
