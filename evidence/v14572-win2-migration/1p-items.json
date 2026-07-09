@@ -1,0 +1,118 @@
+[
+  {
+    "id": "m5rnja2b2qtsonin6ehy3i7nha",
+    "title": "GitLab CE Root UI (wsl1)",
+    "version": 9,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T17:49:09Z",
+    "updated_at": "2026-06-11T11:20:52Z",
+    "additional_information": "root"
+  },
+  {
+    "id": "7xfvc4qnxrl4cjn4bcs3y6y4fm",
+    "title": "GitLab CE API PAT win3 wsl3",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-12T14:42:11Z",
+    "updated_at": "2026-06-12T14:42:11Z"
+  },
+  {
+    "id": "n2ecpwlnkpjs4ufdvquw6xf624",
+    "title": "GitLab CE Runner Auth Token (wsl2)",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "PASSWORD",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-07-08T14:33:00Z",
+    "updated_at": "2026-07-08T14:33:00Z",
+    "additional_information": "Thu Jul  9 00:32:59 AEST 2026"
+  },
+  {
+    "id": "nnhcm6xvyes5kgxv2uuqb5eusi",
+    "title": "GitLab CE API PAT (wsl1)",
+    "version": 7,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T17:52:02Z",
+    "updated_at": "2026-06-10T18:40:05Z"
+  },
+  {
+    "id": "i5ri4arsc5ao6xs4pxc2gfcx3m",
+    "title": "GitLab CE Root PAT (wsl2 rotation 2026-07-08)",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-07-08T14:36:00Z",
+    "updated_at": "2026-07-08T14:36:00Z"
+  },
+  {
+    "id": "x57gj3ejadnwfc2fwfcvad7dye",
+    "title": "GitLab CE Fleet (wsl1)",
+    "tags": [
+      "fleet",
+      "auto-inventory"
+    ],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:55:58Z",
+    "updated_at": "2026-06-10T13:55:58Z",
+    "additional_information": "root",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:30080"
+      }
+    ]
+  },
+  {
+    "id": "prpfb4m2a4j35wzptejtrouqcq",
+    "title": "Engram mem0-compat (wsl1 tunnel)",
+    "tags": [
+      "fleet",
+      "auto-inventory",
+      "url-only"
+    ],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:57:03Z",
+    "updated_at": "2026-06-10T13:57:03Z",
+    "additional_information": "operator",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://127.0.0.1:8281"
+      }
+    ]
+  }
+]

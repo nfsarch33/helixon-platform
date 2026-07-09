@@ -1,0 +1,1 @@
+cdcb2876e38bd76d174cdb3205797dc0  /home/jaslian/.local/bin/fleet-registrar

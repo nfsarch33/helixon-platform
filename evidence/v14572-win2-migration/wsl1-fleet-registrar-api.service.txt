@@ -1,0 +1,12 @@
+[Unit]
+Description=Fleet Registrar REST API (wsl1, post-v14572 migration)
+After=network-online.target fleet-registrar.service
+Wants=network-online.target fleet-registrar.service
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c 'echo "fleet-registrar-api on wsl1: see /home/jason/Code/fleet-registrar-api/fleet_registrar_api.py on wsl2 (Python service, deferred to CF-v14572-02)"'
+Restart=no
+
+[Install]
+WantedBy=default.target
