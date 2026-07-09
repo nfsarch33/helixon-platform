@@ -545,6 +545,11 @@ type DispatcherConfig struct {
 	ResendClient Client
 	BrevoClient  Client
 	OtelMeter    metric.Meter
+	// Primary is an optional override (e.g. RotatingSender) used in
+	// preference to the ResendClient+BrevoClient pair. When set, the
+	// round-robin path is skipped and every send goes through Primary;
+	// the legacy fallback path remains as a safety net. v17607-6.
+	Primary Client
 }
 
 // Dispatcher rotates between Resend and Brevo; falls back to the other
@@ -583,11 +588,28 @@ func (d *Dispatcher) WithAuditDB(db *notifydb.DB) *Dispatcher {
 }
 
 // Send attempts the email via the round-robin pick; on ErrDeadLetter, falls
-// back to the other vendor before propagating the failure.
+// back to the other vendor before propagating the failure. When a
+// Primary (e.g. RotatingSender) is configured, it is used directly and
+// the round-robin pick is skipped.
 func (d *Dispatcher) Send(ctx context.Context, m Email) error {
 	if m.IdempotencyKey == "" {
 		return fmt.Errorf("%w: IdempotencyKey required", ErrPermanent)
 	}
+	// v17607-6: enforce canonical recipient allowlist (jaslian@gmail.com only).
+	if err := ValidateRecipients(m.To); err != nil {
+		return err
+	}
+
+	// If a Primary is configured (RotatingSender), use it directly.
+	if d.cfg.Primary != nil {
+		if err := d.cfg.Primary.Send(ctx, m); err == nil {
+			return nil
+		} else if !errors.Is(err, ErrDeadLetter) {
+			return err
+		}
+		// Fall through to legacy round-robin as a safety net.
+	}
+
 	order := d.pickOrder()
 	var lastErr error
 	for i, vendor := range order {

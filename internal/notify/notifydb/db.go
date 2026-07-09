@@ -111,8 +111,11 @@ CREATE INDEX IF NOT EXISTS idx_dispatches_vendor ON dispatches(vendor);
 CREATE INDEX IF NOT EXISTS idx_dispatches_status ON dispatches(status);
 CREATE INDEX IF NOT EXISTS idx_dispatches_created ON dispatches(created_at_unix);
 `
-	_, err := d.conn.Exec(schema)
-	return err
+	if _, err := d.conn.Exec(schema); err != nil {
+		return err
+	}
+	// v17607-6c: LRU sender tracking table.
+	return d.migrateKeyUses()
 }
 
 // Close flushes and closes the connection + mirror.

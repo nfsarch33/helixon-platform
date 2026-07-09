@@ -198,7 +198,7 @@ func TestResend_5xxRetriesExponentialBackoffMax3(t *testing.T) {
 
 	start := time.Now()
 	err := c.Send(context.Background(), notify.Email{
-		To:             []string{"x@y.com"},
+		To:             []string{"jaslian@gmail.com"},
 		Subject:        "t",
 		HTMLBody:       "<p/>",
 		IdempotencyKey: "5xx-1",
@@ -235,7 +235,7 @@ func TestResend_5xxExhaustedMaxAttemptsReturnsTransientError(t *testing.T) {
 	})
 
 	err := c.Send(context.Background(), notify.Email{
-		To:             []string{"x@y.com"},
+		To:             []string{"jaslian@gmail.com"},
 		Subject:        "t",
 		HTMLBody:       "<p/>",
 		IdempotencyKey: "5xx-exhausted",
@@ -270,7 +270,7 @@ func TestResend_IdempotencyDedup(t *testing.T) {
 	})
 
 	mail := notify.Email{
-		To:             []string{"x@y.com"},
+		To:             []string{"jaslian@gmail.com"},
 		Subject:        "t",
 		HTMLBody:       "<p/>",
 		IdempotencyKey: "dedup-1",
@@ -311,7 +311,7 @@ func TestResend_NeverLogsAPIKey(t *testing.T) {
 	})
 
 	err := c.Send(context.Background(), notify.Email{
-		To:             []string{"x@y.com"},
+		To:             []string{"jaslian@gmail.com"},
 		Subject:        "t",
 		HTMLBody:       "<p/>",
 		IdempotencyKey: "redact-1",
@@ -377,7 +377,7 @@ func TestBrevo_4xxFailFast(t *testing.T) {
 	})
 
 	err := c.Send(context.Background(), notify.Email{
-		To:             []string{"x@y.com"},
+		To:             []string{"jaslian@gmail.com"},
 		Subject:        "t",
 		HTMLBody:       "<p/>",
 		IdempotencyKey: "brevo-4xx",
@@ -425,7 +425,7 @@ func TestDispatcher_RoundRobin(t *testing.T) {
 
 	for i := 0; i < 4; i++ {
 		err := disp.Send(context.Background(), notify.Email{
-			To:             []string{"x@y.com"},
+			To:             []string{"jaslian@gmail.com"},
 			Subject:        "rr",
 			HTMLBody:       "<p/>",
 			IdempotencyKey: "rr-" + string(rune('a'+i)),
@@ -471,7 +471,7 @@ func TestDispatcher_FallbackToBrevoOnResendExhaustion(t *testing.T) {
 	})
 
 	err := disp.Send(context.Background(), notify.Email{
-		To:             []string{"x@y.com"},
+		To:             []string{"jaslian@gmail.com"},
 		Subject:        "fallback",
 		HTMLBody:       "<p/>",
 		IdempotencyKey: "fb-1",
