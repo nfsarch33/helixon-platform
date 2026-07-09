@@ -1,0 +1,25 @@
+=== open ports ===
+State  Recv-Q Send-Q               Local Address:Port  Peer Address:PortProcess                                 
+LISTEN 0      128                        0.0.0.0:58512      0.0.0.0:*                                           
+LISTEN 0      1000                10.255.255.254:53         0.0.0.0:*                                           
+LISTEN 0      4096                       0.0.0.0:2233       0.0.0.0:*                                           
+LISTEN 0      4096                     127.0.0.1:6444       0.0.0.0:*                                           
+LISTEN 0      4096                    127.0.0.54:53         0.0.0.0:*                                           
+LISTEN 0      4096                     127.0.0.1:10010      0.0.0.0:*                                           
+LISTEN 0      4096                 127.0.0.53%lo:53         0.0.0.0:*                                           
+LISTEN 0      4096                 100.79.227.40:39738      0.0.0.0:*                                           
+LISTEN 0      4096                       0.0.0.0:8001       0.0.0.0:*                                           
+LISTEN 0      4096                     127.0.0.1:10248      0.0.0.0:*                                           
+LISTEN 0      4096                     127.0.0.1:10249      0.0.0.0:*                                           
+LISTEN 0      4096                     127.0.0.1:10256      0.0.0.0:*                                           
+LISTEN 0      4096                         [::1]:6444          [::]:*                                           
+LISTEN 0      4096                             *:9100             *:*    users:(("node_exporter",pid=2267,fd=3))
+LISTEN 0      128                           [::]:58512         [::]:*                                           
+LISTEN 0      4096                             *:10250            *:*                                           
+LISTEN 0      4096                          [::]:2233          [::]:*                                           
+LISTEN 0      4096   [fd7a:115c:a1e0::df32:e329]:53423         [::]:*                                           
+=== vllm container ===
+time="2026-07-10T05:18:08+10:00" level=warning msg="\"/\" is not a shared mount, this could cause issues or missing mounts with rootless containers"
+Error: changing permissions on file for metacopy check: chmod /home/jason/.local/share/containers/storage/overlay/metacopy-check3524053378/merged/f: permission denied
+=== curl vllm ===
+curl: (7) Failed to connect to 127.0.0.1 port 8000 after 0 ms: Couldn't connect to server

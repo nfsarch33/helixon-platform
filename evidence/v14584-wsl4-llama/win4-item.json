@@ -1,0 +1,57 @@
+{
+  "id": "sjhxjryivr6edhmb2ecovdpot4",
+  "title": "Win PC WSL Ubuntu Login GB / jason@win4",
+  "tags": ["helixon-bootstrap", "v14508.5"],
+  "version": 1,
+  "vault": {
+    "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+    "name": "Cursor_IronClaw"
+  },
+  "category": "LOGIN",
+  "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+  "created_at": "2026-07-08T15:11:57Z",
+  "updated_at": "2026-07-08T15:11:57Z",
+  "additional_information": "jason",
+  "fields": [
+    {
+      "id": "username",
+      "type": "STRING",
+      "purpose": "USERNAME",
+      "label": "username",
+      "value": "jason",
+      "reference": "op://Cursor_IronClaw/sjhxjryivr6edhmb2ecovdpot4/username"
+    },
+    {
+      "id": "password",
+      "type": "CONCEALED",
+      "purpose": "PASSWORD",
+      "label": "password",
+      "value": "Sealab_2025?????",
+      "reference": "op://Cursor_IronClaw/sjhxjryivr6edhmb2ecovdpot4/password",
+      "password_details": {
+        "strength": "FAIR"
+      }
+    },
+    {
+      "id": "notesPlain",
+      "type": "STRING",
+      "purpose": "NOTES",
+      "label": "notesPlain",
+      "reference": "op://Cursor_IronClaw/sjhxjryivr6edhmb2ecovdpot4/notesPlain"
+    },
+    {
+      "id": "host",
+      "type": "STRING",
+      "label": "host",
+      "value": "win4",
+      "reference": "op://Cursor_IronClaw/sjhxjryivr6edhmb2ecovdpot4/host"
+    },
+    {
+      "id": "notes",
+      "type": "STRING",
+      "label": "notes",
+      "value": "Auto-created by helixon-platform v14508.5 bootstrap. Universal Windows password; same value as 'Win PC WSL Ubuntu Login GB' Login item.",
+      "reference": "op://Cursor_IronClaw/sjhxjryivr6edhmb2ecovdpot4/notes"
+    }
+  ]
+}

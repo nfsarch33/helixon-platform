@@ -51,3 +51,6 @@ evidence/**/op-item-raw.json
 
 # AlertManager slack webhook URL (sensitive)
 /home/jaslian/.config/alertmanager/slack-webhook.url
+
+# WSL credentials (sshpass files, mode 0600)
+/home/jaslian/.config/wsl-credentials/

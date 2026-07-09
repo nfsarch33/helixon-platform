@@ -1,0 +1,25 @@
+{
+  "host": "wsl4",
+  "tailscale_ip": "100.79.227.40",
+  "as_of": "2026-07-10T05:18:00+10:00",
+  "services": [
+    {
+      "name": "vllm-qwen25-7b-awq",
+      "port": 8001,
+      "protocol": "http",
+      "endpoint": "http://100.79.227.40:8001",
+      "model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+      "framework": "vllm-0.23.0-82c094fc",
+      "container": "vllm-wsl4 (rootless podman)",
+      "started": "2026-06-26",
+      "openai_compat": true,
+      "status": "up"
+    }
+  ],
+  "infrastructure": {
+    "gpu": "NVIDIA GeForce RTX 3090 (24GB, driver 610.47, CUDA 13.3)",
+    "gpu_uuid": "GPU-9ce8b327-b002-ed65-f64a-6e30f5e147f0",
+    "nvidia_smi": true,
+    "libcuda_passthrough": true
+  }
+}

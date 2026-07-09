@@ -1,0 +1,44 @@
+=== apt search nvidia-utils ===
+nvidia-utils-460 - Transitional package for nvidia-utils-470
+nvidia-utils-460-server - Transitional package for nvidia-utils-470-server
+nvidia-utils-465 - Transitional package for nvidia-utils-470
+nvidia-utils-470-server - NVIDIA Server Driver support binaries
+nvidia-utils-530 - Transitional package for nvidia-utils-535
+nvidia-utils-535 - NVIDIA driver support binaries
+nvidia-utils-535-server - NVIDIA Server Driver support binaries
+nvidia-utils-510 - Transitional package for nvidia-utils-535
+nvidia-utils-515 - Transitional package for nvidia-utils-535
+nvidia-utils-515-server - Transitional package for nvidia-utils-535-server
+=== install nvidia-utils-570 (driver compat for current WSL) ===
+Setting up libnvidia-compute-580:amd64 (580.159.03-0ubuntu0.24.04.1) ...
+Setting up nvidia-utils-580 (580.159.03-0ubuntu0.24.04.1) ...
+Setting up nvidia-utils-570 (570.211.01-0ubuntu1.24.04.1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.7) ...
+=== which nvidia-smi ===
+/usr/bin/nvidia-smi
+=== nvidia-smi ===
+GPU 0: NVIDIA GeForce RTX 3090 (UUID: GPU-9ce8b327-b002-ed65-f64a-6e30f5e147f0)
+=== nvidia-smi full ===
+Fri Jul 10 05:17:21 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.159.03             Driver Version: 610.47         CUDA Version: 13.3     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 3090        On  |   00000000:04:00.0  On |                  N/A |
+| 30%   14C    P8             29W /  350W |   23219MiB /  24576MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A              25      G   /Xwayland                             N/A      |
+|    0   N/A  N/A              25      G   /Xwayland                             N/A      |
+|    0   N/A  N/A              89      C   /python3.12                           N/A      |
++-----------------------------------------------------------------------------------------+

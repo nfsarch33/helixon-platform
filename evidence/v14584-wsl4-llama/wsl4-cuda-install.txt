@@ -1,0 +1,5 @@
+=== step 1: pin distro ===
+DISTRIB=ubuntu24.04
+DISTRIB
+=== step 2: download keyring ===
+curl: (22) The requested URL returned error: 404

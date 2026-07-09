@@ -1,0 +1,15 @@
+Get:31 http://archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+Get:32 http://archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5768 B]
+Get:33 http://archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+Fetched 9836 kB in 4s (2769 kB/s)
+Reading package lists...
+Adding debian:emSign_ECC_Root_CA_-_G3.pem
+Adding debian:emSign_Root_CA_-_C1.pem
+Adding debian:emSign_Root_CA_-_G1.pem
+Adding debian:vTrus_ECC_Root_CA.pem
+Adding debian:vTrus_Root_CA.pem
+done.
+Setting up openjdk-8-jre:amd64 (8u492-ga~us2-0ubuntu1~24.04.1) ...
+update-alternatives: using /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/policytool to provide /usr/bin/policytool (policytool) in auto mode
+Setting up nvidia-visual-profiler (12.0.146~12.0.1-4build4) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.7) ...

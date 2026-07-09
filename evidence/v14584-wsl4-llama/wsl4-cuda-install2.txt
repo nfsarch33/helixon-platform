@@ -1,0 +1,4 @@
+=== try new keyring path ===
+curl: (22) The requested URL returned error: 404
+1.1-1 not found
+ls: cannot access '/tmp/cuda-keyring.deb': No such file or directory

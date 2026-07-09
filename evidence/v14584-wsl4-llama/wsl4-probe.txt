@@ -1,0 +1,49 @@
+=== user ===
+jason
+=== id ===
+uid=1000(jason) gid=1000(jason) groups=1000(jason),27(sudo)
+=== distro ===
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+=== nvidia ===
+/usr/lib/wsl/lib/libcuda.so
+/usr/lib/wsl/lib/libcuda.so.1
+/usr/lib/wsl/lib/libcuda.so.1.1
+=== /dev/dxg ===
+crw-rw-rw- 1 root root 10, 258 Jun 26 10:56 /dev/dxg
+=== llama ===
+=== git ===
+/usr/bin/git
+/usr/bin/curl
+/usr/bin/wget
+=== disk ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sdf       1007G   32G  924G   4% /
+/dev/sdf       1007G   32G  924G   4% /
+=== cpu/ram ===
+8
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       4.0Gi        10Gi        85Mi       1.9Gi        11Gi
+Swap:          4.0Gi       480Ki       4.0Gi
+=== home dir ===
+total 116
+drwxr-x--- 19 jason jason 4096 Jun 24 23:40 .
+drwxr-xr-x  3 root  root  4096 Jun 12 23:32 ..
+drwxr-xr-x  2 jason jason 4096 Jun 13 02:09 .agents
+drwx------  3 jason jason 4096 Jun 13 22:08 .ansible
+-rw-------  1 jason jason  604 Jun 18 12:22 .bash_history
+-rw-r--r--  1 jason jason  220 Mar 31  2024 .bash_logout
+-rw-r--r--  1 jason jason 4945 Jun 26 11:32 .bashrc
+-rw-------  1 jason jason  470 Jun 26 11:32 .bashrc.local
+lrwxrwxrwx  1 jason jason   28 Jun 12 23:34 .cache -> /mnt/d/WSL/home/jason/.cache
+drwxr-xr-x  2 jason jason 4096 Jun 13 02:09 .claude
+drwxr-xr-x  5 jason jason 4096 Jun 13 01:07 .config
+drwxr-xr-x  6 jason jason 4096 Jun 13 02:15 .cursor
+drwxr-xr-x  5 jason jason 4096 Jun 13 00:30 .cursor-server
+-rw-r--r--  1 jason jason   73 Jun 13 02:10 .gitconfig
+drwx------  3 jason jason 4096 Jun 14 00:02 .gnupg
+drwxr-xr-x  2 jason jason 4096 Jun 13 00:23 .landscape
+lrwxrwxrwx  1 jason jason   28 Jun 12 23:34 .local -> /mnt/d/WSL/home/jason/.local
+-rw-rw-r--  1 jason jason    0 Jun 24 20:23 .motd_shown
+drwxr-xr-x  4 jason jason 4096 Jun 13 01:03 .npm
