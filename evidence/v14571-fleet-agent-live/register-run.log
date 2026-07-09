@@ -1,0 +1,4 @@
+===START===
+{"name":"fleet-agent-wsl1","host":"127.0.0.1","port":8686,"protocol":"http","owner":"v14571","status":"up","last_seen_iso":"","tailscale_ip":"100.84.108.92"}
+
+--HTTP 201--

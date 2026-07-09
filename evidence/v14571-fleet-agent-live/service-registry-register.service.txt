@@ -1,0 +1,17 @@
+[Unit]
+Description=Register Helixon Fleet Agent with svcregistryd
+After=svcregistryd.service fleet-agent.service
+Wants=svcregistryd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/home/jaslian/.local/bin/fleet-agent-register.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+StandardOutput=append:%h/logs/service-registry-register.log
+StandardError=append:%h/logs/service-registry-register.log
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,43 @@
+=== Manual helixon test ===
+2026-07-09T23:24:55+10:00
+--- helixon binary ---
+-rwxr-xr-x 1 jaslian jaslian 33925496 Jul  9 19:04 /home/jaslian/local/bin/helixon
+
+--- helixon --help ---
+helixon manages a Helixon agent runtime: validate config (doctor),
+run the lifecycle (serve), and exercise tool dispatch interactively (repl).
+
+Usage:
+  helixon [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  doctor      Validate config and report runtime readiness
+  help        Help about any command
+  platform    Run the Helixon platform HTTP/SSE server (default :8787)
+  repl        Interactive agent loop with tool dispatch (Ctrl-D to exit)
+  serve       Start the Helixon runtime
+  task        Execute a SprintBoard ticket using the agent loop
+  version     Print binary version
+
+Flags:
+  -h, --help   help for helixon
+
+Use "helixon [command] --help" for more information about a command.
+
+--- helixon serve --help ---
+Start the Helixon runtime
+
+Usage:
+  helixon serve [flags]
+
+Flags:
+  -c, --config string           Path to YAML config (required)
+      --dashboard-addr string   Bind /api/v1/dashboard on this address (e.g. 127.0.0.1:9410)
+      --heartbeat string        Override heartbeat_every (e.g. 30s)
+  -h, --help                    help for serve
+      --http-addr string        Bind HTTP channel (POST /api/v1/chat, GET /api/v1/health)
+
+--- Try serve manually ---
+Error: build provider: helixon: api_key env var "OPENAI_API_KEY" is not set
+build provider: helixon: api_key env var "OPENAI_API_KEY" is not set

@@ -1,0 +1,5 @@
+fleet-agent.service                enabled enabled
+llm-router.service                 enabled enabled
+service-registry-register.service  enabled enabled
+sprintboard-api.service            enabled enabled
+svcregistryd.service               enabled enabled

@@ -1,0 +1,20 @@
+[Unit]
+Description=Helixon Fleet Agent (wsl1)
+After=network-online.target svcregistryd.service llm-router.service sprintboard-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Code/helixon-platform
+ExecStartPre=/bin/sh -c 'export OP_SERVICE_ACCOUNT_TOKEN=$(cat %h/.config/op/service-account-token) && /home/jaslian/local/bin/secrets-bootstrap --service fleet-agent --out /run/user/%U/fleet-agent-env'
+EnvironmentFile=-/run/user/%U/fleet-agent-env
+ExecStart=/home/jaslian/local/bin/helixon serve --config %h/.config/helixon/wsl1-fleet-agent.yaml --http-addr 127.0.0.1:8686
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=60
+TimeoutStopSec=15
+StandardOutput=append:%h/logs/fleet-agent.log
+StandardError=append:%h/logs/fleet-agent.log
+
+[Install]
+WantedBy=default.target
