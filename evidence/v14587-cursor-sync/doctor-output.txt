@@ -1,0 +1,873 @@
+============================================================
+  cursor-tools doctor
+============================================================
+
+  Suite 1: L0 Rules
+    PASS  Rules directory exists
+    PASS  Rules dir has files
+    PASS  Rule: 00-capabilities
+    PASS  Rule: devcontainer-execution
+    PASS  Rule: engineering-standards
+    PASS  Rule: outsource-to-save-tokens
+    PASS  Rule: rtk-token-optimization
+    PASS  Rule: self-improvement
+    PASS  Rule: skill-routing
+    PASS  Rule: subagents
+    PASS  Rule: template.rules
+    PASS  Rule: zendesk-workspace.rules
+    PASS  00-capabilities is non-empty
+    PASS  devcontainer-execution is non-empty
+    PASS  engineering-standards is non-empty
+    PASS  No credentials in 00-capabilities.md
+    PASS  No credentials in 01-1password-uuid-required.mdc
+    PASS  No credentials in 01-fleet-doctor-cadence.mdc
+    PASS  No credentials in 01-sprint-evidence-required.mdc
+    PASS  No credentials in 01-svcregistry-canon.mdc
+    PASS  No credentials in 01-systemd-user-convention.mdc
+    PASS  No credentials in 01-tailscale-wsl-mirror.mdc
+    PASS  No credentials in 12-factor-agents.mdc
+    PASS  No credentials in 1password-redact.mdc
+    PASS  No credentials in README.md
+    PASS  No credentials in agent-race-awareness.mdc
+    PASS  No credentials in agentrace-integration.mdc
+    PASS  No credentials in ansible-apply-vs-drift.md
+    PASS  No credentials in anthropic-aci.mdc
+    PASS  No credentials in async-multi-machine-coordination.mdc
+    PASS  No credentials in australian-english-assessments.mdc
+    PASS  No credentials in autonomous-personal-repo-ops.mdc
+    PASS  No credentials in chinese-shareholder-brief.md
+    PASS  No credentials in code-review-deep-logic-scan.mdc
+    PASS  No credentials in completion-and-application-artifacts.mdc
+    PASS  No credentials in compose-dont-duplicate.md
+    PASS  No credentials in cross-model-review.md
+    PASS  No credentials in deprecation-semble-check.mdc
+    PASS  No credentials in design-before-code-gate.mdc
+    PASS  No credentials in devcontainer-execution.md
+    PASS  No credentials in devops-agent-guardrails.md
+    PASS  No credentials in docker-go-test.mdc
+    PASS  No credentials in documentation-review.md
+    PASS  No credentials in drift-7.x-helixoneval-rubric-coverage.mdc
+    PASS  No credentials in drift-7.x-svc-registry-port-collision.mdc
+    PASS  No credentials in drift-8.x-plan-sync-pr-min-coverage.mdc
+    PASS  No credentials in drift-8.x-shell-timeout-mandatory.mdc
+    PASS  No credentials in drift-8.x-subagent-budget-checkpoint-every-30min.mdc
+    PASS  No credentials in drift-8.x-subagent-deliverable-max-3-files.mdc
+    PASS  No credentials in drift-8.x-testcontainers-podman-default.mdc
+    PASS  No credentials in engineering-discipline.mdc
+    PASS  No credentials in engineering-standards.md
+    PASS  No credentials in evidence-based-development.mdc
+    PASS  No credentials in evidence-filename-convention.mdc
+    PASS  No credentials in evospine-cycle.mdc
+    PASS  No credentials in fast-model-downloads.md
+    PASS  No credentials in fleet-destructive-op-deny.mdc
+    PASS  No credentials in fleet-health-automation.mdc
+    PASS  No credentials in fleet-pr-review-autonomy.mdc
+    PASS  No credentials in fleet-slo-self-heal.md
+    PASS  No credentials in fleet-token-saving.mdc
+    PASS  No credentials in fleet-travel-latency-china.mdc
+    PASS  No credentials in forbidden-runtime-helixon-only.mdc
+    PASS  No credentials in git-ops-guard.mdc
+    PASS  No credentials in go-toolchain-rebuild.md
+    PASS  No credentials in golang-first-tooling.mdc
+    PASS  No credentials in graceful-degradation.mdc
+    PASS  No credentials in gstack-autoresearch-planning.md
+    PASS  No credentials in handoff-automation-on-commit.mdc
+    PASS  No credentials in handoff-per-todo.mdc
+    PASS  No credentials in handoff-protocol-multi-machine.mdc
+    PASS  No credentials in hardware-preflight.md
+    PASS  No credentials in headroom-token-saving.mdc
+    PASS  No credentials in idempotency-rules.mdc
+    PASS  No credentials in implementation-preflight.mdc
+    PASS  No credentials in instrumented-retrier.md
+    PASS  No credentials in interactive-qa-session-start.mdc
+    PASS  No credentials in karpathy-guidelines.mdc
+    PASS  No credentials in lowfat-token-compression.mdc
+    PASS  No credentials in macbook-no-inbound.md
+    PASS  No credentials in macbook-only-async-offload.mdc
+    PASS  No credentials in mcp-tool-canon.mdc
+    PASS  No credentials in media-library-mntz.mdc
+    PASS  No credentials in memory-routing-layers.mdc
+    PASS  No credentials in mission-control-a2a-proof.md
+    PASS  No credentials in multi-agent-workflow.mdc
+    PASS  No credentials in multitask-discipline.mdc
+    PASS  No credentials in nas-fleet-scripts.md
+    PASS  No credentials in no-sh-scripts.mdc
+    PASS  No credentials in no-shell-auth-in-configs.mdc
+    PASS  No credentials in no-shell-leak.mdc
+    PASS  No credentials in ntfs-retirement.mdc
+    PASS  No credentials in ntfs-single-task.mdc
+    PASS  No credentials in observability.mdc
+    PASS  No credentials in oci-ssh-jump-for-fleet.mdc
+    PASS  No credentials in operator-action-needs-handoff.mdc
+    PASS  No credentials in operator-suggestion-gate.mdc
+    PASS  No credentials in otel-genai-semconv.mdc
+    PASS  No credentials in output-brevity.mdc
+    PASS  No credentials in outsource-to-save-tokens.md
+    PASS  No credentials in pair-lock.mdc
+    PASS  No credentials in personal-ai-gateway-routing.mdc
+    PASS  No credentials in plan-sync.mdc
+    PASS  No credentials in post-sprint-commit-merge.mdc
+    PASS  No credentials in pr-discipline.mdc
+    PASS  No credentials in progressive-disclosure-session.mdc
+    PASS  No credentials in public-repo-terms-gate.mdc
+    PASS  No credentials in research-before-build.md
+    PASS  No credentials in research-global-kb-first.mdc
+    PASS  No credentials in resource-aware-subagents.mdc
+    PASS  No credentials in resource-guard.mdc
+    PASS  No credentials in response-summary-template.mdc
+    PASS  No credentials in reuse-first.mdc
+    PASS  No credentials in reuse-mature-oss-first.mdc
+    PASS  No credentials in rtk-token-optimization.md
+    PASS  No credentials in self-improvement.md
+    PASS  No credentials in semantic-density.mdc
+    PASS  No credentials in semantic-versioning.md
+    PASS  No credentials in semble-comprehensive-search.mdc
+    PASS  No credentials in semble-first-code-search.mdc
+    PASS  No credentials in sentrux-always.mdc
+    PASS  No credentials in sentrux-skip-for-kb-repos.mdc
+    PASS  No credentials in session-context-budget.mdc
+    PASS  No credentials in single-owner-per-repo.mdc
+    PASS  No credentials in skill-routing.md
+    PASS  No credentials in sot-llm-endpoints.mdc
+    PASS  No credentials in sprint-closeout-evidence-gate.mdc
+    PASS  No credentials in sprint-pattern.mdc
+    PASS  No credentials in sprint-plan-template-enforcement.mdc
+    PASS  No credentials in sprint-scaffold-7-stories.mdc
+    PASS  No credentials in sprintboard-mcp-required.mdc
+    PASS  No credentials in subagent-hook-failopen.mdc
+    PASS  No credentials in subagent-offload.mdc
+    PASS  No credentials in subagents.md
+    PASS  No credentials in superpowers-process-spine.mdc
+    PASS  No credentials in template.rules
+    PASS  No credentials in terminal-session-discipline.mdc
+    PASS  No credentials in ticket-comment-format.mdc
+    PASS  No credentials in timestamp-discipline.mdc
+    PASS  No credentials in tool-discipline-before-use.mdc
+    PASS  No credentials in upstream-sync.mdc
+    PASS  No credentials in user-sovereignty.mdc
+    PASS  No credentials in verification-iron-law.mdc
+    PASS  No credentials in win3-portable-everything.mdc
+    PASS  No credentials in worklog-per-sprint.mdc
+    PASS  No credentials in workspace-cleanliness-gate.mdc
+    PASS  No credentials in zd-gateway-boundary.mdc
+    PASS  No credentials in zd-github-no-force-push.mdc
+    PASS  No credentials in zd-macbook-async-offload.md
+    PASS  No credentials in zd-user-story-format.mdc
+    PASS  No credentials in zendesk-workspace.rules
+
+  Suite 2: L1 Startup Indexes
+    PASS  global-memories dir exists
+    PASS  Startup index: daily-startup-prompt.md
+    PASS  Startup index: skills-index.md
+    PASS  Startup index: mcp-index-and-selection-sop.md
+    PASS  Startup index: one-person-company-progress.md
+    PASS  daily prompt has memory system
+    PASS  skills index has count
+    FAIL  No credentials in daily-startup-prompt.md -- credential pattern found
+    PASS  No credentials in skills-index.md
+    PASS  No credentials in mcp-index-and-selection-sop.md
+    PASS  No credentials in one-person-company-progress.md
+
+  Suite 3: L2 Global KB
+    PASS  global-kb dir exists
+    PASS  sop/ dir exists
+    PASS  cursor-config/ dir exists
+    PASS  architecture/ dir exists
+    PASS  learnings/ dir exists
+    PASS  global-memories/ dir exists
+
+  Suite 4: Skills Registry
+    PASS  skills dir exists
+    PASS  agents-skills dir exists
+    PASS  cursor skills >= 25
+    PASS  agents skills >= 3
+    PASS  total skills >= 30
+    PASS  skills-index.md exists
+    PASS  00-index SKILL.md exists
+    PASS  Skill: self-improving-agent
+    PASS  Skill: automation-workflows
+    PASS  Skill: systematic-debugging
+    PASS  Skill: go-clean-architecture
+    PASS  Skill: go-security-review
+    PASS  Skill: multi-search-engine
+    PASS  Skill: memory-system
+    PASS  Skill: session-handoff
+    PASS  Skill: find-skills
+    PASS  Skill: skillvet
+
+  Suite 5: skills-cursor Policy
+    PASS  skills-cursor dir exists
+    PASS  skills-cursor count >= 5
+    PASS  skills-index documents skills-cursor
+    PASS  00-index documents skills-cursor
+
+  Suite 6: Cross-File Consistency
+    FAIL  daily prompt has skill count -- '154 unique skills' not found in daily-startup-prompt.md
+    FAIL  skills index has count -- '154 unique skills' not found in skills-index.md
+    PASS  daily prompt mentions hooks
+    PASS  daily prompt mentions sub-agents
+    PASS  daily prompt mentions slash commands
+    PASS  daily prompt mentions unified repo
+    PASS  daily prompt mentions bootstrap
+    PASS  daily prompt mentions Context Mode
+    PASS  skills index mentions cursor path
+    PASS  skills index mentions agents path
+
+  Suite 7: Git Sync
+    PASS  .git exists for global-kb
+    PASS  origin remote exists
+    PASS  remote points to cursor-global-kb
+    PASS  git identity is personal
+    PASS  allowMainPush is true
+    FAIL  repo is clean -- uncommitted changes:  M research/perplexity-round3/test-slug.evidence.json
+ M research/perplexity-round3/test-slug.manifest.json
+
+    PASS  core.hooksPath set
+
+  Suite 8: Hooks, Sub-agents, Commands, MCP
+    PASS  cursor-tools binary exists
+    PASS  hooks.json routes guard-shell to Go
+    PASS  hooks.json routes sanitize-read to Go
+    PASS  hooks.json routes guard-mcp to Go
+    PASS  hooks.json routes post-edit to Go
+    PASS  hooks.json routes housekeeping to Go
+    PASS  hooks.json is symlink
+    PASS  Agent: go-architect.md
+    PASS  Agent: go-tester.md
+    PASS  Agent: flutter-architect.md
+    PASS  Agent: flutter-implementer.md
+    PASS  Agent: agent-orchestrator.md
+    PASS  Agent: memory-ops.md
+    PASS  Commands >= 6
+    PASS  MCP index exists
+    PASS  MCP index has servers
+    PASS  No credentials in MCP index
+
+  Suite 9: Install Readiness
+    PASS  global-kb checkout exists
+    PASS  cursor-tools binary exists
+    PASS  skills symlink exists
+    PASS  rules symlink exists
+    PASS  commands symlink exists
+    PASS  agents symlink exists
+    PASS  hooks.json is symlink
+    PASS  MCP config exists
+    PASS  bootstrap.sh exists
+    PASS  systemd installer exists
+
+  Suite 10: MCP Readiness
+    PASS  mcp.json exists
+    PASS  mcp.json parses
+    PASS  mcpServers present
+    PASS  MCP server: mem0
+    PASS  MCP server: context-mode
+    PASS  MCP server: context7
+    PASS  MCP server: git-mcp-server
+    PASS  MCP server: duckduckgo
+    PASS  MCP server: fetch
+    PASS  Perplexity server present
+    PASS  Command resolvable: user-allPepper-memory-bank
+    PASS  Env ready: user-allPepper-memory-bank
+    PASS  Absolute args exist: user-allPepper-memory-bank
+    FAIL  Command resolvable: user-playwright -- command not found: /usr/bin/docker
+    PASS  Env ready: user-playwright
+    PASS  Absolute args exist: user-playwright
+    PASS  Command resolvable: user-sequential-thinking
+    PASS  Env ready: user-sequential-thinking
+    PASS  Absolute args exist: user-sequential-thinking
+    FAIL  Command resolvable: user-atlassian-jira -- command not found: /usr/bin/docker
+    PASS  Env ready: user-atlassian-jira
+    PASS  Absolute args exist: user-atlassian-jira
+    PASS  Command resolvable: user-google-scholar
+    PASS  Env ready: user-google-scholar
+    FAIL  Absolute args exist: user-google-scholar -- missing absolute arg path
+    PASS  Command resolvable: user-memory
+    PASS  Env ready: user-memory
+    PASS  Absolute args exist: user-memory
+    PASS  Command resolvable: context-mode
+    PASS  Env ready: context-mode
+    PASS  Absolute args exist: context-mode
+    PASS  Command resolvable: context7
+    PASS  Env ready: context7
+    PASS  Absolute args exist: context7
+    PASS  Command resolvable: user-time
+    PASS  Env ready: user-time
+    PASS  Absolute args exist: user-time
+    PASS  Command resolvable: user-tavily-mcp
+    FAIL  Env ready: user-tavily-mcp -- missing env placeholder for enabled server
+    PASS  Absolute args exist: user-tavily-mcp
+    PASS  Command resolvable: user-git-mcp-server
+    PASS  Env ready: user-git-mcp-server
+    PASS  Absolute args exist: user-git-mcp-server
+    PASS  Command resolvable: user-context7
+    PASS  Env ready: user-context7
+    PASS  Absolute args exist: user-context7
+    PASS  Command resolvable: user-chrome-devtools
+    PASS  Env ready: user-chrome-devtools
+    PASS  Absolute args exist: user-chrome-devtools
+    PASS  Command resolvable: user-wolfram-alpha
+    FAIL  Env ready: user-wolfram-alpha -- missing env placeholder for enabled server
+    PASS  Absolute args exist: user-wolfram-alpha
+    PASS  Command resolvable: user-exa
+    FAIL  Env ready: user-exa -- missing env placeholder for enabled server
+    PASS  Absolute args exist: user-exa
+    PASS  Command resolvable: mem0
+    FAIL  Env ready: mem0 -- missing env placeholder for enabled server
+    PASS  Absolute args exist: mem0
+    PASS  Command resolvable: user-context-mode
+    PASS  Env ready: user-context-mode
+    PASS  Absolute args exist: user-context-mode
+    PASS  Command resolvable: user-perplexity-ask
+    FAIL  Env ready: user-perplexity-ask -- missing env placeholder for enabled server
+    PASS  Absolute args exist: user-perplexity-ask
+    FAIL  Command resolvable: user-duckduckgo -- command not found: /usr/bin/docker
+    PASS  Env ready: user-duckduckgo
+    PASS  Absolute args exist: user-duckduckgo
+    PASS  Command resolvable: user-perplexity
+    FAIL  Env ready: user-perplexity -- missing env placeholder for enabled server
+    PASS  Absolute args exist: user-perplexity
+    PASS  Command resolvable: user-obs
+    FAIL  Env ready: user-obs -- missing env placeholder for enabled server
+    PASS  Absolute args exist: user-obs
+    PASS  Command resolvable: perplexity-ask
+    FAIL  Env ready: perplexity-ask -- missing env placeholder for enabled server
+    PASS  Absolute args exist: perplexity-ask
+    PASS  Command resolvable: user-engram
+    PASS  Env ready: user-engram
+    PASS  Absolute args exist: user-engram
+    PASS  Command resolvable: user-sprintboard
+    PASS  Env ready: user-sprintboard
+    PASS  Absolute args exist: user-sprintboard
+    FAIL  Command resolvable: user-github-official -- command not found: /usr/bin/docker
+    FAIL  Env ready: user-github-official -- missing env placeholder for enabled server
+    PASS  Absolute args exist: user-github-official
+    FAIL  Command resolvable: user-fetch -- command not found: /usr/bin/docker
+    PASS  Env ready: user-fetch
+    PASS  Absolute args exist: user-fetch
+    PASS  Command resolvable: user-word-document-server
+    PASS  Env ready: user-word-document-server
+    PASS  Absolute args exist: user-word-document-server
+    PASS  Command resolvable: user-engram-oss-legacy
+    PASS  Env ready: user-engram-oss-legacy
+    PASS  Absolute args exist: user-engram-oss-legacy
+    PASS  Command resolvable: git-mcp-server
+    PASS  Env ready: git-mcp-server
+    PASS  Absolute args exist: git-mcp-server
+    PASS  active MCP servers >= 9
+
+  Suite 11: Mem0 Connectivity
+    PASS  mcp.json exists
+    PASS  mcp.json parses
+    PASS  mem0 configured
+    PASS  mem0 enabled
+    PASS  mem0 command resolvable
+    FAIL  mem0 env ready -- MEM0_API_KEY or MEM0_DEFAULT_USER_ID missing
+    PASS  mem0 default user id configured
+    PASS  mem0 api key configured
+    PASS  allPepper absent or removed
+    PASS  memory task routes to mem0
+
+  Suite 12: Platform Readiness
+    PASS  platform profile recognised
+    PASS  WSL detected
+    PASS  home path looks Linux
+    PASS  WSL MCP extras doc exists
+    PASS  SSH key path computed
+
+  Suite 13: Resume Readiness
+    PASS  daily-startup prompt exists
+    PASS  session handoff exists
+    PASS  MCP index exists
+    PASS  daily prompt references session handoff
+    PASS  session handoff has section headers
+    PASS  git status executes
+    PASS  git status output captured
+
+  Suite 14: Memory Routing
+    PASS  rules dir (L0)
+    PASS  global-memories dir (L1)
+    PASS  sop dir (L2)
+    PASS  learnings dir
+    PASS  routing mentions L0
+    PASS  routing mentions L1
+    PASS  routing mentions L2
+    PASS  routing mentions memo
+    PASS  routing mentions Mem0
+    PASS  daily prompt does not route primary memory to allPepper
+    PASS  self-improving-agent skill exists
+    FAIL  skill has memory architecture -- 'Memory' not found in SKILL.md
+    PASS  skill has promotion rules
+    PASS  memory-system skill exists
+    FAIL  memory-system uses mem0 -- 'mem0' not found in SKILL.md
+    PASS  memory-task command exists
+    PASS  memory-task searches mem0 first
+    PASS  memory-task records memory outcomes
+    PASS  memory-task records context-mode outcomes
+    PASS  memory-task records git kb outcomes
+    PASS  self-improvement rule exists
+    FAIL  self-improvement promotes to Mem0 -- 'promote to Mem0' not found in self-improvement.md
+    PASS  self-improvement no longer uses memo learnings as primary shared store
+    PASS  00-capabilities rule exists
+    PASS  00-capabilities uses Mem0 as L1
+    PASS  00-capabilities no longer routes L1 to Pepper
+    PASS  template rule exists
+    PASS  template rule no longer routes add to memory to Pepper
+    PASS  zendesk workspace rule exists
+    PASS  zendesk rule no longer calls Pepper source of truth
+    PASS  zendesk rule no longer updates Pepper
+    PASS  context-mode skill exists
+    PASS  context-mode skill uses ctx_search
+    PASS  context-mode skill tracks outcomes
+    FAIL  mcp index marks allPepper disabled -- '### allPepper-memory-bank' not found in mcp-index-and-selection-sop.md
+    FAIL  mcp index marks allPepper legacy -- 'legacy fallback only' not found in mcp-index-and-selection-sop.md
+
+  Suite 15: Memory Evidence
+    PASS  logs dir exists
+    FAIL  memory parity export exists -- not found: /home/jaslian/logs/memory-parity.md
+    FAIL  memory metrics export exists -- not found: /home/jaslian/logs/memory-metrics.md
+    FAIL  memory parity export proves parity -- cannot read: /home/jaslian/logs/memory-parity.md
+    FAIL  memory parity export has zero missing entries -- cannot read: /home/jaslian/logs/memory-parity.md
+    FAIL  memory metrics export includes memory KPI section -- cannot read: /home/jaslian/logs/memory-metrics.md
+    FAIL  memory metrics export includes coverage column -- cannot read: /home/jaslian/logs/memory-metrics.md
+    FAIL  memory parity export is fresh -- missing file: /home/jaslian/logs/memory-parity.md
+    FAIL  memory metrics export is fresh -- missing file: /home/jaslian/logs/memory-metrics.md
+    PASS  metrics history loads
+
+  Suite 16: Cross-Machine Sync
+    PASS  bootstrap.sh exists
+    PASS  bootstrap has no /opt/homebrew
+    PASS  cursor-tools binary exists
+    FAIL  git-hook commit-msg delegates to Go binary -- 'cursor-tools' not found in commit-msg
+    FAIL  git-hook pre-push delegates to Go binary -- 'cursor-tools' not found in pre-push
+    PASS  legacy/ archive exists
+    PASS  legacy README exists
+    PASS  SSH key exists -- agtc
+
+  Suite 17: Programmatic Count Verification
+    PASS  cursor skills > 0
+    PASS  agents skills > 0
+    PASS  total matches sum
+    PASS  hooks.json has 5 Go routes
+    PASS  agents = 6
+    PASS  commands = 6
+
+  Suite 18: Hook Unit Tests
+    PASS  cursor-tools binary exists
+    PASS  selftest runs without error
+    PASS  selftest has guard-shell tests
+    PASS  selftest has sanitize-read tests
+    PASS  selftest has guard-mcp tests
+
+  Suite 19: Log File Integrity
+    PASS  Log not yet created: guard-shell (OK)
+    PASS  Timestamp check skipped: guard-shell
+    PASS  Log not yet created: sanitize-read (OK)
+    PASS  Timestamp check skipped: sanitize-read
+    PASS  Log not yet created: mcp-audit (OK)
+    PASS  Timestamp check skipped: mcp-audit
+    PASS  Log not yet created: post-edit (OK)
+    PASS  Timestamp check skipped: post-edit
+    PASS  Log exists: housekeeping
+    PASS  timestamps in housekeeping.log
+    PASS  Log exists: checks
+    PASS  timestamps in checks.log
+    PASS  hooks.json has guard-shell route
+    PASS  hooks.json has sanitize-read route
+    PASS  hooks.json has guard-mcp route
+    PASS  hooks.json has post-edit route
+    PASS  hooks.json has housekeeping route
+    PASS  Go binary handles log rotation
+    PASS  Go binary handles log writing
+    PASS  Go binary handles mcp-audit logs
+
+  Suite 20: Automation Pipeline
+    PASS  hooks.json exists
+    PASS  has beforeShellExecution
+    PASS  has beforeReadFile
+    PASS  has beforeMCPExecution
+    PASS  has afterFileEdit
+    PASS  has stop
+    PASS  hooks.json uses Go binary
+    PASS  Go post-edit calls sync-counts
+    PASS  Go post-edit formats go
+    PASS  Go post-edit formats dart
+    PASS  Go housekeeping does git sync
+    PASS  Go daily-refresh exists
+    PASS  Go daily-refresh has MCP step
+    PASS  Go daily-refresh has git sync
+    PASS  Go daily-refresh has inline repo sync
+    PASS  Go mcp-index exists
+    PASS  Go mcp-index renders markdown
+    PASS  Go mcp-index redacts env
+    PASS  Go metrics store exists
+    PASS  Go metrics has JSONL recording
+    PASS  Go metrics has summarise
+    PASS  Go metrics command exists
+    PASS  Go clilog package exists
+    PASS  Go clilog has colour support
+    PASS  Go daily-refresh has metrics step
+
+  Suite 21: Skillvet EDR-Safety
+    PASS  skillvet skill exists
+    PASS  find-skills skill exists
+    PASS  academic-assessment has frontmatter
+    PASS  academic-essay-writer has frontmatter
+    PASS  academic-humanizer has frontmatter
+    PASS  agent-browser has frontmatter
+    PASS  agent-observability has frontmatter
+    PASS  agent-reach has frontmatter
+    PASS  agent-self-evaluation has frontmatter
+    PASS  agent-skills-optimization has frontmatter
+    PASS  agile-sprint-mastery has frontmatter
+    PASS  ai-research-manager has frontmatter
+    PASS  architecture-decisions has frontmatter
+    PASS  argocd has frontmatter
+    PASS  aris-research-integration has frontmatter
+    PASS  automation-workflows has frontmatter
+    PASS  autonomous-research has frontmatter
+    PASS  aws-cloud-operations has frontmatter
+    PASS  bayesian-decision-assistant has frontmatter
+    PASS  beautiful-mermaid has frontmatter
+    PASS  ci-cd-pipelines has frontmatter
+    PASS  cicd-gitops-promotion has frontmatter
+    PASS  clean-code-principles has frontmatter
+    PASS  cli-anything has frontmatter
+    PASS  cli-discipline has frontmatter
+    PASS  cli-offload-orchestration has frontmatter
+    PASS  cloud-architecture has frontmatter
+    PASS  cluster-monitoring has frontmatter
+    PASS  code-review-pro has frontmatter
+    PASS  codefresh has frontmatter
+    PASS  context-hub has frontmatter
+    PASS  context-mode has frontmatter
+    PASS  docker-ops has frontmatter
+    PASS  dreamhost-manager has frontmatter
+    PASS  eval-harness has frontmatter
+    PASS  evaluation-methodology has frontmatter
+    PASS  evospine has frontmatter
+    PASS  find-skills has frontmatter
+    PASS  first-principles-thinking has frontmatter
+    PASS  fleet-doctor has frontmatter
+    PASS  flutter-mastery has frontmatter
+    PASS  fork-upstream-sync has frontmatter
+    PASS  gcp-cloud-operations has frontmatter
+    PASS  gemini-code-review has frontmatter
+    PASS  gh-address-comments has frontmatter
+    PASS  gh-fix-ci has frontmatter
+    PASS  git-worktree-manager has frontmatter
+    PASS  github-ci has frontmatter
+    PASS  github-identity has frontmatter
+    PASS  go-clean-architecture has frontmatter
+    PASS  go-mcp-server has frontmatter
+    PASS  go-performance-optimization has frontmatter
+    PASS  go-security-review has frontmatter
+    PASS  google-workspace-cli has frontmatter
+    PASS  helixon-framework-patterns has frontmatter
+    PASS  helixon-platform has frontmatter
+    PASS  hf-hub-throughput has frontmatter
+    PASS  homelab-k3s has frontmatter
+    PASS  http-discipline has frontmatter
+    PASS  huggingface-ecosystem has frontmatter
+    PASS  ironclaw-agent-dashboard has frontmatter
+    PASS  ironclaw-ceo-agent has frontmatter
+    PASS  ironclaw-deploy-ops has frontmatter
+    PASS  ironclaw-evolver has frontmatter
+    PASS  ironclaw-external-ops has frontmatter
+    PASS  ironclaw-mission-control has frontmatter
+    PASS  ironclaw-multi-agent has frontmatter
+    PASS  ironclaw-orchestrator has frontmatter
+    PASS  iterative-retrieval has frontmatter
+    PASS  k8s-devops has frontmatter
+    PASS  linkedin-job-hunt has frontmatter
+    PASS  llm-cluster-router has frontmatter
+    PASS  llm-model-evaluator has frontmatter
+    PASS  media-downloader has frontmatter
+    PASS  mem0-selfhost-ops has frontmatter
+    PASS  memory-and-kb has frontmatter
+    PASS  memory-hygiene has frontmatter
+    PASS  memory-system has frontmatter
+    PASS  metrics-dashboard has frontmatter
+    PASS  microservices-go has frontmatter
+    PASS  monitoring-observability has frontmatter
+    PASS  multi-gpu-inference has frontmatter
+    PASS  multi-search-engine has frontmatter
+    PASS  obsidian-tools has frontmatter
+    PASS  onepwd-form-autofill has frontmatter
+    PASS  openclaw-orchestrator has frontmatter
+    PASS  openclaw-vllm has frontmatter
+    PASS  opencode-controller has frontmatter
+    PASS  oracle-cloud-recon has frontmatter
+    PASS  pdf-operations has frontmatter
+    PASS  personal-repo-routing has frontmatter
+    PASS  personal-repo-shell-hygiene has frontmatter
+    PASS  php-mcp-server has frontmatter
+    PASS  podcast-reader has frontmatter
+    PASS  post-merge-housekeeping has frontmatter
+    PASS  postgres-ecosystem has frontmatter
+    PASS  pptx-handler has frontmatter
+    PASS  pptx-mastery has frontmatter
+    PASS  product-management has frontmatter
+    PASS  project-management has frontmatter
+    PASS  react-best-practices has frontmatter
+    PASS  react-native-best-practices has frontmatter
+    PASS  receiving-code-review has frontmatter
+    PASS  release-checklist has frontmatter
+    PASS  res-downloader has frontmatter
+    PASS  research-automation has frontmatter
+    PASS  research-pipeline has frontmatter
+    FAIL  reverse-engineering has frontmatter -- missing YAML frontmatter
+    PASS  rtk-integration has frontmatter
+    PASS  runx-discipline has frontmatter
+    PASS  rust-mastery has frontmatter
+    PASS  seek-job-hunt has frontmatter
+    PASS  self-healing-scrapers has frontmatter
+    PASS  self-improvement-engine has frontmatter
+    PASS  self-improving-agent has frontmatter
+    PASS  session-handoff has frontmatter
+    PASS  session-logs has frontmatter
+    PASS  skill-creator has frontmatter
+    PASS  skillvet has frontmatter
+    PASS  subagent-incident-review has frontmatter
+    PASS  systematic-debugging has frontmatter
+    PASS  tailscale-fleet has frontmatter
+    PASS  tech-meeting-summary has frontmatter
+    PASS  temporal-developer has frontmatter
+    PASS  temporal-orchestration has frontmatter
+    PASS  ui-agent-automation has frontmatter
+    PASS  ui-ux-pro-max has frontmatter
+    PASS  unified-go-logging has frontmatter
+    PASS  upwork-job-hunt has frontmatter
+    PASS  vidbee-manager has frontmatter
+    PASS  web-search-plus has frontmatter
+    PASS  workspace-hygiene-doctor has frontmatter
+    PASS  wp-blocks has frontmatter
+    PASS  wp-development has frontmatter
+    PASS  wp-ops has frontmatter
+    PASS  writing-plans has frontmatter
+    PASS  wsl-gpu-ops has frontmatter
+    PASS  wsl-onboarding has frontmatter
+    PASS  youtube-downloader has frontmatter
+    PASS  zbt-e2e-testing has frontmatter
+
+  Suite 22: IronClaw Readiness
+    PASS  ironclaw not configured (optional for local Cursor+IronClaw integration)
+
+  Suite 23: Global Cursor Config
+    PASS  skills is symlink
+    PASS  rules is symlink
+    PASS  commands is symlink
+    PASS  agents is symlink
+    PASS  agents-skills is symlink
+    PASS  hooks.json is symlink
+    PASS  cursor-tools binary in ~/bin
+    PASS  cursor-tools is executable
+    PASS  legacy/ archive exists
+    PASS  bootstrap.sh exists
+    PASS  bootstrap has skills
+    PASS  bootstrap has rules
+    PASS  bootstrap has hooks
+    PASS  bootstrap has memo
+    PASS  bootstrap builds Go binary
+
+  Suite 24: Race Condition Prevention
+    PASS  Go lockfile package exists
+    PASS  Go DirLock has mkdir
+    PASS  Go DirLock has pid tracking
+    PASS  Go DirLock has stale detection
+    PASS  Go DirLock has release
+    FAIL  Go FileLock has flock -- 'flock' not found in filelock.go
+    FAIL  Go FileLock has LOCK_EX -- 'LOCK_EX' not found in filelock.go
+    PASS  No stale housekeeping lock
+    PASS  Go housekeeping has git sync
+    PASS  Go housekeeping has log rotation
+    PASS  Go guard-shell implementation exists
+    PASS  Go guard-shell records metrics
+    FAIL  pre-push delegates to Go -- 'cursor-tools' not found in pre-push
+    FAIL  commit-msg delegates to Go -- 'cursor-tools' not found in commit-msg
+    PASS  Go commit-msg has conventional format
+    PASS  Go pre-push has allowMainPush
+
+  Suite 25: Data Integrity
+    PASS  Single git remote (2 lines: fetch+push)
+    PASS  Remote is cursor-global-kb
+    PASS  global learnings PATTERNS.md
+    PASS  global learnings episodes/
+
+  Suite 26: Git Hook Integrity
+    PASS  git-hooks dir exists
+    PASS  commit-msg shim exists
+    FAIL  commit-msg delegates to cursor-tools -- 'cursor-tools' not found in commit-msg
+    PASS  commit-msg calls githook subcommand
+    PASS  pre-push shim exists
+    FAIL  pre-push delegates to cursor-tools -- 'cursor-tools' not found in pre-push
+    PASS  pre-push calls githook subcommand
+    PASS  Go commit-msg checks AI attribution
+    PASS  Go commit-msg checks conventional format
+    PASS  Go pre-push blocks main
+    PASS  Go pre-push blocks master
+    PASS  Go pre-push has allowMainPush
+    PASS  core.hooksPath is set
+    PASS  core.hooksPath points to cursor-config
+    PASS  global-kb allows main push
+    PASS  git email is personal
+    PASS  git email not zendesk
+
+  Suite 27: Self-Improvement Pipeline
+    PASS  cursor-tools binary exists
+    PASS  global PATTERNS.md
+    PASS  global ERRORS.md
+    PASS  global LEARNINGS.md
+    PASS  global FEATURE_REQUESTS.md
+    PASS  global episodes/
+    PASS  episodes >= 3
+    PASS  PATTERNS has table header
+    PASS  PATTERNS has entries
+    PASS  Go post-edit triggers promote
+    PASS  Go post-edit detects learnings
+    PASS  Go housekeeping runs promote
+    PASS  skill has abstraction rules
+    PASS  skill references promotion pipeline
+    PASS  bootstrap installs cursor-tools
+
+  Suite 28: DevContainer Compliance
+    PASS  devcontainer-templates dir exists
+    PASS  go-workspace Dockerfile exists
+    PASS  go-workspace devcontainer.json
+    PASS  cursor-tools .devcontainer exists
+    PASS  cursor-tools Dockerfile exists
+    PASS  cursor-tools Dockerfile.dev exists
+    PASS  Makefile has docker target
+    PASS  Makefile has test-docker target
+
+  Suite 29: rtk Token Optimization
+    PASS  rtk binary installed
+    PASS  L0 rule rtk-token-optimization.md exists
+    PASS  rtk-integration skill exists
+
+  Suite 30: Toolchain Freshness
+    PASS  cursor-tools binary exists
+    PASS  cursor-tools source dir exists
+    PASS  binary is up-to-date with source
+    PASS  dist binary matches local binary
+
+  Suite 31: Toolchain Cross-Platform
+    PASS  binary executes on current platform (wsl)
+    PASS  running on WSL profile
+
+  Suite 32: Handoff Acknowledgement
+    PASS  handoff-last-check.txt exists
+    PASS  handoff review ran within last 24h
+    PASS  state file has checked timestamp
+
+  Suite 33: Git Sync Resilience
+    PASS  rerere.enabled is true
+    PASS  merge.ours.driver registered
+    PASS  .gitattributes exists
+    PASS  .gitattributes has ours merge
+    PASS  .gitattributes has union merge
+    PASS  .gitattributes has binary dist
+    PASS  no rebase in progress
+    PASS  no stale index.lock
+    PASS  last-push-result.txt exists
+    PASS  last push was successful or branch is synced with upstream
+    PASS  push state is recent (within 48h)
+
+  Suite 34: Dependency Readiness
+    PASS  git available (git version 2.43.0)
+    PASS  go available (go version go1.22.2 linux/amd64)
+    FAIL  go >= 1.24 -- upgrade Go to 1.24+
+    PASS  gh available (gh version 2.45.0 (2025-07-18 Ubuntu 2.45.0-1ubuntu0.3))
+    PASS  ssh available (OpenSSH_9.6p1 Ubuntu-3ubuntu13.16, OpenSSL 3.0.13 30 Jan 2024)
+    PASS  node available (v22.23.1)
+    PASS  npm available (10.9.8)
+    PASS  python3 available (Python 3.12.3)
+    PASS  uv available (uv 0.11.26 (x86_64-unknown-linux-gnu))
+    FAIL  docker on PATH -- docker not found
+    PASS  jq available (jq-1.7)
+    PASS  curl available (curl 8.5.0 (x86_64-pc-linux-gnu) libcurl/8.5.0 OpenSSL/3.0.13 zlib/1.3 brotli/1.1.0 zstd/1.5.5 libidn2/2.3.7 libpsl/0.21.2 (+libidn2/2.3.7) libssh/0.10.6/openssl/zlib nghttp2/1.59.0 librtmp/2.3 OpenLDAP/2.6.10)
+    PASS  make available (GNU Make 4.3)
+    PASS  rtk available (rtk 0.43.0)
+    PASS  kubectl optional (not installed)
+    PASS  terraform optional (not installed)
+    PASS  helm available (version.BuildInfo{Version:"v3.16.3", GitCommit:"cfd07493f46efc9debd9cc1b02a0961186df7fdf", GitTreeState:"clean", GoVersion:"go1.22.7"})
+    PASS  nvidia-smi on PATH
+    PASS  nvidia-smi responds (NVIDIA-SMI version  : 610.43.02)
+
+  Suite 35: Coordination Signals
+    PASS  memory-system skill exists
+    PASS  memory-system mentions coordination
+    PASS  multi-cursor-sync-protocol exists
+    PASS  sync protocol mentions Mem0 coordination
+    PASS  daily prompt references signal list
+    PASS  cursor-tools binary exists
+    FAIL  signal list reachable -- cursor-tools signal list: signal list failed: exit status 1
+
+  Suite 36: Agent Stack Health
+    PASS  agent-doctor not installed (optional — build with: cd ~/ai-agent-business-stack/go && go build -o bin/agent-doctor ./cmd/agent-doctor/)
+
+  Suite 37: DRL EvoLoop Observability
+    PASS  Prometheus ready — not reachable (optional); GET http://127.0.0.1:9099/-/ready status=0 err=Get "http://127.0.0.1:9099/-/ready": dial tcp 127.0.0.1:9099: connect: connection refused — set FLEET_DRL_DOCTOR_STRICT=1 to fail
+    PASS  DRL service healthz — not reachable (optional); GET http://127.0.0.1:8180/healthz status=0 err=Get "http://127.0.0.1:8180/healthz": dial tcp 127.0.0.1:8180: connect: connection refused — set FLEET_DRL_DOCTOR_STRICT=1 to fail
+    PASS  Pushgateway metrics OK (http://127.0.0.1:9091/metrics)
+    PASS  docker-compose.drl.yml — not found (clone ai-agent-business-stack or set FLEET_DRL_COMPOSE_DIR, optional)
+
+  Suite 38: EvoLoop Cycle Freshness
+    PASS  no cycle log found (stack may be on WSL): tried /home/jaslian/fleet/evoloop-cycles.jsonl
+
+  Suite 39: Pre-Push Readiness
+    PASS  pre-push skill (workspace-specific, not in global path)
+    FAIL  evidence rule has CI verification -- evidence-based-development.mdc missing CI Status Claims section
+    PASS  evidence rule has rebase strategy
+    PASS  PR discipline rule (workspace-specific)
+
+============================================================
+  RESULTS
+============================================================
+
+Suite                                                Pass  Total
+--------------------------------------------------------------
+  Suite 1: L0 Rules                                   151/151   PASS
+  Suite 2: L1 Startup Indexes                         10/11   FAIL
+  Suite 3: L2 Global KB                               6/6   PASS
+  Suite 4: Skills Registry                            17/17   PASS
+  Suite 5: skills-cursor Policy                       4/4   PASS
+  Suite 6: Cross-File Consistency                     8/10   FAIL
+  Suite 7: Git Sync                                   6/7   FAIL
+  Suite 8: Hooks, Sub-agents, Commands, MCP           17/17   PASS
+  Suite 9: Install Readiness                          10/10   PASS
+  Suite 10: MCP Readiness                              83/98   FAIL
+  Suite 11: Mem0 Connectivity                          9/10   FAIL
+  Suite 12: Platform Readiness                         5/5   PASS
+  Suite 13: Resume Readiness                           7/7   PASS
+  Suite 14: Memory Routing                             31/36   FAIL
+  Suite 15: Memory Evidence                            2/10   FAIL
+  Suite 16: Cross-Machine Sync                         6/8   FAIL
+  Suite 17: Programmatic Count Verification            6/6   PASS
+  Suite 18: Hook Unit Tests                            5/5   PASS
+  Suite 19: Log File Integrity                         20/20   PASS
+  Suite 20: Automation Pipeline                        25/25   PASS
+  Suite 21: Skillvet EDR-Safety                        139/140   FAIL
+  Suite 22: IronClaw Readiness                         1/1   PASS
+  Suite 23: Global Cursor Config                       15/15   PASS
+  Suite 24: Race Condition Prevention                  12/16   FAIL
+  Suite 25: Data Integrity                             4/4   PASS
+  Suite 26: Git Hook Integrity                         15/17   FAIL
+  Suite 27: Self-Improvement Pipeline                  15/15   PASS
+  Suite 28: DevContainer Compliance                    8/8   PASS
+  Suite 29: rtk Token Optimization                     3/3   PASS
+  Suite 30: Toolchain Freshness                        4/4   PASS
+  Suite 31: Toolchain Cross-Platform                   2/2   PASS
+  Suite 32: Handoff Acknowledgement                    3/3   PASS
+  Suite 33: Git Sync Resilience                        11/11   PASS
+  Suite 34: Dependency Readiness                       17/19   FAIL
+  Suite 35: Coordination Signals                       6/7   FAIL
+  Suite 36: Agent Stack Health                         1/1   PASS
+  Suite 37: DRL EvoLoop Observability                  4/4   PASS
+  Suite 38: EvoLoop Cycle Freshness                    1/1   PASS
+  Suite 39: Pre-Push Readiness                         3/4   FAIL
+--------------------------------------------------------------
+
+  692/738 assertions passed (94%)
+
+  46 FAILURES detected.
+
