@@ -215,53 +215,74 @@ func MemoryTool(searcher *memory.HybridSearcher, defaultAppID, defaultUserID str
 				return "", errors.New("memory tool: HybridSearcher not configured")
 			}
 			op, _ := args["op"].(string)
-			appID, _ := args["app_id"].(string)
-			if appID == "" {
-				appID = defaultAppID
-			}
-			userID, _ := args["user_id"].(string)
-			if userID == "" {
-				userID = defaultUserID
-			}
+			appID, userID := memoryAppUserID(args, defaultAppID, defaultUserID)
 			switch op {
 			case "read":
-				id, _ := args["id"].(string)
-				if id == "" {
-					return "", errors.New("memory.read: id is required")
-				}
-				m, err := searcher.Read(ctx, id)
-				if err != nil {
-					return "", err
-				}
-				data, _ := json.Marshal(m)
-				return string(data), nil
+				return memoryRead(ctx, searcher, args)
 			case "write":
-				content, _ := args["content"].(string)
-				if content == "" {
-					return "", errors.New("memory.write: content is required")
-				}
-				m, err := searcher.Write(ctx, content, appID, userID)
-				if err != nil {
-					return "", err
-				}
-				data, _ := json.Marshal(m)
-				return string(data), nil
+				return memoryWrite(ctx, searcher, appID, userID, args)
 			case "search":
-				q, _ := args["query"].(string)
-				if q == "" {
-					return "", errors.New("memory.search: query is required")
-				}
-				results, err := searcher.Search(ctx, q, appID, userID)
-				if err != nil {
-					return "", err
-				}
-				data, _ := json.Marshal(results)
-				return string(data), nil
+				return memorySearch(ctx, searcher, appID, userID, args)
 			default:
 				return "", fmt.Errorf("memory: unknown op %q", op)
 			}
 		},
 	}
+}
+
+// memoryRead handles the memory.read op. Extracted from MemoryTool in v17206 (CC reduction).
+func memoryRead(ctx context.Context, searcher *memory.HybridSearcher, args map[string]any) (string, error) {
+	id, _ := args["id"].(string)
+	if id == "" {
+		return "", errors.New("memory.read: id is required")
+	}
+	m, err := searcher.Read(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.Marshal(m)
+	return string(data), nil
+}
+
+// memoryWrite handles the memory.write op. Extracted from MemoryTool in v17206 (CC reduction).
+func memoryWrite(ctx context.Context, searcher *memory.HybridSearcher, appID, userID string, args map[string]any) (string, error) {
+	content, _ := args["content"].(string)
+	if content == "" {
+		return "", errors.New("memory.write: content is required")
+	}
+	m, err := searcher.Write(ctx, content, appID, userID)
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.Marshal(m)
+	return string(data), nil
+}
+
+// memorySearch handles the memory.search op. Extracted from MemoryTool in v17206 (CC reduction).
+func memorySearch(ctx context.Context, searcher *memory.HybridSearcher, appID, userID string, args map[string]any) (string, error) {
+	q, _ := args["query"].(string)
+	if q == "" {
+		return "", errors.New("memory.search: query is required")
+	}
+	results, err := searcher.Search(ctx, q, appID, userID)
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.Marshal(results)
+	return string(data), nil
+}
+
+// memoryAppUserID extracts optional app_id/user_id overrides with defaults. Extracted in v17206.
+func memoryAppUserID(args map[string]any, defaultApp, defaultUser string) (string, string) {
+	appID, _ := args["app_id"].(string)
+	if appID == "" {
+		appID = defaultApp
+	}
+	userID, _ := args["user_id"].(string)
+	if userID == "" {
+		userID = defaultUser
+	}
+	return appID, userID
 }
 
 // SprintboardTool wraps the controlplane.SprintboardClient.
@@ -345,6 +366,21 @@ func (c FileReadConfig) withDefaults() FileReadConfig {
 	return c
 }
 
+// validateAllowedPath checks that path is within one of the allowed prefixes.
+// Returns nil if no allowed paths are configured, or if path matches a prefix.
+// Extracted from FileReadTool + FileWriteTool in v17206 (CC reduction).
+func validateAllowedPath(path string, allowedPaths []string) error {
+	if len(allowedPaths) == 0 {
+		return nil
+	}
+	for _, prefix := range allowedPaths {
+		if strings.HasPrefix(path, prefix) {
+			return nil
+		}
+	}
+	return fmt.Errorf("path %q is not within allowed directories", path)
+}
+
 // FileReadTool returns a tool that reads file contents with size bounds.
 func FileReadTool(cfg FileReadConfig) tooldispatch.ToolDef {
 	cfg = cfg.withDefaults()
@@ -364,17 +400,8 @@ func FileReadTool(cfg FileReadConfig) tooldispatch.ToolDef {
 			if path == "" {
 				return "", errors.New("path is required")
 			}
-			if len(cfg.AllowedPaths) > 0 {
-				allowed := false
-				for _, prefix := range cfg.AllowedPaths {
-					if strings.HasPrefix(path, prefix) {
-						allowed = true
-						break
-					}
-				}
-				if !allowed {
-					return "", fmt.Errorf("path %q is not within allowed directories", path)
-				}
+			if err := validateAllowedPath(path, cfg.AllowedPaths); err != nil {
+				return "", err
 			}
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -426,17 +453,8 @@ func FileWriteTool(cfg FileWriteConfig) tooldispatch.ToolDef {
 			if path == "" {
 				return "", errors.New("path is required")
 			}
-			if len(cfg.AllowedPaths) > 0 {
-				allowed := false
-				for _, prefix := range cfg.AllowedPaths {
-					if strings.HasPrefix(path, prefix) {
-						allowed = true
-						break
-					}
-				}
-				if !allowed {
-					return "", fmt.Errorf("path %q is not within allowed directories", path)
-				}
+			if err := validateAllowedPath(path, cfg.AllowedPaths); err != nil {
+				return "", err
 			}
 			if int64(len(content)) > cfg.MaxBytes {
 				return "", fmt.Errorf("content exceeds max size of %d bytes", cfg.MaxBytes)
