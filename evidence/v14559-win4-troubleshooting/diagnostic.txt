@@ -1,0 +1,29 @@
+=== SELF ===
+  Hostname: DESKTOP-12RO1AF
+  TailscaleIPs: ['100.84.108.92', 'fd7a:115c:a1e0::6332:6c5d']
+  OS: linux Online: True
+
+=== PEER desktop-p5bul0f-wsl4 ===
+  TailscaleIPs: ['100.79.227.40', 'fd7a:115c:a1e0::df32:e329']
+  OS: linux Online: True
+  Relay: syd
+  LastSeen: 2026-07-08T17:38:59.1Z
+
+
+=== Ping win4 (5 samples) ===
+64 bytes from 100.93.107.109: icmp_seq=3 ttl=128 time=104 ms
+64 bytes from 100.93.107.109: icmp_seq=4 ttl=128 time=210 ms
+64 bytes from 100.93.107.109: icmp_seq=5 ttl=128 time=151 ms
+
+--- 100.93.107.109 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4006ms
+rtt min/avg/max/mdev = 102.767/134.857/209.628/41.494 ms
+
+=== Ping wsl4 (5 samples) ===
+64 bytes from 100.79.227.40: icmp_seq=3 ttl=64 time=119 ms
+64 bytes from 100.79.227.40: icmp_seq=4 ttl=64 time=131 ms
+64 bytes from 100.79.227.40: icmp_seq=5 ttl=64 time=112 ms
+
+--- 100.79.227.40 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4006ms
+rtt min/avg/max/mdev = 92.613/122.175/155.567/20.859 ms
