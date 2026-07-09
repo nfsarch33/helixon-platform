@@ -1,0 +1,35 @@
+=== runx version check ===
+2026-07-09T23:10:25+10:00
+
+--- runx binary ---
+/usr/local/bin/runx
+runx-cli 0.6.19
+
+--- check for runx in PATH ---
+ls: cannot access '/home/jaslian/local/bin/runx': No such file or directory
+lrwxrwxrwx 1 root root 34 Jul  8 19:23 /usr/local/bin/runx -> /home/jaslian/.npm-global/bin/runx
+
+--- runx skill (helixon-fleet-report) ---
+total 28
+drwxr-xr-x  2 jaslian jaslian 4096 Jul  9 18:56 .
+drwxrwxr-x 99 jaslian jaslian 4096 Jul  9 23:09 ..
+-rw-r--r--  1 jaslian jaslian   27 Jul  9 18:56 .gitignore
+-rw-r--r--  1 jaslian jaslian  883 Jul  9 18:56 README.md
+-rw-r--r--  1 jaslian jaslian 1145 Jul  9 18:57 SKILL.md
+-rw-r--r--  1 jaslian jaslian  328 Jul  9 19:00 X.yaml
+-rw-r--r--  1 jaslian jaslian 1425 Jul  9 18:57 run.mjs
+
+--- runx X.yaml (skill harness) ---
+- name: helixon-fleet-report-smoke
+  input:
+    sprint: v14552-test
+  assertions:
+    - kind: jsonpath
+      path: $.sprint
+      equals: v14552-test
+    - kind: jsonpath
+      path: $.services.engram
+      one_of: [active, inactive, failed, unknown]
+- name: helixon-fleet-report-missing-sprint
+  input: {}
+  expect_error: true

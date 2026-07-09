@@ -1,0 +1,7 @@
+=== Try different X.yaml formats ===
+2026-07-09T23:18:07+10:00
+--- runx harness /tmp/X-wrapped.yaml ---
+runx: native harness replay failed for /tmp/X-wrapped.yaml: receipt validation failed: production receipt signer issuer type is unsupported
+
+--- runx harness /tmp/X-map.yaml ---
+runx: native harness replay failed for /tmp/X-map.yaml: receipt validation failed: production receipt signer issuer type is unsupported

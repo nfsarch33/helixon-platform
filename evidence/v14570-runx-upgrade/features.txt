@@ -1,0 +1,67 @@
+=== runx feature check ===
+2026-07-09T23:10:59+10:00
+
+--- runx help ---
+runx
+
+Usage:
+  runx <command> [args]
+  runx --help
+  runx --version
+
+Commands:
+  runx new <name> [--directory dir] [--json]
+  runx init [-g|--global] [--prefetch official] [--json]
+  runx verify [receipt-id] [--receipt-dir dir] [--receipt <path|->] [--notary <path|-> --notary-key trusted.pem] [-j|--json]
+  runx history [query] [--skill s] [--status s] [--source s] [--actor a] [--artifact-type t] [--since iso] [--until iso] [--receipt-dir dir] [--json]
+  runx resume <run-id> <answers.json> [-R dir] [-j|--json]
+  runx list [tools|skills|graphs|packets|overlays] [--ok-only|--invalid-only] [-j|--json]
+  runx login [--provider github|google|gitlab] [--for default|publish] [--api-base-url url] [--allow-local-api] [-j|--json]
+  runx config set|get|list [provider|model|api-key|public-token] [value] [-j|--json]
+  runx policy inspect|lint <policy.json> [--json]
+  runx publish <receipt.json> [--api-base-url url] [--token token] [--allow-local-api] [-j|--json]
+  runx kernel eval --input <file|-> --json
+  runx payment admission issue --input <file|-> --json
+  runx parser eval --input <file|-> --json
+  runx doctor [path|authority|registry] [--json]
+  runx dev [root] [--lane lane] [--json]
+  runx export <claude|codex> [skill-ref...] [--project] [--json]
+  runx mcp serve <skill-ref...> [--receipt-dir dir] [--http-listen [addr]] [--http-allow-non-loopback]
+  runx skill <skill-ref|owner/name@version|skill-dir|SKILL.md> [runner] [-p profile] [-i key=value] [--input-json key=json] [-j] [--registry url|path] [--digest sha256] [--flag value] [--credential descriptor --secret-env NAME] [-R dir]
+  runx skill inspect <skill-ref|owner/name@version|skill-dir|SKILL.md> [runner] [-j] [--registry url|path] [--digest sha256]
+  runx add <skill-ref|github-url> [--registry url|path] [--version version] [--ref git-ref] [--digest sha256] [--to dir] [--api-base-url url] [--json]
+  runx harness <fixture.yaml...|skill-dir|SKILL.md> [-R dir] [-j|--json]
+  runx tool build <tool-dir>|--all [--json]
+
+--- runx manifest subcommand ---
+runx: unknown command manifest
+
+--- runx skill subcommand ---
+runx skill
+
+Usage:
+  runx skill <skill-ref|owner/name@version|skill-dir|SKILL.md> [runner] [-p profile] [-i key=value] [--input-json key=json] [-j] [--registry url|path] [--digest sha256] [--flag value] [--credential descriptor --secret-env NAME] [-R dir]
+  runx skill inspect <skill-ref|owner/name@version|skill-dir|SKILL.md> [runner] [-j] [--registry url|path] [--digest sha256]
+
+Options:
+  -p, --profile name       Use a local credential profile from .runx/credentials.json
+  -i, --input key=value    Set a structured input; repeat for multiple inputs
+  --input-json key=json    Set an input that must parse as JSON
+  -R, --receipts dir       Write receipts under dir
+  --receipt-dir dir        Alias for --receipts
+  -j, --json               Print machine-readable output
+  --registry url|path
+  --digest sha256
+  --flag value
+  --credential descriptor  One-shot local credential descriptor
+  --secret-env NAME        Env var holding the one-shot credential secret
+
+--- check latest runx release on npmjs ---
+latest tag: None
+versions count: 0
+most recent 5: []
+
+--- vendor verification ---
+runx GitHub org: https://github.com/runx/runx
+runx-cli npm package: https://www.npmjs.com/package/runx-cli
+error: Expecting value: line 1 column 1 (char 0)

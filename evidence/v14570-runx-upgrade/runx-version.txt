@@ -1,0 +1,5 @@
+runx_version: runx-cli 0.6.19
+runx_bin: /usr/local/bin/runx
+runx_sha256: 046d110b1174ef9ed234d630ea9de5cfd206bdd16b7157d516a31fd80e8f3bcb
+vendor: github.com/runxhq/runx (canonical repo)
+npm_pkg: @runxhq/cli (was runx-cli; renamed/unpublished 2023-08-15)
