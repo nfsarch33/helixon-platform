@@ -1,0 +1,4 @@
+# HELP svcregistry_operations_total Total number of svcregistry operations partitioned by op and status.
+# TYPE svcregistry_operations_total counter
+svcregistry_operations_total{op="list",status="ok"} 532
+svcregistry_operations_total{op="register",status="ok"} 16

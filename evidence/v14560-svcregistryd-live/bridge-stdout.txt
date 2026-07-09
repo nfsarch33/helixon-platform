@@ -1,0 +1,22 @@
+=== svcregistry-bridge run ===
+{"time":"2026-07-09T22:19:44.230502393+10:00","level":"INFO","msg":"registered","name":"engramd","port":8280}
+{"time":"2026-07-09T22:19:44.231096441+10:00","level":"INFO","msg":"registered","name":"engramd-mem0compat","port":8281}
+{"time":"2026-07-09T22:19:44.231766523+10:00","level":"INFO","msg":"registered","name":"sprintboard-api","port":9400}
+{"time":"2026-07-09T22:19:44.232379996+10:00","level":"INFO","msg":"registered","name":"sprintboard-mcp","port":9401}
+{"time":"2026-07-09T22:19:44.232886138+10:00","level":"INFO","msg":"registered","name":"llm-cluster-router","port":8787}
+{"time":"2026-07-09T22:19:44.233427874+10:00","level":"INFO","msg":"registered","name":"llm-cluster-router-metrics","port":9091}
+{"time":"2026-07-09T22:19:44.233940905+10:00","level":"INFO","msg":"registered","name":"llm-cluster-router-debug","port":6060}
+{"time":"2026-07-09T22:19:44.234488228+10:00","level":"INFO","msg":"registered","name":"llama-server-c7-q8","port":8010}
+{"time":"2026-07-09T22:19:44.234922644+10:00","level":"INFO","msg":"registered","name":"llama-server-c2-q4","port":8011}
+{"time":"2026-07-09T22:19:44.23540705+10:00","level":"INFO","msg":"registered","name":"vllm-c1-awq","port":8004}
+{"time":"2026-07-09T22:19:44.235833862+10:00","level":"INFO","msg":"registered","name":"ollama-embed-c6","port":11434}
+{"time":"2026-07-09T22:19:44.236266199+10:00","level":"INFO","msg":"registered","name":"prometheus","port":9090}
+{"time":"2026-07-09T22:19:44.236725013+10:00","level":"INFO","msg":"registered","name":"grafana","port":3000}
+{"time":"2026-07-09T22:19:44.237227486+10:00","level":"INFO","msg":"registered","name":"alertmanager","port":9093}
+{"time":"2026-07-09T22:19:44.237838173+10:00","level":"INFO","msg":"registered","name":"k3s-server","port":6443}
+{"time":"2026-07-09T22:19:44.238342875+10:00","level":"INFO","msg":"registered","name":"ssh-fleet-lan","port":22}
+bridge: registered=16 failed=0 skipped=0
+exit=0
+
+service_count_after_bridge: 16
+metric_lines: 4
