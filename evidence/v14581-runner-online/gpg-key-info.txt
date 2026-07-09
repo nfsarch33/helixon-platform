@@ -1,0 +1,5 @@
+pub   rsa4096 2020-03-02 [SC] [expires: 2028-02-06]
+      F6403F6544A38863DAA0B6E03F01618A51312F3F
+uid                      GitLab B.V. (package repository signing key) <packages@gitlab.com>
+sub   rsa4096 2020-03-02 [E] [expires: 2028-02-06]
+

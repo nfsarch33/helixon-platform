@@ -1,0 +1,30 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+curl is already the newest version (8.5.0-2ubuntu10.10).
+openssh-server is already the newest version (1:9.6p1-3ubuntu13.16).
+ca-certificates is already the newest version (20260601~24.04.1).
+perl is already the newest version (5.38.2-3.2ubuntu0.3).
+perl set to manually installed.
+The following packages were automatically installed and are no longer required:
+  libdrm-nouveau2 libdrm-radeon1 libgl1-amber-dri libglapi-amber
+  libwayland-server0 libxcb-dri2-0
+Use 'sudo apt autoremove' to remove them.
+The following packages will be upgraded:
+  tzdata
+1 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+Need to get 280 kB of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 tzdata all 2026b-0ubuntu0.24.04.1 [280 kB]
+Preconfiguring packages ...
+Fetched 280 kB in 2s (131 kB/s)
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 129249 files and directories currently installed.)
+Preparing to unpack .../tzdata_2026b-0ubuntu0.24.04.1_all.deb ...
+Unpacking tzdata (2026b-0ubuntu0.24.04.1) over (2026a-0ubuntu0.24.04.1) ...
+Setting up tzdata (2026b-0ubuntu0.24.04.1) ...
+
+Current default time zone: 'Australia/Sydney'
+Local time is now:      Fri Jul 10 04:37:26 AEST 2026.
+Universal Time is now:  Thu Jul  9 18:37:26 UTC 2026.
+Run 'dpkg-reconfigure tzdata' if you wish to change it.
+

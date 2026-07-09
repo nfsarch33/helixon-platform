@@ -1,0 +1,7 @@
+Runtime platform                                  [0;m  arch[0;m=amd64 os[0;m=linux pid[0;m=1799780 revision[0;m=24b9b726 version[0;m=19.1.1
+Running in system-mode.                           [0;m 
+                                                  [0;m 
+[0;33mWARNING: Support for registration tokens and runner parameters in the 'register' command has been deprecated in GitLab Runner 15.6 and will be replaced with support for authentication tokens. For more information, see https://docs.gitlab.com/ci/runners/new_creation_workflow/[0;m 
+[31;1mERROR: Registering runner... failed               [0;m  [31;1mcorrelation_id[0;m=f3dc17b5c35c4e229671244106473686 [31;1mrunner[0;m=[ERROR] 2 [31;1mrunner_name[0;m=wsl1-runner [31;1mstatus[0;m=execute JSON request: execute request: couldn't execute POST against http://127.0.0.1:8929/api/v4/runners: Post "http://127.0.0.1:8929/api/v4/runners": dial tcp 127.0.0.1:8929: connect: connection refused
+[31;1mPANIC: Failed to register the runner.             [0;m 
+register exit: 1

@@ -1,0 +1,2 @@
+Runtime platform                                  [0;m  arch[0;m=amd64 os[0;m=linux pid[0;m=1800313 revision[0;m=24b9b726 version[0;m=19.1.1
+Listing configured runners                        [0;m  ConfigFile[0;m=/etc/gitlab-runner/config.toml

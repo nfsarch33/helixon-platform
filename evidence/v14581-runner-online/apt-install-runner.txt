@@ -1,0 +1,42 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages were automatically installed and are no longer required:
+  libdrm-nouveau2 libdrm-radeon1 libgl1-amber-dri libglapi-amber
+  libwayland-server0 libxcb-dri2-0
+Use 'sudo apt autoremove' to remove them.
+The following additional packages will be installed:
+  gitlab-runner-helper-images
+Suggested packages:
+  docker-engine
+The following NEW packages will be installed:
+  gitlab-runner gitlab-runner-helper-images
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 570 MB of archives.
+After this operation, 659 MB of additional disk space will be used.
+Get:1 https://packages.gitlab.com/runner/gitlab-runner/ubuntu noble/main all gitlab-runner-helper-images all 19.1.1-1 [540 MB]
+Get:2 https://packages.gitlab.com/runner/gitlab-runner/ubuntu noble/main amd64 gitlab-runner amd64 19.1.1-1 [30.2 MB]
+Fetched 570 MB in 38s (15.1 MB/s)
+Selecting previously unselected package gitlab-runner-helper-images.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 129249 files and directories currently installed.)
+Preparing to unpack .../gitlab-runner-helper-images_19.1.1-1_all.deb ...
+Unpacking gitlab-runner-helper-images (19.1.1-1) ...
+Selecting previously unselected package gitlab-runner.
+Preparing to unpack .../gitlab-runner_19.1.1-1_amd64.deb ...
+Unpacking gitlab-runner (19.1.1-1) ...
+Setting up gitlab-runner-helper-images (19.1.1-1) ...
+Setting up gitlab-runner (19.1.1-1) ...
+GitLab Runner: creating gitlab-runner...
+Home directory skeleton not used
+Runtime platform                                  [0;m  arch[0;m=amd64 os[0;m=linux pid[0;m=1799336 revision[0;m=24b9b726 version[0;m=19.1.1
+gitlab-runner: the service is not installed
+Runtime platform                                  [0;m  arch[0;m=amd64 os[0;m=linux pid[0;m=1799353 revision[0;m=24b9b726 version[0;m=19.1.1
+gitlab-ci-multi-runner: the service is not installed
+Runtime platform                                  [0;m  arch[0;m=amd64 os[0;m=linux pid[0;m=1799399 revision[0;m=24b9b726 version[0;m=19.1.1
+Runtime platform                                  [0;m  arch[0;m=amd64 os[0;m=linux pid[0;m=1799515 revision[0;m=24b9b726 version[0;m=19.1.1
+INFO: docker not found, checking for podman...
+INFO: podman found, using podman
+
+Check and remove all unused containers (both dangling and unreferenced)
+-----------------------------------------------------------------------
+Total reclaimed space: 0B

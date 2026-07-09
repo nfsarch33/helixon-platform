@@ -1,0 +1,32 @@
+=== runner binary ===
+/usr/bin/gitlab-runner
+Version:      19.1.1
+Git revision: 24b9b726
+Git branch:   19-1-stable
+GO version:   go1.26.3
+Built:        2026-06-25T11:31:53Z
+OS/Arch:      linux/amd64
+
+=== config file ===
+ls: cannot open directory '/etc/gitlab-runner/': Permission denied
+cat: /etc/gitlab-runner/config.toml: Permission denied
+
+=== service status ===
+Unit gitlab-runner.service could not be found.
+system-wide:
+● gitlab-runner.service - GitLab Runner
+     Loaded: loaded (/etc/systemd/system/gitlab-runner.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-07-10 04:38:52 AEST; 2min 51s ago
+   Main PID: 1799529 (gitlab-runner)
+      Tasks: 16 (limit: 154372)
+     Memory: 16.3M (peak: 21.5M)
+        CPU: 119ms
+     CGroup: /system.slice/gitlab-runner.service
+             └─1799529 /usr/bin/gitlab-runner run --config /etc/gitlab-runner/config.toml --working-directory /home/gitlab-runner --service gitlab-runner --user gitlab-runner
+
+=== /etc/gitlab-runner dir ===
+total 16
+drwx------   2 root root 4096 Jul 10 04:38 .
+drwxr-xr-x 108 root root 4096 Jul 10 04:41 ..
+-rw-------   1 root root   14 Jul 10 04:38 .runner_system_id
+-rw-------   1 root root   98 Jul 10 04:38 config.toml

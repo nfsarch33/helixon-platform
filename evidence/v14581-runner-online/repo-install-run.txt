@@ -1,0 +1,14 @@
+Hit:1 https://deb.nodesource.com/node_22.x nodistro InRelease
+Get:2 https://pkgs.tailscale.com/stable/ubuntu noble InRelease
+Hit:3 http://archive.ubuntu.com/ubuntu noble InRelease
+Hit:4 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:5 https://downloads.1password.com/linux/debian/amd64 stable InRelease
+Hit:6 http://archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:7 http://archive.ubuntu.com/ubuntu noble-backports InRelease
+Get:8 https://packages.gitlab.com/runner/gitlab-runner/ubuntu noble InRelease [18.4 kB]
+Get:9 https://packages.gitlab.com/runner/gitlab-runner/ubuntu noble/main amd64 Packages [8565 B]
+Get:10 https://packages.gitlab.com/runner/gitlab-runner/ubuntu noble/main all Packages [5453 B]
+Fetched 39.0 kB in 5s (7902 B/s)
+Reading package lists...
+Repository configured successfully.
+Ready to install packages.

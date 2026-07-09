@@ -1,0 +1,3 @@
+Version:      19.1.1
+Git revision: 24b9b726
+Git branch:   19-1-stable
