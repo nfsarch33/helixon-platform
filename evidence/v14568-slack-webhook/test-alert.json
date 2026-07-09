@@ -1,0 +1,27 @@
+[
+    {
+        "annotations": {
+            "description": "sentrux test alert from v14568",
+            "summary": "v14568 test alert"
+        },
+        "endsAt": "2026-07-09T23:07:53.116+10:00",
+        "fingerprint": "b52d32453680f4ce",
+        "receivers": [
+            {
+                "name": "helixon-fleet-critical"
+            }
+        ],
+        "startsAt": "2026-07-09T23:02:53.116+10:00",
+        "status": {
+            "inhibitedBy": [],
+            "silencedBy": [],
+            "state": "active"
+        },
+        "updatedAt": "2026-07-09T23:02:53.116+10:00",
+        "labels": {
+            "alertname": "TestSeverity",
+            "service": "engramd",
+            "severity": "critical"
+        }
+    }
+]

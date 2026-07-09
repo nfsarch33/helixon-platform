@@ -1,0 +1,3 @@
+=== Install amtool ===
+2026-07-09T23:02:09+10:00
+latest alertmanager release: v0.33.1

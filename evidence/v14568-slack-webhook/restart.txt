@@ -1,0 +1,42 @@
+=== Active alerts in AlertManager ===
+2026-07-09T23:03:32+10:00
+
+test-alert.json written
+-rw-r--r-- 1 jaslian jaslian 730 Jul  9 23:03 /home/jaslian/Code/helixon-platform/evidence/v14568-slack-webhook/test-alert.json
+
+=== Restart AlertManager to pick up new config ===
+active
+
+=== Reload config via /-/reload ===
+
+=== Final alertmanager.yml ===
+# Helixon AlertManager configuration (v14547)
+# Routes alerts from the fleet's Prometheus instances to the helixon Telegram
+# channel and to syslog. No email / PagerDuty integration (per fleet policy).
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'helixon-fleet-default'
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: 'helixon-fleet-critical'
+      group_wait: 10s
+      repeat_interval: 1h
+    - matchers:
+        - service="engramd"
+      receiver: 'helixon-fleet-engram'
+    - matchers:
+        - service="llm-router"
+      receiver: 'helixon-fleet-llm'
+
+receivers:
+  - name: 'helixon-fleet-default'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest'

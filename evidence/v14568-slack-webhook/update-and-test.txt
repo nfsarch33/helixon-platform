@@ -1,0 +1,16 @@
+Added Slack placeholder to helixon-fleet-critical receiver
+
+=== Reload alertmanager ===
+Failed to reload alertmanager.service: Job type reload is not applicable for unit alertmanager.service.
+active
+
+=== Send test alert via existing webhook ===
+
+exit=0
+
+=== Verify alert was ingested by svcregistryd ===
+curl: (22) The requested URL returned error: 404
+
+
+=== List active alerts ===
+  alert=TestSeverity state=active

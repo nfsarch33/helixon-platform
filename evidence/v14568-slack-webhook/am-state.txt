@@ -1,0 +1,65 @@
+=== Current AlertManager state ===
+2026-07-09T23:01:43+10:00
+
+--- alertmanager service status ---
+active
+total 16
+drwxr-xr-x  2 jaslian jaslian 4096 Jul  9 18:05 .
+drwxrwxr-x 18 jaslian jaslian 4096 Jul  9 23:01 ..
+-rwxr--r--  1 jaslian jaslian 1469 Jul  9 18:05 alertmanager.yml
+-rw-r--r--  1 jaslian jaslian  356 Jul  9 18:05 alertmanager.yml.example
+
+--- current config ---
+# Helixon AlertManager configuration (v14547)
+# Routes alerts from the fleet's Prometheus instances to the helixon Telegram
+# channel and to syslog. No email / PagerDuty integration (per fleet policy).
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'helixon-fleet-default'
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: 'helixon-fleet-critical'
+      group_wait: 10s
+      repeat_interval: 1h
+    - matchers:
+        - service="engramd"
+      receiver: 'helixon-fleet-engram'
+    - matchers:
+        - service="llm-router"
+      receiver: 'helixon-fleet-llm'
+
+receivers:
+  - name: 'helixon-fleet-default'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest'
+        send_resolved: true
+
+  - name: 'helixon-fleet-critical'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest'
+        send_resolved: true
+
+  - name: 'helixon-fleet-engram'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest?service=engramd'
+        send_resolved: true
+
+  - name: 'helixon-fleet-llm'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest?service=llm-router'
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="Watchdog"
+
+--- /api/v2/status (config check) ---
+/mnt/c/Users/jaslian.DESKTOP-12RO1AF/AppData/Local/Temp/am_config.sh: line 20: amtool: command not found

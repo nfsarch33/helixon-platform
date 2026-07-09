@@ -1,0 +1,1349 @@
+[
+  {
+    "id": "zzvrihqejvqivwswlsbncbtfda",
+    "title": "Perplexity embedding API key - keynear@hotmail.com",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-05-19T03:00:32Z",
+    "updated_at": "2026-05-19T03:00:50Z"
+  },
+  {
+    "id": "55z2jgso2aefsu6ropoxiip4by",
+    "title": "MSI Win PC WSL Ubuntu Login",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2025-06-25T09:23:18Z",
+    "updated_at": "2026-04-09T06:01:25Z",
+    "additional_information": "jason"
+  },
+  {
+    "id": "hfri3ziy6cjfec4xha7wkfkkri",
+    "title": "LLM Cluster Router Fleet (wsl1)",
+    "tags": ["fleet", "auto-inventory", "url-only"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:57:15Z",
+    "updated_at": "2026-06-10T13:57:15Z",
+    "additional_information": "operator",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:8787"
+      }
+    ]
+  },
+  {
+    "id": "5kuknlit5ioo37t4guxq7mbngi",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:20:32Z",
+    "updated_at": "2026-07-08T15:20:32Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "qijbasqzba54hxtr75dkfsmese",
+    "title": "RustDesk Relay Fleet",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T14:12:22Z",
+    "updated_at": "2026-06-10T14:12:22Z",
+    "additional_information": "—",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:21116"
+      }
+    ]
+  },
+  {
+    "id": "3yc3u4ivnapdddjqt2extury2e",
+    "title": "id_ed25519_wsl2_fleet.pub from wsl1",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SSH_KEY",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-29T07:04:54Z",
+    "updated_at": "2026-03-29T07:04:54Z"
+  },
+  {
+    "id": "pwjkp2gii6cnaqwwj4fmesdxd4",
+    "title": "Resend jaslian@gmail.com",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T10:08:12Z",
+    "updated_at": "2026-03-31T10:08:34Z",
+    "additional_information": "Signs in with Google",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://resend.com/onboarding"
+      }
+    ]
+  },
+  {
+    "id": "5vijnmow7o47mz3ceg4x5co5pe",
+    "title": "Prometheus Fleet (wsl1)",
+    "tags": ["fleet", "auto-inventory", "url-only"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:56:51Z",
+    "updated_at": "2026-06-10T13:56:51Z",
+    "additional_information": "operator",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:9099"
+      }
+    ]
+  },
+  {
+    "id": "ql3cdtzfyzbxrtdqztvlk57dve",
+    "title": "mem0-oss-admin",
+    "tags": ["mem0", "phase-c", "self-host"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-05-08T11:41:58Z",
+    "updated_at": "2026-05-08T11:41:58Z",
+    "additional_information": "jaslian@gmail.com"
+  },
+  {
+    "id": "43zuyrxjg5brxfuah4tzytc6zy",
+    "title": "litellm-master-key",
+    "version": 3,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "PASSWORD",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-06-19T11:28:00Z",
+    "updated_at": "2026-06-19T21:57:58Z",
+    "additional_information": "2026-06-19 09:28 PM",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://litellm.cylrl.dev/v1"
+      }
+    ]
+  },
+  {
+    "id": "3sk5mfxk3pcyaafpq4l5jbth2u",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:14:21Z",
+    "updated_at": "2026-07-08T15:14:21Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "i5ri4arsc5ao6xs4pxc2gfcx3m",
+    "title": "GitLab CE Root PAT (wsl2 rotation 2026-07-08)",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-07-08T14:36:00Z",
+    "updated_at": "2026-07-08T14:36:00Z"
+  },
+  {
+    "id": "bsqycxxs2hxqyjiemxea7m47ae",
+    "title": "oracle_jump SSH Key (MacBook -\u003e OCI jump host)",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-23T09:01:36Z",
+    "updated_at": "2026-04-23T09:01:36Z",
+    "additional_information": "oracle_jump ed25519 keypair. Generated 2026-04-23 on MacBook for OCI free-tier j"
+  },
+  {
+    "id": "qlr2av3qbybcogtibsfamyd6ju",
+    "title": "Amazon AWS Agent1 Login",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-27T02:19:41Z",
+    "updated_at": "2026-03-27T02:20:35Z",
+    "additional_information": "jaslian+aws1@gmail.com",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://aws.amazon.com"
+      }
+    ]
+  },
+  {
+    "id": "45bc7cme577igawch55qqbptdi",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:15:50Z",
+    "updated_at": "2026-07-08T15:15:50Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "czdbviw37zsfk7e23clly2bvw4",
+    "title": "Telegram Bot - Fleet Agent 2",
+    "tags": ["channel", "telegram", "fleet"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-28T03:09:42Z",
+    "updated_at": "2026-03-28T03:09:42Z",
+    "additional_information": "fleet_agent2_bot"
+  },
+  {
+    "id": "23ad5gtlh7yxz7hu2xcuvo2ewu",
+    "title": "Resend xiuyingni81@gmail.com",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T10:11:16Z",
+    "updated_at": "2026-03-31T10:11:51Z",
+    "additional_information": "Signs in with Google",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://resend.com/emails"
+      }
+    ]
+  },
+  {
+    "id": "qqt3bayjxxddc6hapn6tmtk5j4",
+    "title": "Brevo info@oztac 300 daily limit",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T09:57:46Z",
+    "updated_at": "2026-03-31T10:30:15Z",
+    "additional_information": "Signs in with Google",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://onboarding.brevo.com/account/register/profile"
+      }
+    ]
+  },
+  {
+    "id": "iejwsu7tlgr6db7c3dpis3jdxa",
+    "title": "ArgoCD Fleet (wsl1)",
+    "tags": ["fleet", "auto-inventory"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:56:07Z",
+    "updated_at": "2026-06-10T13:56:07Z",
+    "additional_information": "admin",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:30880"
+      }
+    ]
+  },
+  {
+    "id": "2nnaxyj7w3zfcohinoacgsc4ja",
+    "title": "oracle.com syd",
+    "tags": ["Business"],
+    "version": 5,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2023-01-02T23:28:40Z",
+    "updated_at": "2026-05-12T00:16:10Z",
+    "additional_information": "info@oztac.com.au",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://oracle.com"
+      }
+    ]
+  },
+  {
+    "id": "4qt774avrbzabdscc6ezygl5hi",
+    "title": "Aliyun Team Qwen Token Plan Key",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-06-20T21:55:12Z",
+    "updated_at": "2026-06-22T16:30:44Z",
+    "additional_information": "aliyun-1290381991214564",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+      }
+    ]
+  },
+  {
+    "id": "oc4bque5f4z53ix6a3jbjyvxze",
+    "title": "oracle-vpn-semaphore",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "PASSWORD",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-20T11:42:03Z",
+    "updated_at": "2026-04-20T11:42:03Z",
+    "additional_information": "Mon Apr 20 21:42:02 AEST 2026"
+  },
+  {
+    "id": "d63ts6ab5jqygbftqnomylfkzq",
+    "title": "chengdu_jump SSH Key (MacBook -\u003e Chengdu Win)",
+    "tags": ["ssh", "chengdu", "jump"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-09T08:30:12Z",
+    "updated_at": "2026-04-09T08:30:12Z",
+    "additional_information": "Dedicated ed25519 key for MacBook-\u003eChengdu Windows laptop SSH jump. Add the publ"
+  },
+  {
+    "id": "reg7i5k2duyn6ra4wjodka2jiq",
+    "title": "Resend Login jzlian083@gmaifl.com",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T10:04:54Z",
+    "updated_at": "2026-03-31T10:06:42Z",
+    "additional_information": "jzlian083@gmail.com",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://resend.com"
+      }
+    ]
+  },
+  {
+    "id": "axjq42eq4ou43kc7nbt7oi7pfq",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:18:00Z",
+    "updated_at": "2026-07-08T15:18:00Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "ofp5zyyku7sieik7rjvkelhrgu",
+    "title": "Secure Note Agent Credentials",
+    "version": 2,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-27T11:03:40Z",
+    "updated_at": "2026-03-27T11:14:34Z",
+    "additional_information": "# Minimax API Key - for all fleet agent usage highspeed model m2.7 - 4000 reques"
+  },
+  {
+    "id": "pfhiyhwiey7yvqrtzdglrj2o4a",
+    "title": "Service Account Auth Token: cursor_ironclaw",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-05-28T15:45:55Z",
+    "updated_at": "2026-05-28T15:45:55Z"
+  },
+  {
+    "id": "dgj4a6rw6ewdvl5gic3ss7ddmq",
+    "title": "ZD Claude Code AI Gateway bedrock",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-04-28T01:12:58Z",
+    "updated_at": "2026-04-28T01:12:58Z",
+    "additional_information": "—"
+  },
+  {
+    "id": "n2ecpwlnkpjs4ufdvquw6xf624",
+    "title": "GitLab CE Runner Auth Token (wsl2)",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "PASSWORD",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-07-08T14:33:00Z",
+    "updated_at": "2026-07-08T14:33:00Z",
+    "additional_information": "Thu Jul  9 00:32:59 AEST 2026"
+  },
+  {
+    "id": "prpfb4m2a4j35wzptejtrouqcq",
+    "title": "Engram mem0-compat (wsl1 tunnel)",
+    "tags": ["fleet", "auto-inventory", "url-only"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:57:03Z",
+    "updated_at": "2026-06-10T13:57:03Z",
+    "additional_information": "operator",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://127.0.0.1:8281"
+      }
+    ]
+  },
+  {
+    "id": "ripotpfq43jzlreor4zo2ay734",
+    "title": "minimax-api-1",
+    "version": 5,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-05-06T08:35:11Z",
+    "updated_at": "2026-07-08T02:57:17Z",
+    "additional_information": "MiniMax API key slot 1 for minimax-openai-bridge. Never expose in argv, logs, re"
+  },
+  {
+    "id": "dv5f5ciourulkph7dipygnvxlu",
+    "title": "mem0-oss-admin-key",
+    "version": 4,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "PASSWORD",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-05-06T02:40:44Z",
+    "updated_at": "2026-05-08T14:08:32Z",
+    "additional_information": "Wed May  6 02:40:44 UTC 2026"
+  },
+  {
+    "id": "nfb4gwurt6jiyekk4prabu4nau",
+    "title": "Stripe Sandbox Credentials",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-07-09T11:39:58Z",
+    "updated_at": "2026-07-09T11:41:11Z",
+    "additional_information": "—"
+  },
+  {
+    "id": "pdueu5keepupnhd5cjj2fqumem",
+    "title": "Win PC WSL Ubuntu Login GB",
+    "version": 2,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2025-06-25T09:23:18Z",
+    "updated_at": "2026-05-28T15:04:32Z",
+    "additional_information": "jason"
+  },
+  {
+    "id": "pwfsbfuvhqaz63oc7ujgb24uou",
+    "title": "Exa API Key 1",
+    "tags": ["search", "exa", "fleet"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-28T03:09:48Z",
+    "updated_at": "2026-03-28T03:09:48Z",
+    "additional_information": "exa-fleet"
+  },
+  {
+    "id": "imdpytv5wxi7oppbyh4n52al7a",
+    "title": "fleet_lan.pub Macbook Zd",
+    "version": 2,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SSH_KEY",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-29T06:41:21Z",
+    "updated_at": "2026-03-29T06:41:55Z"
+  },
+  {
+    "id": "rqzjv2k6rar2pmwjuoursdlxh4",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:15:28Z",
+    "updated_at": "2026-07-08T15:15:28Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "nnhcm6xvyes5kgxv2uuqb5eusi",
+    "title": "GitLab CE API PAT (wsl1)",
+    "version": 7,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T17:52:02Z",
+    "updated_at": "2026-06-10T18:40:05Z"
+  },
+  {
+    "id": "ilsww3ycbjmtbwra2wmpsfryae",
+    "title": "PayPal Sandbox Acc",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "PASSWORD",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-07-09T11:50:58Z",
+    "updated_at": "2026-07-09T11:52:56Z",
+    "additional_information": "2026-07-09 09:50 PM"
+  },
+  {
+    "id": "5won46qifska3q24i5sqhpqlbq",
+    "title": "Brevo info@oztac 300 daily limit",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T09:57:46Z",
+    "updated_at": "2026-03-31T10:30:15Z",
+    "additional_information": "Signs in with Google",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://onboarding.brevo.com/account/register/profile"
+      }
+    ]
+  },
+  {
+    "id": "dwdpi2hyhc2mpxwacyiaxfwdi4",
+    "title": "DreamHost",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-06-19T00:33:27Z",
+    "updated_at": "2026-07-08T01:21:53Z",
+    "additional_information": "info@oztac.com.au",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://panel.dreamhost.com/"
+      }
+    ]
+  },
+  {
+    "id": "nrmcadhudzunh37ajvoqfsmmyy",
+    "title": "tailscale-auth-key",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-20T11:41:33Z",
+    "updated_at": "2026-04-20T11:41:33Z"
+  },
+  {
+    "id": "rta4gta7frins7qb56hjgdtrka",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T18:15:36Z",
+    "updated_at": "2026-07-08T18:15:36Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "gbqnlvhkop6lfsx4czf5gp6nga",
+    "title": "Telegram Bot - Fleet Agent 1",
+    "tags": ["channel", "telegram", "fleet"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-28T03:09:39Z",
+    "updated_at": "2026-03-28T03:09:39Z",
+    "additional_information": "fleet_agent1_bot"
+  },
+  {
+    "id": "e6sucdnaqbawr373n6oda4n4pi",
+    "title": "Uptime Kuma Fleet (wsl1)",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T14:12:41Z",
+    "updated_at": "2026-06-10T14:12:41Z",
+    "additional_information": "—",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:3001"
+      }
+    ]
+  },
+  {
+    "id": "umjju2lqgejs2jrcgsiidzvriq",
+    "title": "Grafana Admin",
+    "tags": ["grafana", "observability", "wsl2"],
+    "version": 3,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-24T20:59:49Z",
+    "updated_at": "2026-06-26T01:42:23Z",
+    "additional_information": "admin",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://wsl2:3000"
+      }
+    ]
+  },
+  {
+    "id": "nruynfsbnmjmqx6tld6c7uaopm",
+    "title": "Resend info@oztac",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T10:00:24Z",
+    "updated_at": "2026-03-31T10:01:02Z",
+    "additional_information": "Signs in with Google",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://resend.com/onboarding"
+      }
+    ]
+  },
+  {
+    "id": "gmfbh6yqhrgcovmxmbhbttl3cu",
+    "title": "Tavily API Key 1",
+    "tags": ["search", "tavily", "fleet"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-28T03:09:45Z",
+    "updated_at": "2026-03-28T03:09:45Z",
+    "additional_information": "tavily-fleet"
+  },
+  {
+    "id": "62hsrafqwghfz7kdz3b5qucgqy",
+    "title": "Grafana Fleet (wsl1)",
+    "tags": ["fleet", "auto-inventory", "url-only"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:56:46Z",
+    "updated_at": "2026-06-10T13:56:46Z",
+    "additional_information": "operator",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:3003"
+      }
+    ]
+  },
+  {
+    "id": "vvgrbbr4zo5ohmzxpnt5efa4r4",
+    "title": "RustDesk Device win1",
+    "version": 6,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-06-10T17:45:01Z",
+    "updated_at": "2026-07-06T16:20:55Z",
+    "additional_information": "Placeholder — operator must fill device_id and password from RustDesk client on "
+  },
+  {
+    "id": "kmphrecalfj3sayb3h3mxwjcnu",
+    "title": "zd api gateway bedrock claude models",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-04-28T12:29:52Z",
+    "updated_at": "2026-04-28T12:29:52Z",
+    "additional_information": "export AWS_ENDPOINT_URL_BEDROCK_RUNTIME=https://ai-gateway.zende.sk/bedrock"
+  },
+  {
+    "id": "s2h64ocrkfye2fr4lszgwcbijm",
+    "title": "wsl2_win11 tailscale auth key expire on 27 Jun 2026",
+    "version": 4,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-29T07:53:14Z",
+    "updated_at": "2026-03-29T07:56:30Z",
+    "additional_information": "wsl1_win11"
+  },
+  {
+    "id": "mhdzmvjzylkejcvdhnt6tfj46y",
+    "title": "AWS SES cylrl.dev IAM",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-03-30T07:07:56Z",
+    "updated_at": "2026-03-30T07:07:56Z",
+    "additional_information": "AKIAQFFXNLDOJFXD6MXH"
+  },
+  {
+    "id": "hblg7fxbhxnlmnv3us3i6jo2wu",
+    "title": "minimax-api-2",
+    "version": 4,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-05-06T08:35:17Z",
+    "updated_at": "2026-07-08T02:57:09Z",
+    "additional_information": "MiniMax API key slot 2 for minimax-openai-bridge quota/rate-limit fallback. Neve"
+  },
+  {
+    "id": "fk53vwaafv5jhv5vdkt4dftvy4",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:16:25Z",
+    "updated_at": "2026-07-08T15:16:25Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "mqveimv2o5z4kiqnjybepiwbpq",
+    "title": "SMTP2GO",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T10:15:02Z",
+    "updated_at": "2026-03-31T10:29:23Z",
+    "additional_information": "info@oztac.com.au",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://www.smtp2go.com"
+      }
+    ]
+  },
+  {
+    "id": "62ruxw2zud5fp7jpxgi2cgjb64",
+    "title": "github pat",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-22T10:01:59Z",
+    "updated_at": "2026-03-22T10:01:59Z",
+    "additional_information": "nfsarch33"
+  },
+  {
+    "id": "vygyluc6uiuhqj4kee4ygy527m",
+    "title": "wsl1_win11 tailscale auth key expire on 27 Jun 2026",
+    "version": 4,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-29T07:51:54Z",
+    "updated_at": "2026-03-29T07:56:23Z",
+    "additional_information": "wsl1_win11"
+  },
+  {
+    "id": "lepitf6yct2kr2wul376cmm4ay",
+    "title": "RustDesk Device win4",
+    "version": 3,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-06-11T08:05:17Z",
+    "updated_at": "2026-06-16T10:08:42Z",
+    "additional_information": "Placeholder — operator must fill device_id and password from RustDesk client GUI"
+  },
+  {
+    "id": "sjhxjryivr6edhmb2ecovdpot4",
+    "title": "Win PC WSL Ubuntu Login GB / jason@win4",
+    "tags": ["helixon-bootstrap", "v14508.5"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:11:57Z",
+    "updated_at": "2026-07-08T15:11:57Z",
+    "additional_information": "jason"
+  },
+  {
+    "id": "t6m7idvh5sipb3ubpcpnuhqvi4",
+    "title": "oracle-cloud-oci",
+    "version": 2,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-20T11:41:47Z",
+    "updated_at": "2026-04-22T09:30:53Z"
+  },
+  {
+    "id": "x57gj3ejadnwfc2fwfcvad7dye",
+    "title": "GitLab CE Fleet (wsl1)",
+    "tags": ["fleet", "auto-inventory"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:55:58Z",
+    "updated_at": "2026-06-10T13:55:58Z",
+    "additional_information": "root",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:30080"
+      }
+    ]
+  },
+  {
+    "id": "m5rnja2b2qtsonin6ehy3i7nha",
+    "title": "GitLab CE Root UI (wsl1)",
+    "version": 9,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T17:49:09Z",
+    "updated_at": "2026-06-11T11:20:52Z",
+    "additional_information": "root"
+  },
+  {
+    "id": "63kyxmei7jyaiepnqs4a3dv42q",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:14:43Z",
+    "updated_at": "2026-07-08T15:14:43Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "z5rykmtuizvyqnvignmrgze2ce",
+    "title": "mem0-oss-jwt-secret",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "PASSWORD",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-05-06T02:40:41Z",
+    "updated_at": "2026-05-06T02:40:41Z",
+    "additional_information": "Wed May  6 12:40:40 AEST 2026"
+  },
+  {
+    "id": "y6wyb3uprbijx3f6btjsi3hbze",
+    "title": "oracle cloud Tokyo",
+    "tags": ["Business"],
+    "version": 2,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2023-01-02T23:28:40Z",
+    "updated_at": "2026-05-12T00:15:18Z",
+    "additional_information": "jaslian@gmail.com",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://oracle.com"
+      }
+    ]
+  },
+  {
+    "id": "u2mcruwbzlvrfj7nppvxxusynq",
+    "title": "Helixon Dashboard Fleet (wsl1)",
+    "tags": ["fleet", "auto-inventory", "url-only"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:57:08Z",
+    "updated_at": "2026-06-10T13:57:08Z",
+    "additional_information": "operator",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:9095"
+      }
+    ]
+  },
+  {
+    "id": "kocor3kayl7lsteqecmxpsue2u",
+    "title": "zd api gateway openai models",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-04-28T12:30:16Z",
+    "updated_at": "2026-04-28T12:30:16Z",
+    "additional_information": "export OPENAI_BASE_URL=https://ai-gateway.zende.sk/v1"
+  },
+  {
+    "id": "smvoqaxttwlabd6jqqxng6aj2y",
+    "title": "Win PC WSL Ubuntu Login GB / jason@win2",
+    "tags": ["helixon-bootstrap", "v14508.5"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T15:11:56Z",
+    "updated_at": "2026-07-08T15:11:56Z",
+    "additional_information": "jason"
+  },
+  {
+    "id": "7xfvc4qnxrl4cjn4bcs3y6y4fm",
+    "title": "GitLab CE API PAT win3 wsl3",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-12T14:42:11Z",
+    "updated_at": "2026-06-12T14:42:11Z"
+  },
+  {
+    "id": "mo6x2g5fd34eg4a3hpfuz3gcqu",
+    "title": "Service Account Auth Token: msi-win11-laptop",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-04-09T16:26:24Z",
+    "updated_at": "2026-04-09T16:26:24Z"
+  },
+  {
+    "id": "7w7iwwwkx55u27qcddr6prwv4m",
+    "title": "1password op Service Account Auth Token: win1/wsl1",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-07-06T19:40:28Z",
+    "updated_at": "2026-07-06T19:40:28Z"
+  },
+  {
+    "id": "w7uspwgtg4y5gh6m4fdnxtu6lu",
+    "title": "SprintBoard Fleet (wsl1)",
+    "tags": ["fleet", "auto-inventory", "url-only"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
+    "created_at": "2026-06-10T13:56:57Z",
+    "updated_at": "2026-06-10T13:56:57Z",
+    "additional_information": "operator",
+    "urls": [
+      {
+        "primary": true,
+        "href": "http://100.119.90.30:9400"
+      }
+    ]
+  },
+  {
+    "id": "ulrwzgbep6c4o64dtsu32sqdlq",
+    "title": "gcp-helixon-bootstrap-sa-key",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "DOCUMENT",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-05-15T23:29:33Z",
+    "updated_at": "2026-05-15T23:29:33Z"
+  },
+  {
+    "id": "a5ykjrdtpnlkxe67paksosjnzm",
+    "title": "RustDesk Device win2",
+    "version": 3,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-06-10T17:45:07Z",
+    "updated_at": "2026-06-16T10:09:46Z",
+    "additional_information": "Placeholder — operator must fill device_id and password from RustDesk client on "
+  },
+  {
+    "id": "zaxwib67wlnsxbiswprf5lkxoi",
+    "title": "v14508.5-regression",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "KCMT5IXW2BBEVALRAPGYLGAN3U",
+    "created_at": "2026-07-08T18:17:39Z",
+    "updated_at": "2026-07-08T18:17:39Z",
+    "additional_information": "test"
+  },
+  {
+    "id": "syap7mcjsscsfmvrp3u4rizgcq",
+    "title": "fleet_lan SSH Key Pair (WSL1 Access)",
+    "tags": ["ssh", "fleet", "wsl1", "chengdu"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "SECURE_NOTE",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-09T06:07:44Z",
+    "updated_at": "2026-04-09T06:07:44Z",
+    "additional_information": "SSH key pair for accessing WSL1 (DESKTOP-078M990) via Tailscale. Copy both files"
+  },
+  {
+    "id": "7plsotwmnuc4s3kevyvstaoqua",
+    "title": "Telegram Bot - Cursor WSL1",
+    "tags": ["channel", "telegram", "cursor"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-28T03:09:36Z",
+    "updated_at": "2026-03-28T03:09:36Z",
+    "additional_information": "cursor_wsl1_bot"
+  },
+  {
+    "id": "6frr5lxereqjvzs64cfzrt45ey",
+    "title": "oci-tokyo-api-key",
+    "tags": ["oci", "tokyo", "api-key"],
+    "version": 2,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-05-07T08:40:41Z",
+    "updated_at": "2026-05-07T09:33:00Z"
+  },
+  {
+    "id": "wgc57cozwfhzmlovy3joa5qrou",
+    "title": "mem0",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "API_CREDENTIAL",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-26T08:57:58Z",
+    "updated_at": "2026-04-26T08:57:58Z"
+  },
+  {
+    "id": "6ebi3ccm3xrji7yniqacdq4oqq",
+    "title": "github pat nfsarch33 win3/wsl3",
+    "version": 2,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-05-28T18:54:21Z",
+    "updated_at": "2026-06-11T18:36:46Z",
+    "additional_information": "nfsarch33"
+  },
+  {
+    "id": "jgt7yaixlrmymfiswliqadoaoi",
+    "title": "Main Tailscale API Access token",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-29T07:55:59Z",
+    "updated_at": "2026-03-29T07:55:59Z",
+    "additional_information": "tailscale_api_access_token"
+  },
+  {
+    "id": "aphudyg7fjueu4uilhwy7a3ivi",
+    "title": "Tailscale Auth Key macbook",
+    "tags": ["fleet", "tailscale", "macbook", "v256-pm17"],
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "XUO7SZFI2RAXLAB7A4M5L6XC4U",
+    "created_at": "2026-04-26T18:44:40Z",
+    "updated_at": "2026-04-26T18:44:40Z",
+    "additional_information": "macbook fleet member"
+  },
+  {
+    "id": "mjlr5fkdjj3mhd2c3a7t4zzroe",
+    "title": "Resend keynear@gmail.com",
+    "version": 1,
+    "vault": {
+      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+      "name": "Cursor_IronClaw"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+    "created_at": "2026-03-31T10:13:13Z",
+    "updated_at": "2026-03-31T10:13:34Z",
+    "additional_information": "Signs in with Google",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://resend.com/emails"
+      }
+    ]
+  }
+]
