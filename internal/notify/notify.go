@@ -30,6 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -109,9 +110,10 @@ type ResendConfig struct {
 
 // ResendClient is the Resend HTTP-API client. Implements Client.
 type ResendClient struct {
-	cfg ResendConfig
-	do  HTTPDoer
-	id  *IdempotencyStore
+	cfg   ResendConfig
+	do    HTTPDoer
+	id    *IdempotencyStore
+	audit *notifydb.DB
 }
 
 // NewResendClient returns a Resend client with the supplied config.
@@ -129,6 +131,37 @@ func NewResendClient(cfg ResendConfig) *ResendClient {
 		cfg.HTTPDoer = &http.Client{Timeout: cfg.Timeout}
 	}
 	return &ResendClient{cfg: cfg, do: cfg.HTTPDoer, id: NewIdempotencyStore()}
+}
+
+// WithAuditDB attaches a notifydb persistence sink. v17409-4.
+func (c *ResendClient) WithAuditDB(db *notifydb.DB) *ResendClient {
+	c.audit = db
+	return c
+}
+
+// recordAudit writes a Dispatch row when c.audit is set. Errors are logged
+// but never returned to the caller (audit is best-effort).
+func (c *ResendClient) recordAudit(ctx context.Context, key, subject string, err error) {
+	if c.audit == nil {
+		return
+	}
+	status := "ok"
+	errStr := ""
+	if err != nil {
+		status = "error"
+		errStr = err.Error()
+	}
+	_ = c.audit.Insert(ctx, notifydb.Dispatch{
+		ID:          key,
+		Vendor:      "resend",
+		Recipient:   "(collapsed)",
+		Subject:     subject,
+		Status:      status,
+		Error:       errStr,
+		CreatedUnix: time.Now().Unix(),
+		SentAtUnix:  time.Now().Unix(),
+		Attempt:     c.cfg.MaxRetry,
+	})
 }
 
 // Vendor returns the vendor name for cost attribution.
@@ -198,7 +231,9 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 		if err != nil {
 			lastErr = err
 			if attempt == maxAttempt {
-				return fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+				finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+				c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+				return finalErr
 			}
 			backoff(attempt)
 			continue
@@ -207,18 +242,23 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 		resp.Body.Close()
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, nil)
 			return nil // success
 		}
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 			// Deterministic: never retry. Sanitize the body before including
 			// in the error message — server echoes must NEVER carry the
 			// API key (it shouldn't, but defence-in-depth).
-			return fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
+			finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
+			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			return finalErr
 		}
 		// 5xx: transient
 		lastErr = fmt.Errorf("%w: status %d", ErrTransient, resp.StatusCode)
 		if attempt == maxAttempt {
-			return fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
+			finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
+			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			return finalErr
 		}
 		backoff(attempt)
 	}
@@ -241,9 +281,10 @@ type BrevoConfig struct {
 
 // BrevoClient is the Brevo HTTP-API client.
 type BrevoClient struct {
-	cfg BrevoConfig
-	do  HTTPDoer
-	id  *IdempotencyStore
+	cfg   BrevoConfig
+	do    HTTPDoer
+	id    *IdempotencyStore
+	audit *notifydb.DB
 }
 
 // NewBrevoClient returns a Brevo client with the supplied config.
@@ -265,6 +306,36 @@ func NewBrevoClient(cfg BrevoConfig) *BrevoClient {
 
 // Vendor returns the vendor name.
 func (c *BrevoClient) Vendor() string { return "brevo" }
+
+// WithAuditDB attaches a notifydb persistence sink. v17409-4.
+func (c *BrevoClient) WithAuditDB(db *notifydb.DB) *BrevoClient {
+	c.audit = db
+	return c
+}
+
+// recordAudit writes a Dispatch row when c.audit is set. Best-effort.
+func (c *BrevoClient) recordAudit(ctx context.Context, key, subject string, err error) {
+	if c.audit == nil {
+		return
+	}
+	status := "ok"
+	errStr := ""
+	if err != nil {
+		status = "error"
+		errStr = err.Error()
+	}
+	_ = c.audit.Insert(ctx, notifydb.Dispatch{
+		ID:          key,
+		Vendor:      "brevo",
+		Recipient:   "(collapsed)",
+		Subject:     subject,
+		Status:      status,
+		Error:       errStr,
+		CreatedUnix: time.Now().Unix(),
+		SentAtUnix:  time.Now().Unix(),
+		Attempt:     c.cfg.MaxRetry,
+	})
+}
 
 type brevoPayload struct {
 	Sender      brevoAddr         `json:"sender"`
@@ -346,7 +417,9 @@ func (c *BrevoClient) doWithRetry(ctx context.Context, body []byte, m Email) err
 		if err != nil {
 			lastErr = err
 			if attempt == maxAttempt {
-				return fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+				finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+				c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+				return finalErr
 			}
 			backoff(attempt)
 			continue
@@ -355,14 +428,19 @@ func (c *BrevoClient) doWithRetry(ctx context.Context, body []byte, m Email) err
 		resp.Body.Close()
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, nil)
 			return nil
 		}
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			return fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
+			finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
+			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			return finalErr
 		}
 		lastErr = fmt.Errorf("%w: status %d", ErrTransient, resp.StatusCode)
 		if attempt == maxAttempt {
-			return fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
+			finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
+			c.recordAudit(ctx, m.IdempotencyKey, m.Subject, finalErr)
+			return finalErr
 		}
 		backoff(attempt)
 	}
