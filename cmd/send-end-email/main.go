@@ -26,10 +26,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/notify"
+	"github.com/nfsarch33/helixon-platform/internal/notify/endemail"
+	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
 )
 
 func main() {
@@ -44,6 +45,7 @@ func main() {
 		dryRun    = flag.Bool("dry-run", false, "skip network send, emit audit event")
 		fromAddr  = flag.String("from", "noreply@oztac.com.au", "From address")
 		noCC      = flag.Bool("no-cc", false, "send only to Primary (jaslian@gmail.com) per v16301 unified-target directive")
+		auditDB   = flag.String("audit-db", "", "path to notifydb SQLite file (optional; default: ~/logs/runx/notifydb.sqlite3)")
 	)
 	flag.Parse()
 
@@ -58,36 +60,55 @@ func main() {
 		*brevoKey = os.Getenv("BREVO_API_KEY")
 	}
 
-	var htmlBody string
+	var bodyMD string
 	if *bodyFile != "" {
 		raw, err := os.ReadFile(*bodyFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: read body-file: %v\n", err)
 			os.Exit(2)
 		}
-		htmlBody = markdownToHTML(string(raw))
+		bodyMD = string(raw)
 	}
 
-	recipients := notify.DefaultRecipients()
-	toAddrs := append([]string{recipients.Primary}, recipients.CC...)
+	// v17409-5: hardened END email template produces both HTML and
+	// plain-text bodies. The CLI no longer carries the converter
+	// inline.
+	tmpl := endemail.Template{
+		Plan:         *plan,
+		Subject:      *subject,
+		BodyMarkdown: bodyMD,
+		JobID:        *jobID,
+		IdempKey:     *idemKey,
+		TenantID:     "cursor-global-kb",
+	}
+	m := tmpl.Build()
 
-	ccList := recipients.CC
 	if *noCC {
-		ccList = nil
+		m.CC = nil
 	}
 
-	m := notify.Email{
-		To:             []string{recipients.Primary},
-		CC:             ccList,
-		Subject:        *subject,
-		HTMLBody:       htmlBody,
-		TextBody:       "", // markdown body is rendered to HTML; TextBody is fallback
-		IdempotencyKey: *idemKey,
-		JobID:          *jobID,
-		TenantID:       "cursor-global-kb",
-		CostEstimate:   0.001, // best-effort; single email
+	// v17409-5: open notifydb (optional) and write a "rendered" audit row.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var db *notifydb.DB
+	if *auditDB != "" {
+		var err error
+		db, err = notifydb.Open(*auditDB, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARN: open audit-db: %v (continuing without)\n", err)
+		} else {
+			defer db.Close()
+		}
+	} else {
+		// Best-effort: try the default path. If it fails (no HOME, no
+		// write permission), proceed without audit.
+		if d, derr := notifydb.Open(notifydb.DefaultPath(), nil); derr == nil {
+			db = d
+			defer db.Close()
+		}
 	}
-	_ = toAddrs // Resend free-tier collapses CC into To per ADR-0087
+	_, _ = endemail.RenderAndAudit(ctx, tmpl, db)
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	auditEvent := map[string]any{
@@ -103,13 +124,11 @@ func main() {
 		"dry_run":         *dryRun,
 		"resend_key_set":  *resendKey != "",
 		"brevo_key_set":   *brevoKey != "",
+		"html_body_len":   len(m.HTMLBody),
+		"text_body_len":   len(m.TextBody),
+		"audit_db":        db != nil,
 	}
 
-	// Idempotency pre-check (mirrors the package's IdempotencyStore.Acquire
-	// semantics but does not actually mutate store). Always returns
-	// (acquired=true, inFlight=false) for the first call here because we
-	// do not have a persistent store between processes. The package's
-	// own in-memory store will dedup within a single process.
 	auditEvent["idempotency_first_call"] = true
 
 	if *dryRun || (*resendKey == "" && *brevoKey == "") {
@@ -119,10 +138,11 @@ func main() {
 			auditEvent["blocker"] = "op service account token expired (CARRY-055 unresolved). Provide --resend-key/--brevo-key or set RESEND_API_KEY/BREVO_API_KEY env to enable live send."
 		}
 		auditEvent["email_render"] = map[string]any{
-			"to":       m.To,
-			"cc":       m.CC,
-			"subject":  m.Subject,
-			"body_len": len(htmlBody),
+			"to":            m.To,
+			"cc":            m.CC,
+			"subject":       m.Subject,
+			"html_body_len": len(m.HTMLBody),
+			"text_body_len": len(m.TextBody),
 		}
 		out, _ := json.MarshalIndent(auditEvent, "", "  ")
 		fmt.Println(string(out))
@@ -131,14 +151,11 @@ func main() {
 	}
 
 	// Live path
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	resendCfg := notify.ResendConfig{APIKey: *resendKey, FromAddr: *fromAddr}
-	resendClient := notify.NewResendClient(resendCfg)
+	resendClient := notify.NewResendClient(resendCfg).WithAuditDB(db)
 
 	brevoCfg := notify.BrevoConfig{APIKey: *brevoKey}
-	brevoClient := notify.NewBrevoClient(brevoCfg)
+	brevoClient := notify.NewBrevoClient(brevoCfg).WithAuditDB(db)
 
 	disp := notify.NewDispatcher(notify.DispatcherConfig{
 		ResendClient: resendClient,
@@ -156,53 +173,4 @@ func main() {
 	auditEvent["result"] = "sent"
 	out, _ := json.MarshalIndent(auditEvent, "", "  ")
 	fmt.Println(string(out))
-}
-
-// markdownToHTML is a minimal converter for the END email body. We avoid
-// pulling in a full markdown library because the END body is authored
-// markdown and the notify package will accept HTML as-is.
-func markdownToHTML(md string) string {
-	var b strings.Builder
-	inCode := false
-	for _, line := range strings.Split(md, "\n") {
-		switch {
-		case strings.HasPrefix(line, "```"):
-			if inCode {
-				b.WriteString("</pre>\n")
-				inCode = false
-			} else {
-				b.WriteString("<pre>")
-				inCode = true
-			}
-		case strings.HasPrefix(line, "# "):
-			b.WriteString("<h1>")
-			b.WriteString(strings.TrimPrefix(line, "# "))
-			b.WriteString("</h1>\n")
-		case strings.HasPrefix(line, "## "):
-			b.WriteString("<h2>")
-			b.WriteString(strings.TrimPrefix(line, "## "))
-			b.WriteString("</h2>\n")
-		case strings.HasPrefix(line, "- "):
-			b.WriteString("<li>")
-			b.WriteString(strings.TrimPrefix(line, "- "))
-			b.WriteString("</li>\n")
-		case strings.HasPrefix(line, "|") && strings.Contains(line, "|"):
-			// very rough table row
-			b.WriteString(line)
-			b.WriteString("\n")
-		default:
-			if inCode {
-				b.WriteString(line)
-				b.WriteString("\n")
-			} else {
-				b.WriteString("<p>")
-				b.WriteString(line)
-				b.WriteString("</p>\n")
-			}
-		}
-	}
-	if inCode {
-		b.WriteString("</pre>\n")
-	}
-	return b.String()
 }
