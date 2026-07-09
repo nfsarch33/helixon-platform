@@ -1,0 +1,82 @@
+{
+  "verdict": "PASS",
+  "check_count": 14,
+  "pass_count": 13,
+  "fail_count": 0,
+  "warn_count": 1,
+  "checks": [
+    {
+      "check": "no-direct-main-push",
+      "status": "PASS",
+      "detail": "pushed only via PRs and feature branches "
+    },
+    {
+      "check": "no-plaintext-secrets",
+      "status": "PASS",
+      "detail": "no plaintext refs found (audit artifacts excluded) "
+    },
+    {
+      "check": "registry-sot-required",
+      "status": "PASS",
+      "detail": "all services have name + port "
+    },
+    {
+      "check": "llm-router-token-required",
+      "status": "WARN",
+      "detail": "llm-router auth not explicit "
+    },
+    {
+      "check": "engram-embed-url-required",
+      "status": "PASS",
+      "detail": "engramd has embed_url "
+    },
+    {
+      "check": "v14576-v14593-evidence-present",
+      "status": "PASS",
+      "detail": "all 18 evidence dirs exist "
+    },
+    {
+      "check": "v14576-v14593-retro-present",
+      "status": "PASS",
+      "detail": "retro at sprint-retros/v14576-v14593-retro.md "
+    },
+    {
+      "check": "ADR-0098-present",
+      "status": "PASS",
+      "detail": "ADR-0098 production readiness committed "
+    },
+    {
+      "check": "oci-webui-sop-present",
+      "status": "PASS",
+      "detail": "sop/oracle-cloud-web-ui-automation.md present "
+    },
+    {
+      "check": "wsl-pw-migration-sop-present",
+      "status": "PASS",
+      "detail": "sop/1password-wsl-password-migration-strategy.md present "
+    },
+    {
+      "check": "rotation-audit-complete",
+      "status": "PASS",
+      "detail": "rotation-audit.csv has 18 rows (17 items + header) "
+    },
+    {
+      "check": "nodes-yaml-no-fh3nbqn",
+      "status": "PASS",
+      "detail": "no duplicate desktop-fh3nbqn-* Tailscale hostnames "
+    },
+    {
+      "check": "hook-check-11-added",
+      "status": "PASS",
+      "detail": "browser-automation Check 11 added (browser_automation_preferred) "
+    },
+    {
+      "check": "no-uncommitted-changes",
+      "status": "PASS",
+      "detail": "working tree clean on both repos "
+    }
+  ],
+  "generated_at": "2026-07-09T22:03:49Z",
+  "arc": "v14576-v14593",
+  "release_tag_target": "sentrux-2026-10-21"
+}
