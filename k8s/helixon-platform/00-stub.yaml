@@ -1,0 +1,9 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: helixon-platform-stub
+  namespace: helixon-platform
+data:
+  owner: argo-cd
+  sprint: v14545
