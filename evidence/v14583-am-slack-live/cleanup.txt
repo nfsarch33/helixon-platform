@@ -1,0 +1,15 @@
+=== expire alert ===
+found alert: FleetDoctorFailing fingerprint: 55a18d88356048e1
+
+=== files in evidence dir ===
+total 84
+drwxr-xr-x  2 jaslian jaslian  4096 Jul 10 05:06 .
+drwxr-xr-x 45 jaslian jaslian  4096 Jul 10 04:57 ..
+-rw-r--r--  1 jaslian jaslian   191 Jul 10 05:02 amtool-check.txt
+-rw-r--r--  1 jaslian jaslian   114 Jul 10 05:06 cleanup.txt
+-rw-r--r--  1 jaslian jaslian  1931 Jul 10 04:58 config-redacted.txt
+-rw-r--r--  1 jaslian jaslian  1123 Jul 10 05:04 delivery-check.txt
+-rw-r--r--  1 jaslian jaslian 46963 Jul 10 05:06 journal.txt
+-rw-r--r--  1 jaslian jaslian  1645 Jul 10 05:03 restart-log.txt
+-rw-r--r--  1 jaslian jaslian  1043 Jul 10 05:04 synthetic-alert.txt
+-rw-r--r--  1 jaslian jaslian  3712 Jul 10 05:03 verify.txt

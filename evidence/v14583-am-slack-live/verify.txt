@@ -1,0 +1,38 @@
+=== receivers via API ===
+[
+    {
+        "name": "helixon-fleet-default"
+    },
+    {
+        "name": "helixon-fleet-critical"
+    },
+    {
+        "name": "helixon-fleet-engram"
+    },
+    {
+        "name": "helixon-fleet-llm"
+    }
+]
+
+=== status ===
+{
+    "cluster": {
+        "peers": [],
+        "status": "disabled"
+    },
+    "config": {
+        "original": "global:\n  resolve_timeout: 5m\n  http_config:\n    follow_redirects: true\n    enable_http2: true\n  smtp_hello: localhost\n  smtp_require_tls: true\n  pagerduty_url: https://events.pagerduty.com/v2/enqueue\n  opsgenie_api_url: https://api.opsgenie.com/\n  wechat_api_url: https://qyapi.weixin.qq.com/cgi-bin/\n  victorops_api_url: https://alert.victorops.com/integrations/generic/20131114/alert/\n  telegram_api_url: https://api.telegram.org\n  webex_api_url: https://webexapis.com/v1/messages\nroute:\n  receiver: helixon-fleet-default\n  group_by:\n  - alertname\n  - cluster\n  - service\n  continue: false\n  routes:\n  - receiver: helixon-fleet-critical\n    matchers:\n    - severity=\"critical\"\n    continue: false\n    group_wait: 10s\n    repeat_interval: 1h\n  - receiver: helixon-fleet-engram\n    matchers:\n    - service=\"engramd\"\n    continue: false\n  - receiver: helixon-fleet-llm\n    matchers:\n    - service=\"llm-router\"\n    continue: false\n  group_wait: 30s\n  group_interval: 5m\n  repeat_interval: 4h\ninhibit_rules:\n- source_matchers:\n  - alertname=\"Watchdog\"\n  target_matchers:\n  - severity=\"critical\"\n  equal:\n  - alertname\n  - cluster\n  - service\nreceivers:\n- name: helixon-fleet-default\n  webhook_configs:\n  - send_resolved: true\n    http_config:\n      follow_redirects: true\n      enable_http2: true\n    url: <secret>\n    url_file: \"\"\n    max_alerts: 0\n- name: helixon-fleet-critical\n  slack_configs:\n  - send_resolved: true\n    http_config:\n      follow_redirects: true\n      enable_http2: true\n    api_url_file: /home/jaslian/.config/alertmanager/slack-webhook.url\n    channel: '#fleet-critical'\n    username: '{{ template \"slack.default.username\" . }}'\n    color: '{{ if eq .Status \"firing\" }}danger{{ else }}good{{ end }}'\n    title: '{{ .CommonAnnotations.summary }}'\n    title_link: '{{ template \"slack.default.titlelink\" . }}'\n    pretext: '{{ template \"slack.default.pretext\" . }}'\n    text: '{{ .CommonAnnotations.description }}'\n    short_fields: false\n    footer: '{{ template \"slack.default.footer\" . }}'\n    fallback: '{{ template \"slack.default.fallback\" . }}'\n    callback_id: '{{ template \"slack.default.callbackid\" . }}'\n    icon_emoji: '{{ template \"slack.default.iconemoji\" . }}'\n    icon_url: '{{ template \"slack.default.iconurl\" . }}'\n    link_names: false\n  webhook_configs:\n  - send_resolved: true\n    http_config:\n      follow_redirects: true\n      enable_http2: true\n    url: <secret>\n    url_file: \"\"\n    max_alerts: 0\n- name: helixon-fleet-engram\n  webhook_configs:\n  - send_resolved: true\n    http_config:\n      follow_redirects: true\n      enable_http2: true\n    url: <secret>\n    url_file: \"\"\n    max_alerts: 0\n- name: helixon-fleet-llm\n  webhook_configs:\n  - send_resolved: true\n    http_config:\n      follow_redirects: true\n      enable_http2: true\n    url: <secret>\n    url_file: \"\"\n    max_alerts: 0\ntemplates: []\n"
+    },
+    "uptime": "2026-07-10T05:03:07.771+10:00",
+    "versionInfo": {
+        "branch": "HEAD",
+        "buildDate": "20240228-11:51:20",
+        "buildUser": "root@22cd11f671e9",
+        "goVersion": "go1.21.7",
+        "revision": "0aa3c2aad14cff039931923ab16b26b7481783b5",
+        "version": "0.27.0"
+    }
+}
+
+=== active alerts (none expected) ===
+[]

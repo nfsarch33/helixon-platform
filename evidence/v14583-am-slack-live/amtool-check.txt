@@ -1,0 +1,10 @@
+=== amtool check-config ===
+Checking '/home/jaslian/.config/alertmanager/alertmanager.yml'  SUCCESS
+Found:
+ - global config
+ - route
+ - 1 inhibit rules
+ - 4 receivers
+ - 0 templates
+
+exit: 0

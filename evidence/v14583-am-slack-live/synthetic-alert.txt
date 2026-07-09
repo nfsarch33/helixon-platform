@@ -1,0 +1,35 @@
+=== add synthetic FleetDoctorFailing alert ===
+
+=== alerts after post ===
+[
+    {
+        "annotations": {
+            "description": "Synthetic alert from v14583 to verify Slack routing config",
+            "summary": "Helixon fleet-doctor reported failures"
+        },
+        "endsAt": "2026-07-10T05:08:56.213+10:00",
+        "fingerprint": "55a18d88356048e1",
+        "receivers": [
+            {
+                "name": "helixon-fleet-critical"
+            }
+        ],
+        "startsAt": "2026-07-10T05:03:56.213+10:00",
+        "status": {
+            "inhibitedBy": [],
+            "silencedBy": [],
+            "state": "active"
+        },
+        "updatedAt": "2026-07-10T05:03:56.213+10:00",
+        "labels": {
+            "alertname": "FleetDoctorFailing",
+            "cluster": "wsl1",
+            "service": "fleet-doctor",
+            "severity": "critical"
+        }
+    }
+]
+=== notification log (Slack attempts) ===
+ls: cannot access '/home/jaslian/.local/share/alertmanager/nflog/': Not a directory
+
+=== nflog latest ===

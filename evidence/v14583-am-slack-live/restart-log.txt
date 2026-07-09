@@ -1,0 +1,30 @@
+=== before restart ===
+● alertmanager.service - Helixon AlertManager (v14547)
+     Loaded: loaded (/home/jaslian/.config/systemd/user/alertmanager.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-07-09 23:03:32 AEST; 5h 59min ago
+       Docs: https://prometheus.io/docs/alerting/latest/alertmanager/
+   Main PID: 3427988 (alertmanager)
+      Tasks: 18 (limit: 154372)
+     Memory: 14.3M (peak: 18.9M)
+        CPU: 1.368s
+     CGroup: /user.slice/user-1001.slice/user@1001.service/app.slice/alertmanager.service
+             └─3427988 /home/jaslian/local/bin/alertmanager --config.file=/home/jaslian/.config/alertmanager/alertmanager.yml --storage.path=/home/jaslian/.local/share/alertmanager --web.listen-address=127.0.0.1:9093 --cluster.listen-address=
+
+=== restart ===
+restart exit: 0
+
+=== after restart ===
+● alertmanager.service - Helixon AlertManager (v14547)
+     Loaded: loaded (/home/jaslian/.config/systemd/user/alertmanager.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-07-10 05:03:07 AEST; 3s ago
+       Docs: https://prometheus.io/docs/alerting/latest/alertmanager/
+   Main PID: 1805025 (alertmanager)
+      Tasks: 16 (limit: 154372)
+     Memory: 20.5M (peak: 20.7M)
+        CPU: 60ms
+     CGroup: /user.slice/user-1001.slice/user@1001.service/app.slice/alertmanager.service
+             └─1805025 /home/jaslian/local/bin/alertmanager --config.file=/home/jaslian/.config/alertmanager/alertmanager.yml --storage.path=/home/jaslian/.local/share/alertmanager --web.listen-address=127.0.0.1:9093 --cluster.listen-address=
+
+=== HTTP probe ===
+HTTP 200
+HTTP 200

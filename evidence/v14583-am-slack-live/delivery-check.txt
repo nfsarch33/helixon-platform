@@ -1,0 +1,39 @@
+=== alerts after 13s ===
+[
+    {
+        "annotations": {
+            "description": "Synthetic alert from v14583 to verify Slack routing config",
+            "summary": "Helixon fleet-doctor reported failures"
+        },
+        "endsAt": "2026-07-10T05:08:56.213+10:00",
+        "fingerprint": "55a18d88356048e1",
+        "receivers": [
+            {
+                "name": "helixon-fleet-critical"
+            }
+        ],
+        "startsAt": "2026-07-10T05:03:56.213+10:00",
+        "status": {
+            "inhibitedBy": [],
+            "silencedBy": [],
+            "state": "active"
+        },
+        "updatedAt": "2026-07-10T05:03:56.213+10:00",
+        "labels": {
+            "alertname": "FleetDoctorFailing",
+            "cluster": "wsl1",
+            "service": "fleet-doctor",
+            "severity": "critical"
+        }
+    }
+]
+
+=== alertmanager storage ===
+total 8
+drwxr-xr-x  2 jaslian jaslian 4096 Jul 10 05:03 .
+drwxrwxr-x 17 jaslian jaslian 4096 Jul  9 23:36 ..
+-rw-rw-r--  1 jaslian jaslian    0 Jul 10 05:03 nflog
+-rw-rw-r--  1 jaslian jaslian    0 Jul 10 05:03 silences
+
+=== alert silences ===
+[]

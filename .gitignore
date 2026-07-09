@@ -48,3 +48,6 @@ evidence/*/plaintext-scan*.json
 # 1Password full-item JSON (may contain CONCEALED values)
 evidence/**/op-item-full.json
 evidence/**/op-item-raw.json
+
+# AlertManager slack webhook URL (sensitive)
+/home/jaslian/.config/alertmanager/slack-webhook.url

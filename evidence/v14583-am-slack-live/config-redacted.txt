@@ -1,0 +1,63 @@
+# Helixon AlertManager configuration (v14547)
+# Routes alerts from the fleet's Prometheus instances to the helixon Telegram
+# channel and to syslog. No email / PagerDuty integration (per fleet policy).
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'helixon-fleet-default'
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: 'helixon-fleet-critical'
+      group_wait: 10s
+      repeat_interval: 1h
+    - matchers:
+        - service="engramd"
+      receiver: 'helixon-fleet-engram'
+    - matchers:
+        - service="llm-router"
+      receiver: 'helixon-fleet-llm'
+
+receivers:
+  - name: 'helixon-fleet-default'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest'
+        send_resolved: true
+
+  - name: 'helixon-fleet-critical'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest'
+        send_resolved: true
+    # Slack receiver placeholder — will be enabled once
+    # `SENTRUX_SLACK_WEBHOOK` is added to 1Password.
+    # Per `01-1password-uuid-required.mdc`, use UUID lookup, not display name.
+    # slack_configs:
+    #   - api_url_file: '%h/.config/alertmanager/slack-webhook.url'
+    #     channel: '#helixon-fleet-critical'
+    #     send_resolved: true
+    #     title: '{{ .CommonAnnotations.summary }}'
+    #     text: '{{ .CommonAnnotations.description }}'
+
+  - name: 'helixon-fleet-engram'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest?service=engramd'
+        send_resolved: true
+
+  - name: 'helixon-fleet-llm'
+    webhook_configs:
+      - url: 'http://127.0.0.1:7777/api/v1/alerts/ingest?service=llm-router'
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="Watchdog"
+    target_matchers:
+      - severity="critical"
+    equal: ['alertname', 'cluster', 'service']
+
