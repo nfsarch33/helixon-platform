@@ -1,0 +1,13 @@
+=== Push dashboards via Grafana API (DB provisioning) ===
+2026-07-09T22:57:33+10:00
+
+--- helixon-fleet-mesh-v14555-dashboard.json ---
+{"folderUid":"","id":4,"slug":"helixon-fleet-mesh-v14555","status":"success","uid":"cfrl9yngkwmwwb","url":"/d/cfrl9yngkwmwwb/helixon-fleet-mesh-v14555","version":1}
+
+--- qwen36-fleet-v14503-dashboard.json ---
+{"folderUid":"","id":5,"slug":"qwen3-6-fleet-v14503","status":"success","uid":"qwen36-fleet-v14503","url":"/d/qwen36-fleet-v14503/qwen3-6-fleet-v14503","version":1}
+
+--- helixon-commercialise-dashboard.json ---
+{"folderUid":"","id":6,"slug":"helixon-commercialise-readiness","status":"success","uid":"helixon-commercialise-readiness","url":"/d/helixon-commercialise-readiness/helixon-commercialise-readiness","v
+
+--- List dashboards via API ---

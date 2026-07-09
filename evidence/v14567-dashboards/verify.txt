@@ -1,0 +1,21 @@
+=== List dashboards ===
+[{"id":1,"uid":"agentrace-traces","title":"agentrace-traces","uri":"db/agentrace-traces","url":"/d/agentrace-traces/agentrace-traces","slug":"","type":"dash-db","tags":["agentrace","helixon","traces"],"isStarred":false,"sortMeta":0,"isDeleted":false},{"id":2,"uid":"control-plane","title":"control-plane","uri":"db/control-plane","url":"/d/control-plane/control-plane","slug":"","type":"dash-db","tags":["control-plane","helixon"],"isStarred":false,"sortMeta":0,"isDeleted":false},{"id":6,"uid":"helixon-commercialise-readiness","title":"Helixon Commercialise-Readiness","uri":"db/helixon-commercialise-readiness","url":"/d/helixon-commercialise-readiness/helixon-commercialise-readiness","slug":"","type":"dash-db","tags":["commercialise","helixon","shareholder"],"isStarred":false,"sortMeta":0,"isDeleted":false},{"id":4,"uid":"cfrl9yngkwmwwb","title":"Helixon Fleet Mesh (v14555)","uri":"db/helixon-fleet-mesh-v14555","url":"/d/cfrl9yngkwmwwb/helixon-fleet-mesh-v14555","slug":"","type":"dash-db","tags":["fleet","helixon","mesh"],"isStarred":false,"sortMeta":0,"isDeleted":false},{"id":5,"uid":"qwen36-fleet-v14503","title":"Qwen3.6 Fleet (v14503)","uri":"db/qwen3-6-fleet-v14503","url":"/d/qwen36-fleet-v14503/qwen3-6-fleet-v14503","slug":"","type":"dash-db","tags":["fleet","llm","qwen36","v14503"],"isStarred":false,"sortMeta":0,"isDeleted":false},{"id":3,"uid":"qwen36-fleet","title":"qwen36-fleet","uri":"db/qwen36-fleet","url":"/d/qwen36-fleet/qwen36-fleet","slug":"","type":"dash-db","tags":["fleet","helixon","qwen36"],"isStarred":false,"sortMeta":0,"isDeleted":false}]
+
+=== helixon-fleet-mesh-v14555 details ===
+title: Helixon Fleet Mesh (v14555)
+panels: 7
+  panel: id=None title=Fleet node reachability (Tailscale ping) type=stat
+  panel: id=None title=Mesh latency (win1/wsl1 → peer, ms) type=timeseries
+  panel: id=None title=Fleet service health (svcregistryd) type=stat
+  panel: id=None title=Service registry registrations (per minute) type=timeseries
+  panel: id=None title=Agentrace events / minute type=timeseries
+  panel: id=None title=Evospine cycles completed / day type=stat
+  panel: id=None title=AlertManager alerts by status type=timeseries
+
+=== qwen3-6-fleet-v14503 details ===
+title: Qwen3.6 Fleet (v14503)
+panels: 7
+
+=== helixon-commercialise-readiness details ===
+title: Helixon Commercialise-Readiness
+panels: 6

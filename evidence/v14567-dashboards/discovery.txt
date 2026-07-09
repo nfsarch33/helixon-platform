@@ -1,0 +1,25 @@
+=== Existing Grafana dashboards ===
+2026-07-09T22:56:08+10:00
+
+--- helixon-fleet-mesh-v14555-dashboard.json ---
+total 20
+drwxr-xr-x  2 jaslian jaslian 4096 Jul  9 19:16 .
+drwxrwxr-x 98 jaslian jaslian 4096 Jul  9 18:56 ..
+-rw-r--r--  1 jaslian jaslian 2191 Jul  8 15:23 helixon-commercialise-dashboard.json
+-rw-r--r--  1 jaslian jaslian 3103 Jul  9 19:16 helixon-fleet-mesh-v14555-dashboard.json
+-rwxr-xr-x  1 jaslian jaslian 2364 Jul  8 20:53 qwen36-fleet-v14503-dashboard.json
+
+--- helixon-platform observability grafana ---
+total 12
+drwxr-xr-x 3 jaslian jaslian 4096 Jul  9 02:42 .
+drwxr-xr-x 6 jaslian jaslian 4096 Jul  9 19:16 ..
+drwxr-xr-x 2 jaslian jaslian 4096 Jul  9 02:42 dashboards
+
+--- existing grafana provisioning ---
+total 16
+drwxr-xr-x 4 jaslian jaslian 4096 Jul  9 02:42 .
+drwxr-xr-x 6 jaslian jaslian 4096 Jul  9 19:16 ..
+drwxr-xr-x 2 jaslian jaslian 4096 Jul  9 02:42 dashboards
+drwxr-xr-x 2 jaslian jaslian 4096 Jul  9 02:42 datasources
+
+--- Pre-existing dashboards in Grafana ---

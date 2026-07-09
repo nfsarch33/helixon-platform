@@ -1,0 +1,32 @@
+=== Provision dashboards ===
+2026-07-09T22:57:03+10:00
+--- check existing dashboards mounted ---
+total 8
+drwxr-xr-x    2 root     root          4096 Jul  9 12:52 .
+drwxrwxrwx    8 grafana  root          4096 Jul  9 12:57 ..
+
+--- check provisioning dir in container ---
+Error: can only create exec sessions on running containers: container state improper
+
+--- Copy dashboards to existing Grafana data dir ---
+Error: 2 errors occurred:
+	* copying to container: copier: put: error creating "/var/lib/grafana/dashboards/helixon-fleet-mesh-v14555-dashboard.json": copier: put: error opening file "/var/lib/grafana/dashboards/helixon-fleet-mesh-v14555-dashboard.json" for writing: open /var/lib/grafana/dashboards/helixon-fleet-mesh-v14555-dashboard.json: read-only file system
+	* copying from host: copier: get: "/home/jaslian/Code/cursor-global-kb/grafana/helixon-fleet-mesh-v14555-dashboard.json": copying /home/jaslian/Code/cursor-global-kb/grafana/helixon-fleet-mesh-v14555-dashboard.json: io: read/write on closed pipe
+Error: 2 errors occurred:
+	* copying to container: copier: put: error creating "/var/lib/grafana/dashboards/helixon-commercialise-dashboard.json": copier: put: error opening file "/var/lib/grafana/dashboards/helixon-commercialise-dashboard.json" for writing: open /var/lib/grafana/dashboards/helixon-commercialise-dashboard.json: read-only file system
+	* copying from host: copier: get: "/home/jaslian/Code/cursor-global-kb/grafana/helixon-commercialise-dashboard.json": copying /home/jaslian/Code/cursor-global-kb/grafana/helixon-commercialise-dashboard.json: io: read/write on closed pipe
+
+--- Verify copy ---
+total 12
+drwxr-xr-x    2 root     root          4096 Jul  9 12:57 .
+drwxrwxrwx    8 grafana  root          4096 Jul  9 12:57 ..
+-rwxr-xr-x    1 grafana  root          2364 Jul  8 10:53 qwen36-fleet-v14503-dashboard.json
+
+--- Trigger provisioning reload via admin API ---
+{"message":"Dashboards config reloaded"}
+--- Trigger datasources reload ---
+{"message":"Datasources config reloaded"}
+--- List dashboards via API ---
+
+--- List datasources ---
+[{"id":1,"uid":"prometheus","orgId":1,"name":"Prometheus","type":"prometheus","typeName":"Prometheus","typeLogoUrl":"public/app/plugins/datasource/prometheus/img/prometheus_logo.svg","access":"proxy","url":"http://prometheus:9090","user":"","database":"","basicAuth":false,"isDefault":true,"jsonData":{"httpMethod":"POST","timeInterval":"30s"},"readOnly":false}]
