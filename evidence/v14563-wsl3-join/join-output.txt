@@ -1,0 +1,26 @@
+=== Execute with sudo on wsl3 ===
+[sudo] password for jason: [INFO]  Finding release for channel stable
+[INFO]  Using v1.36.2+k3s1 as release
+[INFO]  Downloading hash https://github.com/k3s-io/k3s/releases/download/v1.36.2%2Bk3s1/sha256sum-amd64.txt
+[INFO]  Downloading binary https://github.com/k3s-io/k3s/releases/download/v1.36.2%2Bk3s1/k3s
+[INFO]  Verifying binary download
+[INFO]  Installing k3s to /usr/local/bin/k3s
+[INFO]  Skipping installation of SELinux RPM
+[INFO]  Skipping /usr/local/bin/kubectl symlink to k3s, already exists
+[INFO]  Skipping /usr/local/bin/crictl symlink to k3s, already exists
+[INFO]  Skipping /usr/local/bin/ctr symlink to k3s, command exists in PATH at /usr/bin/ctr
+[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh
+[INFO]  Creating uninstall script /usr/local/bin/k3s-agent-uninstall.sh
+[INFO]  env: Creating environment file /etc/systemd/system/k3s-agent.service.env
+[INFO]  systemd: Creating service file /etc/systemd/system/k3s-agent.service
+[INFO]  systemd: Enabling k3s-agent unit
+Created symlink /etc/systemd/system/multi-user.target.wants/k3s-agent.service → /etc/systemd/system/k3s-agent.service.
+[INFO]  systemd: Starting k3s-agent
+Job for k3s-agent.service failed because the control process exited with error code.
+See "systemctl status k3s-agent.service" and "journalctl -xeu k3s-agent.service" for details.
+
+=== Status after join ===
+NAME              STATUS   ROLES           AGE     VERSION        INTERNAL-IP     EXTERNAL-IP     OS-IMAGE             KERNEL-VERSION                              CONTAINER-RUNTIME
+desktop-0s5prj9   Ready    <none>          10h     v1.36.2+k3s1   192.168.4.64    100.79.227.40   Ubuntu 24.04.4 LTS   6.6.114.1-microsoft-standard-WSL2 (amd64)   containerd://2.3.2-k3s2
+desktop-12ro1af   Ready    control-plane   11h     v1.36.2+k3s1   172.29.144.56   <none>          Ubuntu 24.04.4 LTS   6.18.33.2-microsoft-standard-WSL2 (amd64)   containerd://2.3.2-k3s2
+desktop-p5bul0f   Ready    <none>          7h28m   v1.36.2+k3s1   100.79.227.40   100.79.227.40   Ubuntu 24.04.4 LTS   6.18.33.1-microsoft-standard-WSL2 (amd64)   containerd://2.3.2-k3s2

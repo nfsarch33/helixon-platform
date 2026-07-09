@@ -1,0 +1,45 @@
+=== Status of k3s-agent on wsl3 ===
+[sudo] password for jason: ● k3s-agent.service - Lightweight Kubernetes
+     Loaded: loaded (/etc/systemd/system/k3s-agent.service; enabled; preset: enabled)
+     Active: activating (auto-restart) (Result: exit-code) since Thu 2026-07-09 22:33:51 AEST; 351ms ago
+       Docs: https://k3s.io
+    Process: 2156914 ExecStartPre=/sbin/modprobe br_netfilter (code=exited, status=0/SUCCESS)
+    Process: 2156916 ExecStartPre=/sbin/modprobe overlay (code=exited, status=0/SUCCESS)
+    Process: 2156917 ExecStart=/usr/local/bin/k3s agent --server https://100.84.108.92:6443 --token K10ef93e9f9d423a4089885f7f8646f0f909adae55c58bf151755ad43d347462034::server:60f395e9aca42e3ac1daf19775fdaf8c --node-name wsl3 --node-label helixon.io/node-alias=wsl3 --node-label helixon.io/role=dev-planning --node-label helixon.io/gpu=rtx5070ti --flannel-iface eth0 (code=exited, status=1/FAILURE)
+   Main PID: 2156917 (code=exited, status=1/FAILURE)
+        CPU: 137ms
+
+=== Journal of k3s-agent on wsl3 ===
+[sudo] password for jason: Jul 09 22:33:36 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Main process exited, code=exited, status=1/FAILURE
+Jul 09 22:33:36 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Failed with result 'exit-code'.
+Jul 09 22:33:36 LAPTOP-QBF2FULS systemd[1]: Failed to start k3s-agent.service - Lightweight Kubernetes.
+Jul 09 22:33:41 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Scheduled restart job, restart counter is at 7.
+Jul 09 22:33:41 LAPTOP-QBF2FULS systemd[1]: Starting k3s-agent.service - Lightweight Kubernetes...
+Jul 09 22:33:41 LAPTOP-QBF2FULS k3s[2156835]: time="2026-07-09T22:33:41+10:00" level=info msg="Found ip 172.20.113.115 from iface eth0"
+Jul 09 22:33:41 LAPTOP-QBF2FULS k3s[2156835]: time="2026-07-09T22:33:41+10:00" level=info msg="Starting k3s agent v1.36.2+k3s1 (01b6f04a)"
+Jul 09 22:33:41 LAPTOP-QBF2FULS k3s[2156835]: time="2026-07-09T22:33:41+10:00" level=warning msg="Error starting load balancer: listen tcp 127.0.0.1:6444: bind: address already in use"
+Jul 09 22:33:41 LAPTOP-QBF2FULS k3s[2156835]: time="2026-07-09T22:33:41+10:00" level=fatal msg="Error: listen tcp 127.0.0.1:6444: bind: address already in use"
+Jul 09 22:33:41 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Main process exited, code=exited, status=1/FAILURE
+Jul 09 22:33:41 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Failed with result 'exit-code'.
+Jul 09 22:33:41 LAPTOP-QBF2FULS systemd[1]: Failed to start k3s-agent.service - Lightweight Kubernetes.
+Jul 09 22:33:46 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Scheduled restart job, restart counter is at 8.
+Jul 09 22:33:46 LAPTOP-QBF2FULS systemd[1]: Starting k3s-agent.service - Lightweight Kubernetes...
+Jul 09 22:33:46 LAPTOP-QBF2FULS k3s[2156874]: time="2026-07-09T22:33:46+10:00" level=info msg="Found ip 172.20.113.115 from iface eth0"
+Jul 09 22:33:46 LAPTOP-QBF2FULS k3s[2156874]: time="2026-07-09T22:33:46+10:00" level=info msg="Starting k3s agent v1.36.2+k3s1 (01b6f04a)"
+Jul 09 22:33:46 LAPTOP-QBF2FULS k3s[2156874]: time="2026-07-09T22:33:46+10:00" level=warning msg="Error starting load balancer: listen tcp 127.0.0.1:6444: bind: address already in use"
+Jul 09 22:33:46 LAPTOP-QBF2FULS k3s[2156874]: time="2026-07-09T22:33:46+10:00" level=fatal msg="Error: listen tcp 127.0.0.1:6444: bind: address already in use"
+Jul 09 22:33:46 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Main process exited, code=exited, status=1/FAILURE
+Jul 09 22:33:46 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Failed with result 'exit-code'.
+Jul 09 22:33:46 LAPTOP-QBF2FULS systemd[1]: Failed to start k3s-agent.service - Lightweight Kubernetes.
+Jul 09 22:33:51 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Scheduled restart job, restart counter is at 9.
+Jul 09 22:33:51 LAPTOP-QBF2FULS systemd[1]: Starting k3s-agent.service - Lightweight Kubernetes...
+Jul 09 22:33:51 LAPTOP-QBF2FULS k3s[2156917]: time="2026-07-09T22:33:51+10:00" level=info msg="Found ip 172.20.113.115 from iface eth0"
+Jul 09 22:33:51 LAPTOP-QBF2FULS k3s[2156917]: time="2026-07-09T22:33:51+10:00" level=info msg="Starting k3s agent v1.36.2+k3s1 (01b6f04a)"
+Jul 09 22:33:51 LAPTOP-QBF2FULS k3s[2156917]: time="2026-07-09T22:33:51+10:00" level=warning msg="Error starting load balancer: listen tcp 127.0.0.1:6444: bind: address already in use"
+Jul 09 22:33:51 LAPTOP-QBF2FULS k3s[2156917]: time="2026-07-09T22:33:51+10:00" level=fatal msg="Error: listen tcp 127.0.0.1:6444: bind: address already in use"
+Jul 09 22:33:51 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Main process exited, code=exited, status=1/FAILURE
+Jul 09 22:33:51 LAPTOP-QBF2FULS systemd[1]: k3s-agent.service: Failed with result 'exit-code'.
+Jul 09 22:33:51 LAPTOP-QBF2FULS systemd[1]: Failed to start k3s-agent.service - Lightweight Kubernetes.
+
+=== /etc/systemd/system/k3s-agent.service.env ===
+cat: /etc/systemd/system/k3s-agent.service.env: Permission denied

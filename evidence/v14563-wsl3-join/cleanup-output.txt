@@ -1,0 +1,21 @@
++ grep -v KUBE-
++ iptables-restore
++ grep -v CNI-
++ grep -iv flannel
++ ip6tables-save
++ grep -v KUBE-
++ grep -v CNI-
++ ip6tables-restore
++ grep -iv NAME              STATUS     ROLES           A[sudo] password for jason: === Sleep + status ===
+[sudo] password for jason: active
+---
+LISTEN 0      4096                     127.0.0.1:6444       0.0.0.0:*                                             
+LISTEN 0      4096                             *:10250            *:*                                             
+LISTEN 0      4096                         [::1]:6444          [::]:*                                             
+
+=== Nodes from wsl1 ===
+NAME              STATUS   ROLES           AGE     VERSION        INTERNAL-IP      EXTERNAL-IP     OS-IMAGE             KERNEL-VERSION                              CONTAINER-RUNTIME
+desktop-0s5prj9   Ready    <none>          10h     v1.36.2+k3s1   192.168.4.64     100.79.227.40   Ubuntu 24.04.4 LTS   6.6.114.1-microsoft-standard-WSL2 (amd64)   containerd://2.3.2-k3s2
+desktop-12ro1af   Ready    control-plane   11h     v1.36.2+k3s1   172.29.144.56    <none>          Ubuntu 24.04.4 LTS   6.18.33.2-microsoft-standard-WSL2 (amd64)   containerd://2.3.2-k3s2
+desktop-p5bul0f   Ready    <none>          7h34m   v1.36.2+k3s1   100.79.227.40    100.79.227.40   Ubuntu 24.04.4 LTS   6.18.33.1-microsoft-standard-WSL2 (amd64)   containerd://2.3.2-k3s2
+wsl3              Ready    <none>          4m19s   v1.36.2+k3s1   172.20.113.115   <none>          Ubuntu 24.04.4 LTS   6.6.114.1-microsoft-standard-WSL2 (amd64)   containerd://2.3.2-k3s2
