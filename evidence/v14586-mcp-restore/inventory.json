@@ -1,0 +1,298 @@
+{
+  "timestamp": "2026-07-09T20:26:26.443787+00:00",
+  "win1_path": "/mnt/c/Users/jaslian.DESKTOP-12RO1AF/.cursor/mcp.json",
+  "wsl1_path": "/home/jaslian/.cursor/mcp.json",
+  "win1_server_count": 20,
+  "wsl1_server_count": 39,
+  "operator_approved": [
+    {
+      "operator_name": "user-user-time",
+      "live_name": "user-time",
+      "win1": {
+        "present": true,
+        "disabled": false,
+        "command": "/home/jaslian/.local/bin/uvx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": false,
+        "command": "/home/jaslian/.local/bin/uvx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-sequential-thinking",
+      "live_name": "user-sequential-thinking",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-fetch",
+      "live_name": "user-fetch",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-duckduckgo",
+      "live_name": "user-duckduckgo",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-playwright",
+      "live_name": "user-playwright",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-obs",
+      "live_name": "user-obs",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-engram-oss-legacy",
+      "live_name": "user-engram-oss-legacy",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/echo"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/echo"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-git-mcp-server",
+      "live_name": "user-git-mcp-server",
+      "win1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-github-official",
+      "live_name": "user-github-official",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-atlassian-jira",
+      "live_name": "user-atlassian-jira",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/docker"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-perplexity-ask",
+      "live_name": "user-perplexity-ask",
+      "win1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-context7",
+      "live_name": "user-context7",
+      "win1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-allPepper-memory-bank",
+      "live_name": "user-allPepper-memory-bank",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-memory",
+      "live_name": "user-memory",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-google-scholar",
+      "live_name": "user-google-scholar",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/home/jaslian/.local/bin/uv"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/home/jaslian/.local/bin/uv"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-wolfram-alpha",
+      "live_name": "user-wolfram-alpha",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-word-document-server",
+      "live_name": "user-word-document-server",
+      "win1": {
+        "present": true,
+        "disabled": true,
+        "command": "/home/jaslian/.local/bin/uvx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": true,
+        "command": "/home/jaslian/.local/bin/uvx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-chrome-devtools",
+      "live_name": "user-chrome-devtools",
+      "win1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    },
+    {
+      "operator_name": "user-user-context-mode",
+      "live_name": "user-context-mode",
+      "win1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "wsl1": {
+        "present": true,
+        "disabled": false,
+        "command": "/usr/bin/npx"
+      },
+      "restore_needed": false
+    }
+  ],
+  "cursor_app_control": {
+    "note": "Cursor app control MCP is registered in the Cursor app itself, not in mcp.json",
+    "status": "available"
+  }
+}
