@@ -1,0 +1,25 @@
+=== Synthetic FleetDoctorFailing alert (retry with fleet-doctor.timer) ===
+2026-07-09T23:07:31+10:00
+
+--- Stop fleet-doctor.timer ---
+inactive
+
+--- POST FleetDoctorFailing alert ---
+
+
+--- Verify alert is active ---
+  alertname=FleetDoctorFailing severity=critical state=active
+
+--- Alert JSON (full) ---
+-rw-r--r-- 1 jaslian jaslian 630 Jul  9 23:07 /home/jaslian/Code/helixon-platform/evidence/v14569-on-call/synthetic-fail.json
+
+--- Restore fleet-doctor.timer ---
+active
+
+--- DELETE the test alert to silence it ---
+fingerprint=8aa3b7af8af6700b
+curl: (22) The requested URL returned error: 404
+404
+
+--- Final alert list ---
+remaining active alerts: 1

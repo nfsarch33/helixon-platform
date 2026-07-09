@@ -1,0 +1,26 @@
+{
+  "annotations": {
+    "description": "fleet-doctor.timer was stopped to trigger this alert",
+    "summary": "Synthetic v14569 test alert"
+  },
+  "endsAt": "2026-07-09T23:12:32.355+10:00",
+  "fingerprint": "8aa3b7af8af6700b",
+  "receivers": [
+    {
+      "name": "helixon-fleet-critical"
+    }
+  ],
+  "startsAt": "2026-07-09T23:06:07.615+10:00",
+  "status": {
+    "inhibitedBy": [],
+    "silencedBy": [],
+    "state": "active"
+  },
+  "updatedAt": "2026-07-09T23:07:32.355+10:00",
+  "labels": {
+    "alertname": "FleetDoctorFailing",
+    "host": "desktop-12ro1af",
+    "service": "fleet-doctor",
+    "severity": "critical"
+  }
+}
