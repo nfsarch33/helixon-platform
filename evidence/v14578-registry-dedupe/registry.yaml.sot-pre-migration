@@ -1,0 +1,937 @@
+schema_version: 1
+registry_version: 0.1.0-v14540
+registry_id: helixon-services
+fleet: helixon
+operator: jaslian
+central_node: wsl1
+updated: '2026-07-09T14:40:00+10:00'
+source_files:
+- inventory/fleet/nodes.yaml
+- scripts/fleet/qwen36-matrix.yaml
+- configs/llm-cluster-router.yml
+- inventory/1password/items.csv
+- sop/install-tier1-toolchain.md
+- sop/install-tier2-binaries.md
+services:
+- name: engramd
+  kind: memory-server
+  primary_node: wsl1
+  address: 127.0.0.1
+  port: 8280
+  health_path: /healthz
+  binary: ~/local/bin/engramd
+  owner_sprint: v14532
+  source: sop/engram-install-wsl1.md
+  tags:
+  - memory
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: engramd-mem0compat
+  kind: memory-server-mem0
+  primary_node: wsl1
+  address: 127.0.0.1
+  port: 8281
+  health_path: /healthz
+  binary: ~/local/bin/engramd --mem0-compat
+  owner_sprint: v14532
+  source: sop/engram-install-wsl1.md
+  tags:
+  - memory
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: sprintboard-api
+  kind: sprint-server
+  primary_node: wsl1
+  address: 127.0.0.1
+  port: 9400
+  health_path: /healthz
+  binary: ~/local/bin/sprintboard-api
+  owner_sprint: v14533
+  source: sop/sprintboard-install.md
+  tags:
+  - sprint
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: sprintboard-mcp
+  kind: mcp-server
+  primary_node: wsl1
+  address: 127.0.0.1:9401
+  port: 9401
+  health_path: null
+  binary: ~/local/bin/sprintboard-mcp
+  owner_sprint: v14533
+  source: sop/sprintboard-install.md
+  tags:
+  - mcp
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+  note: stdio MCP over TCP fallback
+- name: llm-cluster-router
+  kind: llm-router
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 8787
+  health_path: /health
+  binary: ~/local/bin/llm-cluster-router
+  owner_sprint: v14534
+  source: configs/llm-cluster-router.yml
+  tags:
+  - llm
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: llm-cluster-router-metrics
+  kind: metrics
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 9091
+  health_path: /metrics
+  binary: ~/local/bin/llm-cluster-router
+  owner_sprint: v14534
+  source: configs/llm-cluster-router.yml
+  tags:
+  - metrics
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: llm-cluster-router-debug
+  kind: pprof
+  primary_node: wsl1
+  address: 127.0.0.1
+  port: 6060
+  health_path: /debug/pprof/
+  binary: ~/local/bin/llm-cluster-router
+  owner_sprint: v14534
+  source: configs/llm-cluster-router.yml
+  tags:
+  - pprof
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: llama-server-c7-q8
+  kind: llm-cell
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 8010
+  health_path: /health
+  binary: ~/local/lib/llama/llama-server
+  owner_sprint: v14530
+  source: scripts/fleet/qwen36-matrix.yaml#C7
+  tags:
+  - llm
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: llama-server-c2-q4
+  kind: llm-cell
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 8011
+  health_path: /health
+  binary: ~/local/lib/llama/llama-server
+  owner_sprint: v14530
+  source: scripts/fleet/qwen36-matrix.yaml#C2
+  tags:
+  - llm
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: vllm-c1-awq
+  kind: llm-cell
+  primary_node: wsl4
+  address: 0.0.0.0
+  port: 8004
+  health_path: /health
+  binary: vllm (deferred CF-v14534-01)
+  owner_sprint: v14534
+  source: scripts/fleet/qwen36-matrix.yaml#C1
+  tags:
+  - llm
+  - wsl4
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: ollama-embed-c6
+  kind: embedding-server
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 11434
+  health_path: /api/tags
+  binary: ollama
+  owner_sprint: v14531
+  source: scripts/fleet/qwen36-matrix.yaml#C6
+  tags:
+  - embedding
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: prometheus
+  kind: metrics-tsdb
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 9090
+  health_path: /-/healthy
+  binary: prometheus
+  owner_sprint: v14538
+  source: observability/prometheus.yml
+  tags:
+  - metrics
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: grafana
+  kind: dashboard
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 3000
+  health_path: /api/health
+  binary: grafana-server
+  owner_sprint: v14538
+  source: observability/grafana-provisioning/
+  tags:
+  - dashboard
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: alertmanager
+  kind: alert-router
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 9093
+  health_path: /-/healthy
+  binary: alertmanager
+  owner_sprint: v14538
+  source: observability/alertmanager.yml
+  tags:
+  - alert
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: k3s-server
+  kind: k8s-control-plane
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 6443
+  health_path: /readyz
+  binary: k3s server
+  owner_sprint: v14528
+  source: sop/k3s-install-wsl1.md
+  tags:
+  - k8s
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+- name: ssh-fleet-lan
+  kind: ssh
+  primary_node: wsl1
+  address: 0.0.0.0
+  port: 22
+  health_path: null
+  binary: /usr/sbin/sshd
+  owner_sprint: v14524
+  source: sop/fleet-ssh-fanout.md
+  tags:
+  - ssh
+  - wsl1
+  status: registered
+  registered_at: '2026-07-09T14:40:00+10:00'
+nodes:
+- alias: wsl1
+  canonical_hostname: desktop-12ro1af-wsl1
+  tailscale_ip: 100.84.108.92
+  os: ubuntu-24.04-wsl2
+  user: jaslian
+  ssh_port: 22
+  role: central-node
+  gpus:
+  - rtx3090:2
+  - rtx2070:1
+  notes: 'Win1/wsl1 = Helixon central processing node.
+
+    Hosts: k3s control plane (v14528), engramd :8280/:8281 (v14532),
+
+    sprintboard-mcp :9400 (v14533), llm-cluster-router :8787 (v14534),
+
+    qwen36-27b-mtp-q8 on dual RTX 3090 (v14530), nomic-embed on RTX 2070 (v14531).'
+- alias: win1
+  canonical_hostname: desktop-12ro1af-win1
+  tailscale_ip: 100.119.60.6
+  os: windows-11-25h2
+  user: jaslian
+  ssh_port: 22
+  role: central-host
+  gpus: null
+  notes: "Windows host for wsl1. Cursor IDE runs here; WSL integration wires to wsl1.\n\
+    No SSH from wsl1\u2192win1 (WSL2 mirror networking); use wsl.exe for setup."
+- alias: wsl2
+  canonical_hostname: desktop-0s5prj9-1-wsl2
+  tailscale_ip: 100.110.82.5
+  os: ubuntu-wsl2
+  user: jason
+  ssh_port: 2233
+  role: secondary-node
+  gpus: null
+  notes: 'Win2/wsl2 = mirror of central-node; currently hosts CI/CD + Engram.
+
+    Inherits all roles from wsl1 once mirror completes (post-v14538).'
+- alias: win2
+  canonical_hostname: desktop-0s5prj9-win2
+  tailscale_ip: 100.100.103.106
+  os: windows-11-24h2
+  user: jason
+  ssh_port: 22
+  role: secondary-host
+  gpus: null
+  notes: ''
+- alias: wsl4
+  canonical_hostname: desktop-p5bul0f-wsl4
+  tailscale_ip: 100.79.227.40
+  os: ubuntu-wsl2
+  user: jason
+  ssh_port: 2233
+  role: llm-node
+  gpus:
+  - rtx3090:1
+  notes: 'LLM node: install qwen3.6-27b GGUF (v14530 carry-forward) and wire to llm-cluster-router.'
+- alias: win4
+  canonical_hostname: desktop-p5bul0f-win4
+  tailscale_ip: 100.93.107.109
+  os: windows-11-24h2
+  user: jason
+  ssh_port: 22
+  role: llm-host
+  gpus: null
+  notes: ''
+- alias: wsl3
+  canonical_hostname: laptop-qbf2fuls-wsl3
+  tailscale_ip: 100.73.98.10
+  os: ubuntu-wsl2
+  user: jason
+  ssh_port: 22
+  role: dev-planning
+  gpus:
+  - rtx5070ti:1
+  notes: 'Win3 = keynear (Windows user) / jason (WSL user). Main dev/planning node.
+
+    Connects to all helixon nodes.'
+- alias: win3
+  canonical_hostname: laptop-qbf2fuls-win3
+  tailscale_ip: 100.101.215.57
+  os: windows-11-25h2
+  user: keynear
+  ssh_port: 22
+  role: dev-host
+  gpus: null
+  notes: "SSH from a Windows host uses wsl.exe (e.g. from Win3 \u2192 wsl3)."
+- alias: oracle-jump
+  canonical_hostname: oracle-jump
+  tailscale_ip: 100.93.242.75
+  os: oracle-linux
+  user: ubuntu
+  ssh_port: 22
+  role: proxy-jump
+  gpus: null
+  notes: Ephemeral Oracle Linux jump box. SSH proxy via `ssh -J jason@oracle-jump
+    <target>`.
+- alias: oci-sydney-jump
+  canonical_hostname: oci-sydney-jump
+  tailscale_ip: 100.124.160.73
+  os: oracle-linux
+  user: ubuntu
+  ssh_port: 22
+  role: proxy-jump-alt
+  gpus: null
+  notes: Sydney OCI jump box (mostly offline). Use oracle-jump as primary proxy.
+- alias: jasnas3001
+  canonical_hostname: jasnas3001
+  tailscale_ip: 100.103.140.10
+  os: linux-nas
+  user: jaslian
+  ssh_port: 22
+  role: nas-storage
+  gpus: null
+  notes: NAS. sshd not running (connection refused). Deferred per operator.
+- alias: msi
+  canonical_hostname: msi
+  tailscale_ip: 100.71.148.74
+  os: windows-11-25h2
+  user: jason
+  ssh_port: 22
+  role: deferred
+  gpus: null
+  notes: In China. Deferred per operator.
+- alias: iphone172
+  canonical_hostname: iphone172
+  tailscale_ip: 100.89.46.96
+  os: ios-26
+  user: jaslian
+  ssh_port: null
+  role: mobile
+  gpus: null
+  notes: Personal phone. Not a fleet node. Excluded from agent workloads.
+- alias: players-aerq61a
+  canonical_hostname: players-aerq61a
+  tailscale_ip: 100.79.23.118
+  os: windows-11-23h2
+  user: jason
+  ssh_port: 22
+  role: retired
+  gpus: null
+  notes: Old desktop. Mostly offline. Retired per operator.
+llm_cells:
+- cell_id: C7
+  node: wsl1
+  gpu_class: rtx3090-dual
+  gpu_slot: gpu0,gpu1
+  model_id: qwen36-27b-mtp-q8
+  repo: unsloth/Qwen3.6-27B-MTP-GGUF
+  file: Qwen3.6-27B-Q8_0.gguf
+  engine: llama-server
+  host_port: 8010
+  max_model_len: 65536
+  status: ready
+  openai_compat_url: http://localhost:8010/v1
+  notes: 'Tier 0-3 routing primary. Default cell for the Helixon central node.
+
+    Tailscale hostname: wsl1.tail447712.ts.net
+
+    OpenAI-compatible API: POST /v1/chat/completions'
+- cell_id: C2
+  node: wsl1
+  gpu_class: rtx3090
+  gpu_slot: gpu0
+  model_id: qwen36-27b-q4
+  repo: unsloth/Qwen3.6-27B-GGUF
+  file: Qwen3.6-27B-Q4_K_M.gguf
+  engine: llama-server
+  host_port: 8011
+  max_model_len: 32768
+  status: ready
+  openai_compat_url: http://localhost:8011/v1
+  notes: 'Faster, lower-quality variant for draft/iterative work.
+
+    Use for C2-tier routing when ctx < 32k.'
+- cell_id: C1
+  node: wsl4
+  gpu_class: rtx3090
+  gpu_slot: gpu0
+  model_id: qwen36-27b-int4
+  repo: cyankiwi/Qwen3.6-27B-AWQ-INT4
+  file: null
+  engine: vllm
+  host_port: 8004
+  max_model_len: 65536
+  status: not_yet
+  openai_compat_url: http://localhost:8004/v1
+  notes: AWQ-INT4 quant for vLLM serving on wsl4. Defer to CF-v14534-01 (peer GPU).
+- cell_id: C6
+  node: wsl1
+  gpu_class: rtx2070
+  gpu_slot: gpu2
+  model_id: nomic-embed-text-v1.5
+  repo: nomic-ai/nomic-embed-text-v1.5-GGUF
+  file: null
+  engine: ollama
+  host_port: 11434
+  max_model_len: 8192
+  status: ready
+  openai_compat_url: http://localhost:11434/v1
+  notes: 'Used by Engram embedding pipeline. RTX 2070 is dedicated to embedding
+
+    to avoid contention with Qwen3.6 Q8_0 on the dual 3090.'
+credentials_index:
+- id: 6ebi3ccm3xrji7yniqacdq4oqq
+  title: github pat nfsarch33 win3/wsl3
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 2
+  op_uri: op://Cursor_IronClaw/github pat nfsarch33 win3/wsl3
+- id: 6frr5lxereqjvzs64cfzrt45ey
+  title: oci-tokyo-api-key
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 2
+  op_uri: op://Cursor_IronClaw/oci-tokyo-api-key
+- id: 7plsotwmnuc4s3kevyvstaoqua
+  title: Telegram Bot - Cursor WSL1
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Telegram Bot - Cursor WSL1
+- id: 7w7iwwwkx55u27qcddr6prwv4m
+  title: '1password op Service Account Auth Token: win1/wsl1'
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: 'op://Cursor_IronClaw/1password op Service Account Auth Token: win1/wsl1'
+- id: 55z2jgso2aefsu6ropoxiip4by
+  title: MSI Win PC WSL Ubuntu Login
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/MSI Win PC WSL Ubuntu Login
+- id: 3yc3u4ivnapdddjqt2extury2e
+  title: id_ed25519_wsl2_fleet.pub from wsl1
+  category: SSH_KEY
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/id_ed25519_wsl2_fleet.pub from wsl1
+- id: 62ruxw2zud5fp7jpxgi2cgjb64
+  title: github pat
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/github pat
+- id: hblg7fxbhxnlmnv3us3i6jo2wu
+  title: minimax-api-2
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 4
+  op_uri: op://Cursor_IronClaw/minimax-api-2
+- id: 2nnaxyj7w3zfcohinoacgsc4ja
+  title: oracle.com syd
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 5
+  op_uri: op://Cursor_IronClaw/oracle.com syd
+- id: 62hsrafqwghfz7kdz3b5qucgqy
+  title: Grafana Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Grafana Fleet (wsl1)
+- id: 63kyxmei7jyaiepnqs4a3dv42q
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: 43zuyrxjg5brxfuah4tzytc6zy
+  title: litellm-master-key
+  category: PASSWORD
+  vault: Cursor_IronClaw
+  version: 3
+  op_uri: op://Cursor_IronClaw/litellm-master-key
+- id: 5kuknlit5ioo37t4guxq7mbngi
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: 3sk5mfxk3pcyaafpq4l5jbth2u
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: 23ad5gtlh7yxz7hu2xcuvo2ewu
+  title: Resend xiuyingni81@gmail.com
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Resend xiuyingni81@gmail.com
+- id: 5vijnmow7o47mz3ceg4x5co5pe
+  title: Prometheus Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Prometheus Fleet (wsl1)
+- id: zzvrihqejvqivwswlsbncbtfda
+  title: Perplexity embedding API key - keynear@hotmail.com
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Perplexity embedding API key - keynear@hotmail.com
+- id: 45bc7cme577igawch55qqbptdi
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: 5won46qifska3q24i5sqhpqlbq
+  title: Brevo info@oztac 300 daily limit
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Brevo info@oztac 300 daily limit
+- id: dgj4a6rw6ewdvl5gic3ss7ddmq
+  title: ZD Claude Code AI Gateway bedrock
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/ZD Claude Code AI Gateway bedrock
+- id: vygyluc6uiuhqj4kee4ygy527m
+  title: wsl1_win11 tailscale auth key expire on 27 Jun 2026
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 4
+  op_uri: op://Cursor_IronClaw/wsl1_win11 tailscale auth key expire on 27 Jun 2026
+- id: e6sucdnaqbawr373n6oda4n4pi
+  title: Uptime Kuma Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Uptime Kuma Fleet (wsl1)
+- id: 4qt774avrbzabdscc6ezygl5hi
+  title: Aliyun Team Qwen Token Plan Key
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Aliyun Team Qwen Token Plan Key
+- id: axjq42eq4ou43kc7nbt7oi7pfq
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: w7uspwgtg4y5gh6m4fdnxtu6lu
+  title: SprintBoard Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/SprintBoard Fleet (wsl1)
+- id: bsqycxxs2hxqyjiemxea7m47ae
+  title: oracle_jump SSH Key (MacBook -> OCI jump host)
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/oracle_jump SSH Key (MacBook -> OCI jump host)
+- id: dv5f5ciourulkph7dipygnvxlu
+  title: mem0-oss-admin-key
+  category: PASSWORD
+  vault: Cursor_IronClaw
+  version: 4
+  op_uri: op://Cursor_IronClaw/mem0-oss-admin-key
+- id: a5ykjrdtpnlkxe67paksosjnzm
+  title: RustDesk Device win2
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 3
+  op_uri: op://Cursor_IronClaw/RustDesk Device win2
+- id: dwdpi2hyhc2mpxwacyiaxfwdi4
+  title: DreamHost
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/DreamHost
+- id: wgc57cozwfhzmlovy3joa5qrou
+  title: mem0
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/mem0
+- id: czdbviw37zsfk7e23clly2bvw4
+  title: Telegram Bot - Fleet Agent 2
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Telegram Bot - Fleet Agent 2
+- id: nrmcadhudzunh37ajvoqfsmmyy
+  title: tailscale-auth-key
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/tailscale-auth-key
+- id: pfhiyhwiey7yvqrtzdglrj2o4a
+  title: 'Service Account Auth Token: cursor_ironclaw'
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: 'op://Cursor_IronClaw/Service Account Auth Token: cursor_ironclaw'
+- id: aphudyg7fjueu4uilhwy7a3ivi
+  title: Tailscale Auth Key macbook
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Tailscale Auth Key macbook
+- id: y6wyb3uprbijx3f6btjsi3hbze
+  title: oracle cloud Tokyo
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 2
+  op_uri: op://Cursor_IronClaw/oracle cloud Tokyo
+- id: 7xfvc4qnxrl4cjn4bcs3y6y4fm
+  title: GitLab CE API PAT win3 wsl3
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/GitLab CE API PAT win3 wsl3
+- id: z5rykmtuizvyqnvignmrgze2ce
+  title: mem0-oss-jwt-secret
+  category: PASSWORD
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/mem0-oss-jwt-secret
+- id: zaxwib67wlnsxbiswprf5lkxoi
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: mo6x2g5fd34eg4a3hpfuz3gcqu
+  title: 'Service Account Auth Token: msi-win11-laptop'
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: 'op://Cursor_IronClaw/Service Account Auth Token: msi-win11-laptop'
+- id: d63ts6ab5jqygbftqnomylfkzq
+  title: chengdu_jump SSH Key (MacBook -> Chengdu Win)
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/chengdu_jump SSH Key (MacBook -> Chengdu Win)
+- id: hfri3ziy6cjfec4xha7wkfkkri
+  title: LLM Cluster Router Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/LLM Cluster Router Fleet (wsl1)
+- id: nruynfsbnmjmqx6tld6c7uaopm
+  title: Resend info@oztac
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Resend info@oztac
+- id: fk53vwaafv5jhv5vdkt4dftvy4
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: nnhcm6xvyes5kgxv2uuqb5eusi
+  title: GitLab CE API PAT (wsl1)
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 7
+  op_uri: op://Cursor_IronClaw/GitLab CE API PAT (wsl1)
+- id: x57gj3ejadnwfc2fwfcvad7dye
+  title: GitLab CE Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/GitLab CE Fleet (wsl1)
+- id: ql3cdtzfyzbxrtdqztvlk57dve
+  title: mem0-oss-admin
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/mem0-oss-admin
+- id: oc4bque5f4z53ix6a3jbjyvxze
+  title: oracle-vpn-semaphore
+  category: PASSWORD
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/oracle-vpn-semaphore
+- id: ofp5zyyku7sieik7rjvkelhrgu
+  title: Secure Note Agent Credentials
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 2
+  op_uri: op://Cursor_IronClaw/Secure Note Agent Credentials
+- id: kmphrecalfj3sayb3h3mxwjcnu
+  title: zd api gateway bedrock claude models
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/zd api gateway bedrock claude models
+- id: gmfbh6yqhrgcovmxmbhbttl3cu
+  title: Tavily API Key 1
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Tavily API Key 1
+- id: prpfb4m2a4j35wzptejtrouqcq
+  title: Engram mem0-compat (wsl1 tunnel)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Engram mem0-compat (wsl1 tunnel)
+- id: i5ri4arsc5ao6xs4pxc2gfcx3m
+  title: GitLab CE Root PAT (wsl2 rotation 2026-07-08)
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/GitLab CE Root PAT (wsl2 rotation 2026-07-08)
+- id: rta4gta7frins7qb56hjgdtrka
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: syap7mcjsscsfmvrp3u4rizgcq
+  title: fleet_lan SSH Key Pair (WSL1 Access)
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/fleet_lan SSH Key Pair (WSL1 Access)
+- id: pdueu5keepupnhd5cjj2fqumem
+  title: Win PC WSL Ubuntu Login GB
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 2
+  op_uri: op://Cursor_IronClaw/Win PC WSL Ubuntu Login GB
+- id: qijbasqzba54hxtr75dkfsmese
+  title: RustDesk Relay Fleet
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/RustDesk Relay Fleet
+- id: iejwsu7tlgr6db7c3dpis3jdxa
+  title: ArgoCD Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/ArgoCD Fleet (wsl1)
+- id: pwjkp2gii6cnaqwwj4fmesdxd4
+  title: Resend jaslian@gmail.com
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Resend jaslian@gmail.com
+- id: t6m7idvh5sipb3ubpcpnuhqvi4
+  title: oracle-cloud-oci
+  category: API_CREDENTIAL
+  vault: Cursor_IronClaw
+  version: 2
+  op_uri: op://Cursor_IronClaw/oracle-cloud-oci
+- id: s2h64ocrkfye2fr4lszgwcbijm
+  title: wsl2_win11 tailscale auth key expire on 27 Jun 2026
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 4
+  op_uri: op://Cursor_IronClaw/wsl2_win11 tailscale auth key expire on 27 Jun 2026
+- id: mjlr5fkdjj3mhd2c3a7t4zzroe
+  title: Resend keynear@gmail.com
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Resend keynear@gmail.com
+- id: imdpytv5wxi7oppbyh4n52al7a
+  title: fleet_lan.pub Macbook Zd
+  category: SSH_KEY
+  vault: Cursor_IronClaw
+  version: 2
+  op_uri: op://Cursor_IronClaw/fleet_lan.pub Macbook Zd
+- id: sjhxjryivr6edhmb2ecovdpot4
+  title: Win PC WSL Ubuntu Login GB / jason@win4
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Win PC WSL Ubuntu Login GB / jason@win4
+- id: jgt7yaixlrmymfiswliqadoaoi
+  title: Main Tailscale API Access token
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Main Tailscale API Access token
+- id: qqt3bayjxxddc6hapn6tmtk5j4
+  title: Brevo info@oztac 300 daily limit
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Brevo info@oztac 300 daily limit
+- id: qlr2av3qbybcogtibsfamyd6ju
+  title: Amazon AWS Agent1 Login
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Amazon AWS Agent1 Login
+- id: u2mcruwbzlvrfj7nppvxxusynq
+  title: Helixon Dashboard Fleet (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Helixon Dashboard Fleet (wsl1)
+- id: pwfsbfuvhqaz63oc7ujgb24uou
+  title: Exa API Key 1
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Exa API Key 1
+- id: kocor3kayl7lsteqecmxpsue2u
+  title: zd api gateway openai models
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/zd api gateway openai models
+- id: rqzjv2k6rar2pmwjuoursdlxh4
+  title: v14508.5-regression
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/v14508.5-regression
+- id: smvoqaxttwlabd6jqqxng6aj2y
+  title: Win PC WSL Ubuntu Login GB / jason@win2
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Win PC WSL Ubuntu Login GB / jason@win2
+- id: mqveimv2o5z4kiqnjybepiwbpq
+  title: SMTP2GO
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/SMTP2GO
+- id: vvgrbbr4zo5ohmzxpnt5efa4r4
+  title: RustDesk Device win1
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 6
+  op_uri: op://Cursor_IronClaw/RustDesk Device win1
+- id: lepitf6yct2kr2wul376cmm4ay
+  title: RustDesk Device win4
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 3
+  op_uri: op://Cursor_IronClaw/RustDesk Device win4
+- id: m5rnja2b2qtsonin6ehy3i7nha
+  title: GitLab CE Root UI (wsl1)
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 9
+  op_uri: op://Cursor_IronClaw/GitLab CE Root UI (wsl1)
+- id: gbqnlvhkop6lfsx4czf5gp6nga
+  title: Telegram Bot - Fleet Agent 1
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Telegram Bot - Fleet Agent 1
+- id: n2ecpwlnkpjs4ufdvquw6xf624
+  title: GitLab CE Runner Auth Token (wsl2)
+  category: PASSWORD
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/GitLab CE Runner Auth Token (wsl2)
+- id: ulrwzgbep6c4o64dtsu32sqdlq
+  title: gcp-helixon-bootstrap-sa-key
+  category: DOCUMENT
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/gcp-helixon-bootstrap-sa-key
+- id: reg7i5k2duyn6ra4wjodka2jiq
+  title: Resend Login jzlian083@gmaifl.com
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/Resend Login jzlian083@gmaifl.com
+- id: ripotpfq43jzlreor4zo2ay734
+  title: minimax-api-1
+  category: SECURE_NOTE
+  vault: Cursor_IronClaw
+  version: 5
+  op_uri: op://Cursor_IronClaw/minimax-api-1
+- id: umjju2lqgejs2jrcgsiidzvriq
+  title: Grafana Admin
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 3
+  op_uri: op://Cursor_IronClaw/Grafana Admin
+- id: mhdzmvjzylkejcvdhnt6tfj46y
+  title: AWS SES cylrl.dev IAM
+  category: LOGIN
+  vault: Cursor_IronClaw
+  version: 1
+  op_uri: op://Cursor_IronClaw/AWS SES cylrl.dev IAM

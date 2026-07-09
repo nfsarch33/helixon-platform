@@ -1,0 +1,18 @@
+{"time":"2026-07-10T03:19:07.536293512+10:00","level":"INFO","msg":"registered","name":"engramd","port":8280}
+{"time":"2026-07-10T03:19:07.536982671+10:00","level":"INFO","msg":"registered","name":"engramd-mem0compat","port":8281}
+{"time":"2026-07-10T03:19:07.537780354+10:00","level":"INFO","msg":"registered","name":"sprintboard-api","port":9400}
+{"time":"2026-07-10T03:19:07.538398919+10:00","level":"INFO","msg":"registered","name":"sprintboard-mcp","port":9401}
+{"time":"2026-07-10T03:19:07.538849686+10:00","level":"INFO","msg":"registered","name":"llm-cluster-router","port":8787}
+{"time":"2026-07-10T03:19:07.539300835+10:00","level":"INFO","msg":"registered","name":"llm-cluster-router-metrics","port":9091}
+{"time":"2026-07-10T03:19:07.539866439+10:00","level":"INFO","msg":"registered","name":"llm-cluster-router-debug","port":6060}
+{"time":"2026-07-10T03:19:07.540382304+10:00","level":"INFO","msg":"registered","name":"llama-server-c7-q8","port":8010}
+{"time":"2026-07-10T03:19:07.541072063+10:00","level":"INFO","msg":"registered","name":"llama-server-c2-q4","port":8011}
+{"time":"2026-07-10T03:19:07.54167581+10:00","level":"INFO","msg":"registered","name":"vllm-c1-awq","port":8004}
+{"time":"2026-07-10T03:19:07.542219507+10:00","level":"INFO","msg":"registered","name":"ollama-embed-c6","port":11434}
+{"time":"2026-07-10T03:19:07.54273101+10:00","level":"INFO","msg":"registered","name":"prometheus","port":9090}
+{"time":"2026-07-10T03:19:07.543260986+10:00","level":"INFO","msg":"registered","name":"grafana","port":3000}
+{"time":"2026-07-10T03:19:07.543808793+10:00","level":"INFO","msg":"registered","name":"alertmanager","port":9093}
+{"time":"2026-07-10T03:19:07.544226005+10:00","level":"INFO","msg":"registered","name":"k3s-server","port":6443}
+{"time":"2026-07-10T03:19:07.544700696+10:00","level":"INFO","msg":"registered","name":"ssh-fleet-lan","port":22}
+{"time":"2026-07-10T03:19:07.545212368+10:00","level":"INFO","msg":"registered","name":"fleet-registrar","port":9103}
+bridge: registered=17 failed=0 skipped=0

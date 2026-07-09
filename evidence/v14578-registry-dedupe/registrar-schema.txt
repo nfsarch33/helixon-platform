@@ -1,0 +1,30 @@
+CREATE TABLE hosts (
+  hostname        TEXT PRIMARY KEY,
+  tailscale_ip    TEXT,
+  os              TEXT,
+  cpu_cores       INTEGER,
+  ram_total       INTEGER,
+  disk_total      INTEGER,
+  gpu             TEXT,
+  last_seen       DATETIME
+)
+CREATE TABLE services (
+  host          TEXT,
+  name          TEXT,
+  port          INTEGER,
+  status        TEXT,
+  last_seen     DATETIME,
+  meta          TEXT,
+  PRIMARY KEY (host, name)
+)
+CREATE TABLE alerts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp   DATETIME,
+  host        TEXT,
+  service     TEXT,
+  severity    TEXT,
+  channel     TEXT,
+  message     TEXT,
+  acked       INTEGER DEFAULT 0
+)
+CREATE TABLE sqlite_sequence(name,seq)

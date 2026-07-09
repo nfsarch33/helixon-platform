@@ -1,0 +1,161 @@
+{
+  "hosts": [
+    {
+      "gpu": "RTX-3090:2 + RTX-2070:1",
+      "name": "wsl1",
+      "role": "central-server",
+      "status": "up",
+      "tailscale_ip": "100.84.108.92"
+    },
+    {
+      "gpu": "RTX-4070-Ti-Super",
+      "name": "wsl2",
+      "role": "central-server",
+      "status": "up",
+      "tailscale_ip": "100.110.82.5"
+    },
+    {
+      "gpu": "RTX-3090",
+      "name": "wsl4",
+      "role": "gpu-worker",
+      "status": "up",
+      "tailscale_ip": "100.79.227.40"
+    }
+  ],
+  "services": [
+    {
+      "deploy_type": "systemd",
+      "labels": {
+        "host": "wsl2",
+        "role": "management"
+      },
+      "name": "engramd",
+      "node": "localhost",
+      "port": 8280,
+      "status": "up",
+      "type": "memory-api"
+    },
+    {
+      "deploy_type": "systemd",
+      "labels": {
+        "host": "wsl2",
+        "role": "embedding"
+      },
+      "name": "ollama",
+      "node": "localhost",
+      "port": 11434,
+      "status": "up",
+      "type": "embedding"
+    },
+    {
+      "deploy_type": "systemd",
+      "labels": {
+        "host": "wsl2",
+        "role": "central-server"
+      },
+      "name": "fleet-registrar",
+      "node": "localhost",
+      "port": 9103,
+      "status": "up",
+      "type": "registry-metrics"
+    },
+    {
+      "deploy_type": "systemd",
+      "labels": {
+        "host": "wsl2",
+        "role": "central-server"
+      },
+      "name": "fleet-registrar-api",
+      "node": "localhost",
+      "port": 9104,
+      "status": "up",
+      "type": "registry-api"
+    },
+    {
+      "deploy_type": "docker",
+      "labels": {
+        "host": "wsl2",
+        "role": "central-server"
+      },
+      "name": "node-exporter-wsl2",
+      "node": "localhost",
+      "port": 9100,
+      "status": "up",
+      "type": "node-metrics"
+    },
+    {
+      "deploy_type": "docker-compose",
+      "labels": {
+        "host": "wsl2",
+        "role": "observability"
+      },
+      "name": "prometheus",
+      "node": "localhost",
+      "port": 9090,
+      "status": "up",
+      "type": "central-metrics"
+    },
+    {
+      "deploy_type": "docker-compose",
+      "labels": {
+        "host": "wsl2",
+        "role": "observability"
+      },
+      "name": "grafana",
+      "node": "localhost",
+      "port": 3000,
+      "status": "up",
+      "type": "dashboard"
+    },
+    {
+      "deploy_type": "docker",
+      "labels": {
+        "host": "wsl2",
+        "role": "evolution"
+      },
+      "name": "evoloop-daemon",
+      "node": "localhost",
+      "port": 9301,
+      "status": "up",
+      "type": "evoloop"
+    },
+    {
+      "deploy_type": "docker",
+      "labels": {
+        "gpu": "RTX-4070-Ti-Super",
+        "host": "wsl2",
+        "role": "gpu-worker"
+      },
+      "name": "vllm",
+      "node": "localhost",
+      "port": 8001,
+      "status": "up",
+      "type": "llm-inference"
+    },
+    {
+      "deploy_type": "systemd",
+      "labels": {
+        "host": "wsl2",
+        "role": "gpu-worker"
+      },
+      "name": "llm-cluster-router",
+      "node": "localhost",
+      "port": 8787,
+      "status": "up",
+      "type": "llm-router"
+    },
+    {
+      "deploy_type": "systemd",
+      "labels": {
+        "host": "wsl4",
+        "role": "gpu-worker"
+      },
+      "name": "node-exporter-wsl4",
+      "node": "100.79.227.40",
+      "port": 9100,
+      "status": "up",
+      "type": "node-metrics"
+    }
+  ],
+  "updated": "2026-07-10T03:16:01.041294"
+}
