@@ -1,75 +1,44 @@
 {"id":"v14511-cf-001","sprint":"v14511","item":"Wire choose-llm hook into Cursor ~/.cursor/hooks.json on win1","severity":"low","evidence":"hooks.json emit covered by install subcommand; Cursor settings UI write is operator-side"}
-
 {"id":"v14511-cf-002","sprint":"v14511","item":"Capture real cost-obs NDJSON row for a live qwen36 cell call","severity":"medium","evidence":"NDJSON pipeline tested in mock mode; live cell offline on wsl1"}
-
 {"id":"v14511-cf-003","sprint":"v14511","item":"Pin agentcage==0.29.0 wheel SHA256 in installer after first download on win1","severity":"medium","evidence":"installer requires SHA256; placeholder accepted in dry-run for verifier"}
-
 {"id":"v14511-cf-004","sprint":"v14511","item":"Self-hosted CI gauntlet (PR #8) is still offline; v14511 merges rely on gh CLI direct push","severity":"medium","evidence":"merge_log captured in PR #12 description"}
-
 {"id":"v14511-cf-005","sprint":"v14511","item":"op cli write-path desktop integration on win1 (carries from v14508.5)","severity":"high","evidence":"1Password Go SDK fallback in cmd/onepassword-bootstrap remains the working path"}
 {"id":"v14512-cf-001","sprint":"v14512","item":"Operator to fill .env and docker compose up observability sidecar","severity":"medium","evidence":"README.md step 1-2; PagerDuty + Slack creds still in 1Password under Cursor_IronClaw"}
-
 {"id":"v14512-cf-002","sprint":"v14512","item":"control-plane must listen on :8080 with /healthz + /readyz for scrape","severity":"high","evidence":"v14508 healthz contract confirmed in v14509-handoff.md but port binding TBD on real deployment"}
-
 {"id":"v14512-cf-003","sprint":"v14512","item":"Pin Prometheus / Grafana image digests in docker-compose after first pull","severity":"low","evidence":"versions tagged :v2.55.0 / :v0.27.0 / :11.3.0 but digest not yet locked"}
-
 {"id":"v14512-cf-004","sprint":"v14512","item":"agentrace SDK must emit /metrics endpoint with the 4 metrics referenced in alerts","severity":"high","evidence":"alert rules assume agentrace_stage_total, agentrace_stage_duration_seconds, agentrace_self_eval_score, agentrace_tokens_total"}
 {"id":"v14513-cf-001","sprint":"v14513","item":"cmd/helixon-slo-ack must be deployed to fleet node running SRE persona","severity":"medium","evidence":"deferred to v14516 helixon-fleet-agents MVP"}
-
 {"id":"v14513-cf-002","sprint":"v14513","item":"observability/runbook.md actions/ scripts (qwen36-cell-rotate.sh etc)","severity":"low","evidence":"deferred; runbook prose only for now"}
-
 {"id":"v14513-cf-003","sprint":"v14513","item":"Wire incidents.ndjson into metrics-dashboard weekly report","severity":"medium","evidence":"deferred to Pair 7 fleet-agents"}
-
 {"id":"v14513-cf-004","sprint":"v14513","item":"Verify Alertmanager /api/v2/silences auth (no auth in dev, prod needs mTLS)","severity":"high","evidence":"self-hosted observability sidecar has no auth yet"}
 {"id":"v14514-cf-001","sprint":"v14514","item":"Real subprocess pinging per MCP server (npx/docker with timeout)","severity":"medium","evidence":"defaultPing only checks binary existence; deferred to v14515"}
-
 {"id":"v14514-cf-002","sprint":"v14514","item":"Add --hide-internal flag to cursor-tools doctor","severity":"low","evidence":"12 expected-fail rows are noisy in human output"}
-
 {"id":"v14514-cf-003","sprint":"v14514","item":"Wire cursor-tools install into Cursor settings UI (no CLI hook yet)","severity":"low","evidence":"mcp.json install via cp; deferred to v14517"}
-
 {"id":"v14514-cf-004","sprint":"v14514","item":"Pull credentials for 9 disabled servers (github, perplexity, jira, wolfram, word, allPepper, playwright, obs, engram-legacy)","severity":"high","evidence":"deferred; needs operator + 1P retrieval"}
 {"id":"v14515-cf-001","sprint":"v14515","item":"semble (semantic cache) — opt-in, needs local 4B embedder in qwen36-matrix.yaml","severity":"medium","evidence":"rtx is keyword-cache only; semantic match deferred to v14521"}
-
 {"id":"v14515-cf-002","sprint":"v14515","item":"cursor-global-kb MacBook sweep across all research/ + runbooks/ + agentic-ai-research/","severity":"low","evidence":"helixon-platform sweep done; global-kb sweep deferred to v14518"}
-
 {"id":"v14515-cf-003","sprint":"v14515","item":"Wire rtx.Cache + headroom.Check into choose-llm hook decide binary","severity":"high","evidence":"enforce.go is library-only; binary integration deferred to v14517"}
-
 {"id":"v14515-cf-004","sprint":"v14515","item":"Per-tenant budget cap enforcement (costobs.Hook)","severity":"high","evidence":"deferred; v14516 agent-card.yaml will carry budget_usd_per_day"}
-
 {"id":"v14515-cf-005","sprint":"v14515","item":"Replace LCG jitter in internal/notify with crypto/rand","severity":"low","evidence":"v14513 noted; reroll deferred"}
 {"id":"v14516-cf-001","sprint":"v14516","item":"Pair-lock across personas (single shared .sprint_lock)","severity":"high","evidence":"deferred to v14517"}
-
 {"id":"v14516-cf-002","sprint":"v14516","item":"docs/persona-schema.md (full JSON-schema equivalent of YAML)","severity":"medium","evidence":"deferred to v14517"}
-
 {"id":"v14516-cf-003","sprint":"v14516","item":"Hook integration test (spawn choose-llm hook decide from real beforeSubmitPrompt)","severity":"medium","evidence":"deferred to v14517"}
-
 {"id":"v14517-cf-001","sprint":"v14517","item":"Sprintboard MCP integration for pair-lock events","severity":"medium","evidence":"deferred; events today only land in .sprint_lock"}
-
 {"id":"v14517-cf-002","sprint":"v14517","item":"Hook timeout: 2s on pair-lock check","severity":"medium","evidence":"hook can stall if pair-lock hangs; defer to v14518"}
-
 {"id":"v14517-cf-003","sprint":"v14517","item":"Per-persona pair-lock schema-version 2 (adds expires_at)","severity":"low","evidence":"v14520 EvoSpine will need expiration"}
-
 {"id":"v14517-cf-004","sprint":"v14517","item":"Cross-repo pair-lock (helixon-platform + helixon-fleet-agents)","severity":"high","evidence":"deferred to v14520"}
 {"id":"v14518-cf-001","sprint":"v14518","item":"Auto-delete merged branches via gh pr merge --delete-branch","severity":"high","evidence":"merged feature branches linger; deferred to v14519"}
-
 {"id":"v14518-cf-002","sprint":"v14518","item":"Triage ledger retroactive entries (v14509-v14517)","severity":"medium","evidence":"ledger started empty; deferred to v14519"}
-
 {"id":"v14518-cf-003","sprint":"v14518","item":"Cursor-global-kb stale reference sweep (macbook/driftctl/sshpass)","severity":"medium","evidence":"deferred to v14519"}
-
 {"id":"v14518-cf-004","sprint":"v14518","item":"Cross-repo hygiene: helixon-autoresearch not seeded","severity":"low","evidence":"v14520 EvoSpine will seed; defer to v14520"}
 {"id":"v14519-cf-001","sprint":"v14519","item":"Weekly cron for close-stale-prs.py","severity":"medium","evidence":"manual sweep; defer to v14520 weekly cron"}
-
 {"id":"v14519-cf-002","sprint":"v14519","item":"GitHub App for batch operations (Helixon-bot)","severity":"medium","evidence":"defer to v14520"}
-
 {"id":"v14519-cf-003","sprint":"v14519","item":"EvoSpine seed for helixon-autoresearch","severity":"high","evidence":"defer to v14520"}
-
 {"id":"v14519-cf-004","sprint":"v14519","item":"backfill triage entries for v14509-v14514","severity":"low","evidence":"ledger started in v14518; backfill manually"}
 {"id":"v14520-cf-001","sprint":"v14520","item":"Apply evospine hypothesis: .github/workflows/close-stale-prs.yml weekly cron","severity":"high","evidence":"v14521 will apply"}
-
 {"id":"v14520-cf-002","sprint":"v14520","item":"Helixon-bot GitHub App for batch ops","severity":"medium","evidence":"v14521 will mint"}
-
 {"id":"v14520-cf-003","sprint":"v14520","item":"Autoresearch scheduler plugin to call our cycle driver","severity":"medium","evidence":"v14521 will integrate"}
-
 {"id":"v14520-cf-004","sprint":"v14520","item":"Cycle driver Go port (perf)","severity":"low","evidence":"defer to v14522 if needed"}
 {"cf_id":"CF-OP-01","source_sprint":"v14543","description":"Rotate oracle_jump SSH key on oracle-jump via OCI web UI/Cloud Shell. Operator action required: append new pubkey to ~/.ssh/authorized_keys on oracle-jump, remove old MacBook-era key. Automation: scripts/oci/oci-rotates-key.sh --dry-run shows the current state; full automation requires OCI Cloud Shell or agent-browser.","status":"pending","blocked_by":["operator"],"created":"2026-07-09T15:07:00+10:00","script":"scripts/oci/oci-rotates-key.sh","sop":"sop/oci-webui-automation.md"}
 {"cf_id": "CF-v14536-01", "source_sprint": "v14536", "closed_sprint": "v14544", "description": "GitLab CE Helm install on k3s. Resolution: switched to gitlab/gitlab-runner (lightweight, ~256MB) instead of full gitlab/gitlab CE chart (4GB+). Dry-run install verified against live 3-node cluster; only operator action is registration token + live install.", "resolution_sprint": "v14544", "script": "scripts/install-gitlab-runner.sh", "values": "k8s/gitlab/runner-values.yaml", "sop": "sop/gitlab-runner-k3s.md", "closed_at": "2026-07-09T15:20:00+10:00", "status": "closed (operator install pending)"}
+{"id": "CF-v14536-02-closure-1783545436", "type": "closure", "ref": "CF-v14536-02", "closed_in_sprint": "v14545", "closed_at": "2026-07-09T07:17:16.922449Z", "resolution": "Argo CD installed on k3s (wsl1) with pre-created argocd-redis secret + CRDs applied via server-side. App-of-apps synced to 2 services. CF closed.", "evidence": "/home/jaslian/Code/helixon-platform/evidence/v14545-argocd/"}

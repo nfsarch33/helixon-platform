@@ -2,33 +2,53 @@
 //
 // Usage:
 //   secrets-bootstrap vault item field [--export VAR]
+//   secrets-bootstrap --service NAME --out FILE
 //
-// Examples:
-//   secrets-bootstrap Cursor_IronClaw "github pat" password
-//   secrets-bootstrap Cursor_IronClaw "minimax-api-1" api-key --export MINIMAX_API_KEY
-//
-// This binary is a thin wrapper around `op read` that:
-//   - never logs the secret (only writes to stdout / env)
-//   - redacts tokens in any error message
-//   - exits 0 on success, 1 on failure
-//   - has a 5s timeout (op CLI occasionally hangs on desktop-app IPC)
+// v14547: Added --service/--out mode for systemd EnvironmentFile generation.
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
-const version = "1.0.0"
+const version = "1.1.0"
+
+type EnvEntry struct {
+	EnvVar string
+	Vault  string
+	Item   string
+	Field  string
+}
+
+var serviceMap = map[string][]EnvEntry{
+	"engramd": {
+		{EnvVar: "ENGRAM_EMBED_KEY", Vault: "Cursor_IronClaw", Item: "ripotpfq43jzlreor4zo2ay734", Field: "api-key"},
+	},
+	"sprintboard-api": {
+		{EnvVar: "SPRINTBOARD_API_TOKEN", Vault: "Cursor_IronClaw", Item: "w7uspwgtg4y5gh6m4fdnxtu6lu", Field: "password"},
+	},
+	"llm-router": {
+		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "Cursor_IronClaw", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
+	},
+	"svcregistryd": {
+		{EnvVar: "SVCREGISTRY_TOKEN", Vault: "Cursor_IronClaw", Item: "62ruxw2zud5fp7jpxgi2cgjb64", Field: "password"},
+	},
+}
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
-	exportVar := flag.String("export", "", "also export the value to this env var")
-	timeoutSec := flag.Int("timeout", 5, "timeout in seconds for the op CLI call")
+	exportVar := flag.String("export", "", "also export the value to this env var (KEY=val)")
+	timeoutSec := flag.Int("timeout", 10, "timeout in seconds for the op CLI call")
+	serviceName := flag.String("service", "", "service name to bootstrap env for")
+	outPath := flag.String("out", "", "output env file path (used with --service)")
+	listServices := flag.Bool("list", false, "list known service names and exit")
 	flag.Parse()
 
 	if *showVersion {
@@ -36,57 +56,131 @@ func main() {
 		os.Exit(0)
 	}
 
+	if *listServices {
+		for name := range serviceMap {
+			fmt.Println(name)
+		}
+		os.Exit(0)
+	}
+
+	if *serviceName != "" {
+		if *outPath == "" {
+			fmt.Fprintln(os.Stderr, "--out is required with --service")
+			os.Exit(2)
+		}
+		bootstrapServiceEnv(*serviceName, *outPath, *timeoutSec)
+		return
+	}
+
 	args := flag.Args()
 	if len(args) != 3 {
 		fmt.Fprintln(os.Stderr, "usage: secrets-bootstrap <vault> <item> <field> [--export VAR]")
+		fmt.Fprintln(os.Stderr, "       secrets-bootstrap --service NAME --out FILE [--list]")
 		os.Exit(2)
 	}
 	vault, item, field := args[0], args[1], args[2]
-
-	token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
-	if token == "" {
-		fmt.Fprintln(os.Stderr, "OP_SERVICE_ACCOUNT_TOKEN not set; cannot proceed (no plaintext secrets in this binary)")
+	val, err := opRead(vault, item, field, *timeoutSec)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, redact(fmt.Sprintf("op read failed: %v", err)))
 		os.Exit(1)
 	}
-
-	ctx := exec.CommandContext
-	_ = ctx // unused import guard
-	cmd := exec.Command("op", "read", fmt.Sprintf("op://%s/%s/%s", vault, item, field))
-	cmd.Env = append(os.Environ(), "OP_SERVICE_ACCOUNT_TOKEN="+token)
-	// Wire timeout via channel
-	done := make(chan error, 1)
-	go func() {
-		out, err := cmd.Output()
-		if err != nil {
-			done <- err
-			return
-		}
-		fmt.Print(strings.TrimRight(string(out), "\n"))
-		if *exportVar != "" {
-			// Print "export FOO=bar" so caller can eval
-			fmt.Printf("\nexport %s=%q", *exportVar, strings.TrimRight(string(out), "\n"))
-		}
-		done <- nil
-	}()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			fmt.Fprintln(os.Stderr, redact(fmt.Sprintf("op read failed: %v", err)))
-			os.Exit(1)
-		}
-	case <-time.After(time.Duration(*timeoutSec) * time.Second):
-		_ = cmd.Process.Kill()
-		fmt.Fprintln(os.Stderr, redact(fmt.Sprintf("op read timed out after %ds (desktop-app IPC stuck? consider 1Password Go SDK)", *timeoutSec)))
-		os.Exit(1)
+	fmt.Print(val)
+	if *exportVar != "" {
+		fmt.Printf("\nexport %s=%q", *exportVar, val)
 	}
 }
 
-// redact replaces any 1Password service-account JWT prefix with [REDACTED].
+func opRead(vault, item, field string, timeoutSec int) (string, error) {
+	token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
+	if token == "" {
+		return "", fmt.Errorf("OP_SERVICE_ACCOUNT_TOKEN not set; cannot proceed")
+	}
+	ref := fmt.Sprintf("op://%s/%s/%s", vault, item, field)
+	cmd := exec.Command("op", "read", ref)
+	cmd.Env = append(os.Environ(), "OP_SERVICE_ACCOUNT_TOKEN="+token)
+	done := make(chan struct {
+		val string
+		err error
+	}, 1)
+	go func() {
+		out, err := cmd.Output()
+		if err != nil {
+			done <- struct {
+				val string
+				err error
+			}{"", err}
+			return
+		}
+		done <- struct {
+			val string
+			err error
+		}{strings.TrimRight(string(out), "\n"), nil}
+	}()
+	select {
+	case r := <-done:
+		return r.val, r.err
+	case <-time.After(time.Duration(timeoutSec) * time.Second):
+		_ = cmd.Process.Kill()
+		return "", fmt.Errorf("op read %q timed out after %ds", ref, timeoutSec)
+	}
+}
+
+func bootstrapServiceEnv(name, outPath string, timeoutSec int) {
+	entries, ok := serviceMap[name]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "unknown service %q (use --list to see known services)\n", name)
+		os.Exit(2)
+	}
+	if dir := parentDir(outPath); dir != "" {
+		_ = os.MkdirAll(dir, 0700)
+	}
+	tmpPath := outPath + ".tmp"
+	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open %s: %v\n", tmpPath, err)
+		os.Exit(1)
+	}
+	w := bufio.NewWriter(f)
+	fmt.Fprintf(w, "# Generated by secrets-bootstrap %s at %s for service %q\n", version, time.Now().UTC().Format(time.RFC3339), name)
+	for _, e := range entries {
+		val, err := opRead(e.Vault, e.Item, e.Field, timeoutSec)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "skip %s: %v\n", e.EnvVar, redact(err.Error()))
+			fmt.Fprintf(w, "# %s=<unavailable: %s>\n", e.EnvVar, redact(err.Error()))
+			continue
+		}
+		fmt.Fprintf(w, "%s=%q\n", e.EnvVar, val)
+	}
+	if err := w.Flush(); err != nil {
+		fmt.Fprintf(os.Stderr, "flush: %v\n", err)
+		_ = f.Close()
+		_ = os.Remove(tmpPath)
+		os.Exit(1)
+	}
+	if err := f.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "close: %v\n", err)
+		_ = os.Remove(tmpPath)
+		os.Exit(1)
+	}
+	if err := os.Rename(tmpPath, outPath); err != nil {
+		fmt.Fprintf(os.Stderr, "rename: %v\n", err)
+		_ = os.Remove(tmpPath)
+		os.Exit(1)
+	}
+	_ = syscall.Chmod(outPath, 0600)
+}
+
+func parentDir(p string) string {
+	idx := strings.LastIndex(p, "/")
+	if idx < 0 {
+		return ""
+	}
+	return p[:idx]
+}
+
 func redact(s string) string {
 	const prefix = "ops_eyJ"
 	if idx := strings.Index(s, prefix); idx >= 0 {
-		// Keep 60 chars of context after the prefix then [REDACTED]
 		end := idx + 60
 		if end > len(s) {
 			end = len(s)
