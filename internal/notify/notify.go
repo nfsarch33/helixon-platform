@@ -30,6 +30,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nfsarch33/helixon-platform/internal/notify/metrics"
+	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -109,9 +111,11 @@ type ResendConfig struct {
 
 // ResendClient is the Resend HTTP-API client. Implements Client.
 type ResendClient struct {
-	cfg ResendConfig
-	do  HTTPDoer
-	id  *IdempotencyStore
+	cfg     ResendConfig
+	do      HTTPDoer
+	id      *IdempotencyStore
+	audit   *notifydb.DB
+	metrics *metrics.Registry
 }
 
 // NewResendClient returns a Resend client with the supplied config.
@@ -129,6 +133,44 @@ func NewResendClient(cfg ResendConfig) *ResendClient {
 		cfg.HTTPDoer = &http.Client{Timeout: cfg.Timeout}
 	}
 	return &ResendClient{cfg: cfg, do: cfg.HTTPDoer, id: NewIdempotencyStore()}
+}
+
+// WithAuditDB attaches a notifydb persistence sink. v17409-4.
+func (c *ResendClient) WithAuditDB(db *notifydb.DB) *ResendClient {
+	c.audit = db
+	return c
+}
+
+// WithMetrics attaches a metrics.Registry for observability counters.
+// v17409-6.
+func (c *ResendClient) WithMetrics(r *metrics.Registry) *ResendClient {
+	c.metrics = r
+	return c
+}
+
+// recordAudit writes a Dispatch row when c.audit is set. Errors are logged
+// but never returned to the caller (audit is best-effort).
+func (c *ResendClient) recordAudit(ctx context.Context, key, subject string, err error) {
+	if c.audit == nil {
+		return
+	}
+	status := "ok"
+	errStr := ""
+	if err != nil {
+		status = "error"
+		errStr = err.Error()
+	}
+	_ = c.audit.Insert(ctx, notifydb.Dispatch{
+		ID:          key,
+		Vendor:      "resend",
+		Recipient:   "(collapsed)",
+		Subject:     subject,
+		Status:      status,
+		Error:       errStr,
+		CreatedUnix: time.Now().Unix(),
+		SentAtUnix:  time.Now().Unix(),
+		Attempt:     c.cfg.MaxRetry,
+	})
 }
 
 // Vendor returns the vendor name for cost attribution.
@@ -186,43 +228,85 @@ func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) er
 	if err != nil {
 		return fmt.Errorf("%w: build endpoint: %v", ErrPermanent, err)
 	}
-	maxAttempt := c.cfg.MaxRetry + 1
-	var lastErr error
-	for attempt := 1; attempt <= maxAttempt; attempt++ {
-		req, _ := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(body)))
-		req.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Idempotency-Key", m.IdempotencyKey)
+	actor := &resendActor{c: c, m: m, endpoint: endpoint}
+	return retryWithBackoff(ctx, c.cfg.MaxRetry+1, body, m, actor)
+}
 
-		resp, err := c.do.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt == maxAttempt {
-				return fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
-			}
-			backoff(attempt)
-			continue
-		}
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		resp.Body.Close()
+// resendActor implements retryActor for Resend (single-shot HTTP request with
+// Bearer-token auth + JSON body + Idempotency-Key header). tech-debt-block-8.
+type resendActor struct {
+	c        *ResendClient
+	m        Email
+	endpoint string
+}
 
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return nil // success
-		}
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			// Deterministic: never retry. Sanitize the body before including
-			// in the error message — server echoes must NEVER carry the
-			// API key (it shouldn't, but defence-in-depth).
-			return fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
-		}
-		// 5xx: transient
-		lastErr = fmt.Errorf("%w: status %d", ErrTransient, resp.StatusCode)
-		if attempt == maxAttempt {
-			return fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
-		}
-		backoff(attempt)
+// onAttempt increments the Resend per-attempt metric. CC=2.
+func (a *resendActor) onAttempt(_ int) {
+	if a.c.metrics != nil {
+		a.c.metrics.IncAttempt(metrics.VendorResend)
 	}
-	return lastErr
+}
+
+// buildRequest is the Resend-specific request constructor (CC=1).
+func (a *resendActor) buildRequest(ctx context.Context, body []byte) *http.Request {
+	req, _ := http.NewRequestWithContext(ctx, "POST", a.endpoint, strings.NewReader(string(body)))
+	req.Header.Set("Authorization", "Bearer "+a.c.cfg.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", a.m.IdempotencyKey)
+	return req
+}
+
+// do executes one HTTP call. CC=1.
+func (a *resendActor) do(req *http.Request) (*http.Response, error) { return a.c.do.Do(req) }
+
+// onSuccess records audit + emits success metric for 2xx responses. CC=2.
+func (a *resendActor) onSuccess(ctx context.Context, _ []byte) error {
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, nil)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusSuccess)
+	}
+	return nil
+}
+
+// onBadRequest records audit + emits bad-request metric for 4xx responses.
+// Sanitizes the body before embedding in the error so server echoes never
+// carry the API key. CC=4.
+func (a *resendActor) onBadRequest(ctx context.Context, status int, body []byte) error {
+	finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, status, sanitizeBody(body))
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusBadRequest)
+	}
+	return finalErr
+}
+
+// onTransportError records audit + emits dead-letter metric when the HTTP
+// call itself returned an error (network/timeout/cancelled). CC=4.
+func (a *resendActor) onTransportError(ctx context.Context, attempt int, err error) error {
+	finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusDeadLetter)
+	}
+	return finalErr
+}
+
+// onTransientExhausted records audit + emits dead-letter metric when the
+// transient budget is exhausted (last attempt 5xx). CC=4.
+func (a *resendActor) onTransientExhausted(ctx context.Context, attempt, status int, body []byte) error {
+	finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, status, attempt, sanitizeBody(body))
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusDeadLetter)
+	}
+	return finalErr
+}
+
+// lastTransientError returns the transient error to surface if the loop
+// exits without a definitive outcome (defensive — should never hit in
+// practice). CC=1.
+func (a *resendActor) lastTransientError(status int) error {
+	return fmt.Errorf("%w: status %d", ErrTransient, status)
 }
 
 // ---------------------------------------------------------------------------
@@ -241,9 +325,11 @@ type BrevoConfig struct {
 
 // BrevoClient is the Brevo HTTP-API client.
 type BrevoClient struct {
-	cfg BrevoConfig
-	do  HTTPDoer
-	id  *IdempotencyStore
+	cfg     BrevoConfig
+	do      HTTPDoer
+	id      *IdempotencyStore
+	audit   *notifydb.DB
+	metrics *metrics.Registry
 }
 
 // NewBrevoClient returns a Brevo client with the supplied config.
@@ -265,6 +351,43 @@ func NewBrevoClient(cfg BrevoConfig) *BrevoClient {
 
 // Vendor returns the vendor name.
 func (c *BrevoClient) Vendor() string { return "brevo" }
+
+// WithAuditDB attaches a notifydb persistence sink. v17409-4.
+func (c *BrevoClient) WithAuditDB(db *notifydb.DB) *BrevoClient {
+	c.audit = db
+	return c
+}
+
+// WithMetrics attaches a metrics.Registry for observability counters.
+// v17409-6.
+func (c *BrevoClient) WithMetrics(r *metrics.Registry) *BrevoClient {
+	c.metrics = r
+	return c
+}
+
+// recordAudit writes a Dispatch row when c.audit is set. Best-effort.
+func (c *BrevoClient) recordAudit(ctx context.Context, key, subject string, err error) {
+	if c.audit == nil {
+		return
+	}
+	status := "ok"
+	errStr := ""
+	if err != nil {
+		status = "error"
+		errStr = err.Error()
+	}
+	_ = c.audit.Insert(ctx, notifydb.Dispatch{
+		ID:          key,
+		Vendor:      "brevo",
+		Recipient:   "(collapsed)",
+		Subject:     subject,
+		Status:      status,
+		Error:       errStr,
+		CreatedUnix: time.Now().Unix(),
+		SentAtUnix:  time.Now().Unix(),
+		Attempt:     c.cfg.MaxRetry,
+	})
+}
 
 type brevoPayload struct {
 	Sender      brevoAddr         `json:"sender"`
@@ -334,39 +457,83 @@ func (c *BrevoClient) doWithRetry(ctx context.Context, body []byte, m Email) err
 	if err != nil {
 		return fmt.Errorf("%w: build endpoint: %v", ErrPermanent, err)
 	}
-	maxAttempt := c.cfg.MaxRetry + 1
-	var lastErr error
-	for attempt := 1; attempt <= maxAttempt; attempt++ {
-		req, _ := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(body)))
-		req.Header.Set("api-key", c.cfg.APIKey)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Idempotency-Key", m.IdempotencyKey)
+	actor := &brevoActor{c: c, m: m, endpoint: endpoint}
+	return retryWithBackoff(ctx, c.cfg.MaxRetry+1, body, m, actor)
+}
 
-		resp, err := c.do.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt == maxAttempt {
-				return fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
-			}
-			backoff(attempt)
-			continue
-		}
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		resp.Body.Close()
+// brevoActor implements retryActor for Brevo (single-shot HTTP request with
+// api-key header auth + JSON body + Idempotency-Key header). tech-debt-block-8.
+type brevoActor struct {
+	c        *BrevoClient
+	m        Email
+	endpoint string
+}
 
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return nil
-		}
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			return fmt.Errorf("%w: status %d: %s", ErrPermanent, resp.StatusCode, sanitizeBody(respBody))
-		}
-		lastErr = fmt.Errorf("%w: status %d", ErrTransient, resp.StatusCode)
-		if attempt == maxAttempt {
-			return fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, resp.StatusCode, attempt, sanitizeBody(respBody))
-		}
-		backoff(attempt)
+// onAttempt increments the Brevo per-attempt metric. CC=2.
+func (a *brevoActor) onAttempt(_ int) {
+	if a.c.metrics != nil {
+		a.c.metrics.IncAttempt(metrics.VendorBrevo)
 	}
-	return lastErr
+}
+
+// buildRequest is the Brevo-specific request constructor (CC=1).
+func (a *brevoActor) buildRequest(ctx context.Context, body []byte) *http.Request {
+	req, _ := http.NewRequestWithContext(ctx, "POST", a.endpoint, strings.NewReader(string(body)))
+	req.Header.Set("api-key", a.c.cfg.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", a.m.IdempotencyKey)
+	return req
+}
+
+// do executes one HTTP call. CC=1.
+func (a *brevoActor) do(req *http.Request) (*http.Response, error) { return a.c.do.Do(req) }
+
+// onSuccess records audit + emits success metric for 2xx responses. CC=2.
+func (a *brevoActor) onSuccess(ctx context.Context, _ []byte) error {
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, nil)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusSuccess)
+	}
+	return nil
+}
+
+// onBadRequest records audit + emits bad-request metric for 4xx responses.
+// Sanitizes the body before embedding in the error. CC=4.
+func (a *brevoActor) onBadRequest(ctx context.Context, status int, body []byte) error {
+	finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, status, sanitizeBody(body))
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusBadRequest)
+	}
+	return finalErr
+}
+
+// onTransportError records audit + emits dead-letter metric when the HTTP
+// call itself returned an error. CC=4.
+func (a *brevoActor) onTransportError(ctx context.Context, attempt int, err error) error {
+	finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusDeadLetter)
+	}
+	return finalErr
+}
+
+// onTransientExhausted records audit + emits dead-letter metric when the
+// transient budget is exhausted. CC=4.
+func (a *brevoActor) onTransientExhausted(ctx context.Context, attempt, status int, body []byte) error {
+	finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, status, attempt, sanitizeBody(body))
+	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
+	if a.c.metrics != nil {
+		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusDeadLetter)
+	}
+	return finalErr
+}
+
+// lastTransientError returns the transient error to surface if the loop
+// exits without a definitive outcome. CC=1.
+func (a *brevoActor) lastTransientError(status int) error {
+	return fmt.Errorf("%w: status %d", ErrTransient, status)
 }
 
 // ---------------------------------------------------------------------------
@@ -390,6 +557,29 @@ type Dispatcher struct {
 // NewDispatcher returns a vendor-rotating dispatcher.
 func NewDispatcher(cfg DispatcherConfig) *Dispatcher {
 	return &Dispatcher{cfg: cfg}
+}
+
+// WithMetrics propagates the metrics registry to both vendor clients
+// so the round-robin Send path emits the same counters. v17409-6.
+func (d *Dispatcher) WithMetrics(r *metrics.Registry) *Dispatcher {
+	if rc, ok := d.cfg.ResendClient.(*ResendClient); ok {
+		rc.WithMetrics(r)
+	}
+	if bc, ok := d.cfg.BrevoClient.(*BrevoClient); ok {
+		bc.WithMetrics(r)
+	}
+	return d
+}
+
+// WithAuditDB propagates the audit DB to both vendor clients. v17409-4.
+func (d *Dispatcher) WithAuditDB(db *notifydb.DB) *Dispatcher {
+	if rc, ok := d.cfg.ResendClient.(*ResendClient); ok {
+		rc.WithAuditDB(db)
+	}
+	if bc, ok := d.cfg.BrevoClient.(*BrevoClient); ok {
+		bc.WithAuditDB(db)
+	}
+	return d
 }
 
 // Send attempts the email via the round-robin pick; on ErrDeadLetter, falls
@@ -589,8 +779,78 @@ func isAlnum(c byte) bool {
 
 // Hash32 returns a stable 32-bit hash of the input; used for cost
 // attribution row keys in tests and downstream dashboards.
+// Hash32 returns a stable 32-bit hash of the input; used for cost
+// attribution row keys in tests and downstream dashboards.
 func Hash32(s string) uint32 {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(s))
 	return h.Sum32()
+}
+
+// ---------------------------------------------------------------------------
+// retryActor — shared retry-loop abstraction
+// ---------------------------------------------------------------------------
+
+// retryActor encapsulates the vendor-specific pieces of a single-shot HTTP
+// delivery. The orchestration (retry, backoff, attempt counting, audit final
+// emission) lives in retryWithBackoff. Splitting these keeps the orchestration
+// loop flat (CC ≤ 4) and lets us add new vendors without duplicating it.
+//
+// Contract for every method:
+//   - buildRequest must attach the right auth headers
+//   - do runs the HTTP call
+//   - onSuccess is called for any 2xx response
+//   - onBadRequest is called for any 4xx response (fail-fast, no retry)
+//   - onTransportError is called when Do() itself returned an error AND
+//     the attempt budget has been exhausted
+//   - onTransientExhausted is called for a 5xx response on the last attempt
+//   - lastTransientError returns the marker error to set when we will retry
+//     the next iteration (never the user-visible error)
+type retryActor interface {
+	// onAttempt is invoked at the start of each attempt. Actors use it to
+	// increment the per-vendor metrics counter (no return value).
+	onAttempt(attempt int)
+	buildRequest(ctx context.Context, body []byte) *http.Request
+	do(req *http.Request) (*http.Response, error)
+	onSuccess(ctx context.Context, body []byte) error
+	onBadRequest(ctx context.Context, status int, body []byte) error
+	onTransportError(ctx context.Context, attempt int, err error) error
+	onTransientExhausted(ctx context.Context, attempt, status int, body []byte) error
+	lastTransientError(status int) error
+}
+
+// retryWithBackoff drives the per-attempt loop. It is intentionally small
+// (CC ≤ 4) because every behavioural branch is delegated to the actor.
+// CC=4.
+func retryWithBackoff(ctx context.Context, maxAttempt int, body []byte, m Email, actor retryActor) error {
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempt; attempt++ {
+		actor.onAttempt(attempt)
+
+		req := actor.buildRequest(ctx, body)
+		resp, err := actor.do(req)
+		if err != nil {
+			lastErr = actor.lastTransientError(0)
+			if attempt == maxAttempt {
+				return actor.onTransportError(ctx, attempt, err)
+			}
+			backoff(attempt)
+			continue
+		}
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		resp.Body.Close()
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			return actor.onSuccess(ctx, respBody)
+		}
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			return actor.onBadRequest(ctx, resp.StatusCode, respBody)
+		}
+		lastErr = actor.lastTransientError(resp.StatusCode)
+		if attempt == maxAttempt {
+			return actor.onTransientExhausted(ctx, attempt, resp.StatusCode, respBody)
+		}
+		backoff(attempt)
+	}
+	return lastErr
 }
