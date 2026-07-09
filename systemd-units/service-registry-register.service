@@ -1,0 +1,17 @@
+[Unit]
+Description=Register Helixon Fleet Agent with svcregistryd
+After=svcregistryd.service fleet-agent.service
+Wants=svcregistryd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/bin/sh -c 'curl -fsS -X POST http://127.0.0.1:7777/api/v1/services -H "Content-Type: application/json" -d "{\"name\":\"fleet-agent-wsl1\",\"kind\":\"agent\",\"node\":\"wsl1\",\"http_port\":8686,\"owner\":\"v14553\",\"health_url\":\"http://127.0.0.1:8686/api/v1/health\"}" || echo "svcregistryd not ready, will retry on next login"'
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+StandardOutput=append:%h/logs/service-registry-register.log
+StandardError=append:%h/logs/service-registry-register.log
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,10 @@
+# Per-node fleet-agent template. Usage:
+#   systemctl --user enable fleet-agent@wsl2.service
+#   systemctl --user start  fleet-agent@wsl2.service
+#
+# The instance name (e.g. wsl2) is used to resolve:
+#   - %h/.config/helixon/%i-fleet-agent.yaml  (config)
+#   - 127.0.0.1:86%i0                         (http port, last digit of instance)
+#
+# All other agents on win2/wsl2, win3/wsl3, win4/wsl4 should drop a
+# copy of this file and tweak the WorkingDirectory + Tailscale IP.
