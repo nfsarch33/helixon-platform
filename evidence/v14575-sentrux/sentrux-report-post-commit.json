@@ -1,0 +1,54 @@
+{
+  "verdict": "FAIL",
+  "check_count": 9,
+  "pass_count": 7,
+  "fail_count": 1,
+  "warn_count": 1,
+  "checks": [
+    {
+      "check": "no-direct-main-push",
+      "status": "PASS",
+      "detail": "pushed only via PRs and feature branches"
+    },
+    {
+      "check": "no-plaintext-secrets",
+      "status": "PASS",
+      "detail": "no plaintext refs found"
+    },
+    {
+      "check": "registry-sot-required",
+      "status": "PASS",
+      "detail": "all services have name + port"
+    },
+    {
+      "check": "llm-router-token-required",
+      "status": "WARN",
+      "detail": "llm-router auth not explicit"
+    },
+    {
+      "check": "engram-embed-url-required",
+      "status": "PASS",
+      "detail": "engramd has embed_url"
+    },
+    {
+      "check": "evidence-directories-present",
+      "status": "PASS",
+      "detail": "all 17 evidence dirs exist"
+    },
+    {
+      "check": "retro-present",
+      "status": "PASS",
+      "detail": "retro at sprint-retros/v14540-v14557-retro.md"
+    },
+    {
+      "check": "adrs-present",
+      "status": "PASS",
+      "detail": "ADR-0095 + ADR-0096 committed"
+    },
+    {
+      "check": "no-uncommitted-changes",
+      "status": "FAIL",
+      "detail": "2 uncommitted changes"
+    }
+  ]
+}

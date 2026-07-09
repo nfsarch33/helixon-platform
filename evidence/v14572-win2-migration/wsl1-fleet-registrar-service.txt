@@ -1,0 +1,1 @@
+-rw-r--r-- 1 jaslian jaslian 606 Jul  9 23:52 /home/jaslian/.config/systemd/user/fleet-registrar.service

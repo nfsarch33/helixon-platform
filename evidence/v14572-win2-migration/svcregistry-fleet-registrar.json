@@ -1,0 +1,12 @@
+[
+  {
+    "name": "fleet-registrar",
+    "host": "127.0.0.1",
+    "port": 9103,
+    "protocol": "http",
+    "owner": "v14572",
+    "status": "up",
+    "last_seen_iso": "2026-07-09T13:52:45Z",
+    "tailscale_ip": "100.84.108.92"
+  }
+]

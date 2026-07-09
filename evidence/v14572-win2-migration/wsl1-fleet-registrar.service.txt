@@ -1,0 +1,18 @@
+[Unit]
+Description=fleet-registrar (central service register) — migrated from wsl2 (v14572)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+Environment=FLEET_REGISTRAR_LOG_LEVEL=info
+ExecStart=%h/.local/bin/fleet-registrar -addr 127.0.0.1:9103 -db %h/.config/fleet-registrar/registrar.db -engram-log %h/logs/runx/engram-healthcheck.ndjson -poll-interval 60s
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:%h/logs/fleet-registrar.ndjson
+StandardError=append:%h/logs/fleet-registrar-errors.log
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

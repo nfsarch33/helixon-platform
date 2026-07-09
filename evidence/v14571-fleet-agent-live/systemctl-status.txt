@@ -1,0 +1,24 @@
+---fleet-agent.service---
+● fleet-agent.service - Helixon Fleet Agent (wsl1)
+     Loaded: loaded (/home/jaslian/.config/systemd/user/fleet-agent.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-07-09 23:43:29 AEST; 1min 17s ago
+   Main PID: 3748928 (helixon)
+      Tasks: 10 (limit: 154372)
+     Memory: 7.1M (peak: 12.7M)
+        CPU: 135ms
+     CGroup: /user.slice/user-1001.slice/user@1001.service/app.slice/fleet-agent.service
+             └─3748928 /home/jaslian/local/bin/helixon serve --config /home/jaslian/.config/helixon/wsl1-fleet-agent.yaml --http-addr 127.0.0.1:8686
+
+Jul 09 23:43:26 DESKTOP-12RO1AF systemd[336]: Starting fleet-agent.service - Helixon Fleet Agent (wsl1)...
+Jul 09 23:43:29 DESKTOP-12RO1AF systemd[336]: Started fleet-agent.service - Helixon Fleet Agent (wsl1).
+
+---register.service---
+○ service-registry-register.service - Register Helixon Fleet Agent with svcregistryd
+     Loaded: loaded (/home/jaslian/.config/systemd/user/service-registry-register.service; enabled; preset: enabled)
+     Active: inactive (dead) since Thu 2026-07-09 23:44:18 AEST; 28s ago
+    Process: 3755285 ExecStart=/home/jaslian/.local/bin/fleet-agent-register.sh (code=exited, status=0/SUCCESS)
+   Main PID: 3755285 (code=exited, status=0/SUCCESS)
+        CPU: 8ms
+
+Jul 09 23:44:18 DESKTOP-12RO1AF systemd[336]: Starting service-registry-register.service - Register Helixon Fleet Agent with svcregistryd...
+Jul 09 23:44:18 DESKTOP-12RO1AF systemd[336]: Finished service-registry-register.service - Register Helixon Fleet Agent with svcregistryd.

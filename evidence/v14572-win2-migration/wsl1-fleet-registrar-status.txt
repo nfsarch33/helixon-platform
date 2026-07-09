@@ -1,0 +1,11 @@
+● fleet-registrar.service - fleet-registrar (central service register) — migrated from wsl2 (v14572)
+     Loaded: loaded (/home/jaslian/.config/systemd/user/fleet-registrar.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-07-09 23:52:24 AEST; 3min 37s ago
+   Main PID: 3819434 (fleet-registrar)
+      Tasks: 19 (limit: 154372)
+     Memory: 8.4M (peak: 31.8M)
+        CPU: 1.527s
+     CGroup: /user.slice/user-1001.slice/user@1001.service/app.slice/fleet-registrar.service
+             └─3819434 /home/jaslian/.local/bin/fleet-registrar -addr 127.0.0.1:9103 -db /home/jaslian/.config/fleet-registrar/registrar.db -engram-log /home/jaslian/logs/runx/engram-healthcheck.ndjson -poll-interval 60s
+
+Jul 09 23:52:24 DESKTOP-12RO1AF systemd[336]: Started fleet-registrar.service - fleet-registrar (central service register) — migrated from wsl2 (v14572).

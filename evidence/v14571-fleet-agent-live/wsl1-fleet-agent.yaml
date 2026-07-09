@@ -1,0 +1,31 @@
+# WSL1 fleet-agent configuration for helixon serve
+# Connects to local LLM router (127.0.0.1:8080), sprintboard (127.0.0.1:9400),
+# and registers itself with svcregistryd (127.0.0.1:7777).
+
+agent_id: helixon-fleet-wsl1
+system_prompt: |
+  You are the wsl1 fleet agent on win1/wsl1 (the Helixon central node).
+  You receive tasks from the SprintBoard, execute them using available
+  tools (registra, llm-router, engramd, svcregistryd), and report
+  results. Be thorough and include evidence of completion.
+session_dsn: "file:/home/jaslian/.local/share/helixon/fleet-wsl1.db?cache=shared&mode=rwc"
+max_iterations: 50
+max_tokens: 128000
+timeout: 10m
+heartbeat_every: 30s
+
+provider:
+  kind: openai-compat
+  base_url: http://127.0.0.1:8080/v1
+  model: Qwen3.6-27B-MTP
+  api_key: "${OPENAI_API_KEY}"
+  timeout: 60s
+
+sprintboard:
+  url: http://127.0.0.1:9400
+  capabilities: "code,test,review,deploy,registry"
+
+registra:
+  registry_path: /home/jaslian/Code/cursor-global-kb/inventory/services/registry.yaml
+  bridge_url: http://127.0.0.1:7777
+  node_alias: wsl1
