@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
 
   tailscale-exporter:
-    image: gcsmith/tailscale-exporter:latest
+    image: adinhodovic/tailscale-exporter:latest
     network_mode: host
     environment:
       - TAILSCALE_TAILNET=${TAILSCALE_TAILNET:-}
