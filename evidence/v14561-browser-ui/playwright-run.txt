@@ -1,0 +1,18 @@
+Playwright is not installed in inventory/services/ui/. To run the test:
+
+    cd ~/Code/cursor-global-kb/inventory/services/ui
+    npm init -y
+    npm i -D @playwright/test playwright
+    npx playwright install --with-deps chromium
+    npx playwright test playwright-smoke.test.js
+
+The test file is checked in (playwright-smoke.test.js) and ready to
+run when Playwright is installed. Manual verification via curl + the
+HTML form succeeded during v14561:
+
+=== Manual end-to-end curl test ===
+{"name":"smoke-v14561-1783599808","host":"127.0.0.1","port":9999,"protocol":"http","owner":"v14561","status":"up","last_seen_iso":"","tailscale_ip":"100.84.108.92"}
+
+=== Verify registration ===
+matched 1 smoke entries:
+   smoke-v14561-1783599808 : 9999
