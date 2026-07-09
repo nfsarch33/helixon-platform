@@ -30,6 +30,7 @@ import (
 
 	"github.com/nfsarch33/helixon-platform/internal/notify"
 	"github.com/nfsarch33/helixon-platform/internal/notify/endemail"
+	"github.com/nfsarch33/helixon-platform/internal/notify/metrics"
 	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
 )
 
@@ -157,10 +158,13 @@ func main() {
 	brevoCfg := notify.BrevoConfig{APIKey: *brevoKey}
 	brevoClient := notify.NewBrevoClient(brevoCfg).WithAuditDB(db)
 
+	// v17409-6: attach metrics registry so the live send emits
+	// notify_send_total and notify_send_attempts_total counters.
+	metricsReg := metrics.NewRegistry(nil)
 	disp := notify.NewDispatcher(notify.DispatcherConfig{
 		ResendClient: resendClient,
 		BrevoClient:  brevoClient,
-	})
+	}).WithMetrics(metricsReg).WithAuditDB(db)
 
 	if err := disp.Send(ctx, m); err != nil {
 		auditEvent["result"] = "send-error"
@@ -171,6 +175,23 @@ func main() {
 	}
 
 	auditEvent["result"] = "sent"
+
+	// v17409-6: surface per-vendor counters in the audit event so
+	// the rotation/observability story is visible without a Prometheus
+	// scrape. The in-process registry already incremented via the
+	// ResendClient/BrevoClient doWithRetry hooks.
+	snap := metricsReg.Snapshot()
+	sendCounts := make(map[string]int64, len(snap.SendCounts))
+	for k, v := range snap.SendCounts {
+		sendCounts[string(k.Vendor)+"/"+string(k.Status)] = v
+	}
+	attempts := make(map[string]int64, len(snap.Attempts))
+	for k, v := range snap.Attempts {
+		attempts[string(k.Vendor)] = v
+	}
+	auditEvent["notify_send_total"] = sendCounts
+	auditEvent["notify_send_attempts_total"] = attempts
+
 	out, _ := json.MarshalIndent(auditEvent, "", "  ")
 	fmt.Println(string(out))
 }
