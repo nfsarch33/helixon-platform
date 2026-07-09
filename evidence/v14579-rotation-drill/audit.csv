@@ -1,0 +1,13 @@
+uuid,title,account,status,pw_len,sha256,rotation
+pdueu5keepupnhd5cjj2fqumem,Win PC WSL Ubuntu Login GB,jaslian@win1,OK,16,be66f76db172e057861add596136c8165a8708545a486d343c208545f7517d01,excluded-no-touch
+55z2jgso2aefsu6ropoxiip4by,MSI Win PC WSL Ubuntu Login,jason@msi,OK,28,89b98665ea008096260bd4d70bdf20a2a488099d5dff8f05b35b75817dc7ce93,excluded-no-touch
+mo6x2g5fd34eg4a3hpfuz3gcqu,Service Account Auth Token: msi-win11-laptop,sa-msi,OK,852,644f7f45c645ac83b397cb06e340b72db8feb17e1c1ebe0f5b227133829654d2,excluded-no-touch
+pfhiyhwiey7yvqrtzdglrj2o4a,Service Account Auth Token: cursor_ironclaw,sa-vault,OK,852,82646444622cafa050e9d44a664c833f481f3838e8ce9d34238541984dd5fea9,excluded-no-touch
+smvoqaxttwlabd6jqqxng6aj2y,Win PC WSL Ubuntu Login GB / jason@win2,jason@win2,OK,16,be66f76db172e057861add596136c8165a8708545a486d343c208545f7517d01,excluded-no-touch
+s2h64ocrkfye2fr4lszgwcbijm,wsl2_win11 tailscale auth key expire on 27 Jun 2026,wsl2-replacement,OK,62,2e3b25934a137be4254dd868e3ba50a0370e2224e259306f4c4ee0e1356befdf,excluded-no-touch
+7w7iwwwkx55u27qcddr6prwv4m,1password op Service Account Auth Token: win1/wsl1,sa-win1,OK,852,3af201c2e6a2e0c860263b31ce970b967cdab390d934515bebdc7dfee17a257b,excluded-no-touch
+nrmcadhudzunh37ajvoqfsmmyy,tailscale-auth-key,tailnet-admin,OK,0,NONE,excluded-no-touch
+sjhxjryivr6edhmb2ecovdpot4,Win PC WSL Ubuntu Login GB / jason@win4,jason@win4,OK,16,be66f76db172e057861add596136c8165a8708545a486d343c208545f7517d01,excluded-no-touch
+vygyluc6uiuhqj4kee4ygy527m,wsl1_win11 tailscale auth key expire on 27 Jun 2026,wsl1-replacement,OK,62,614370b3b803f970b629cfd987c20f3d8ce28e3facaed50dc59d93668862638c,excluded-no-touch
+jgt7yaixlrmymfiswliqadoaoi,Main Tailscale API Access token,ts-api,OK,60,83a2b33159f36edf618827adc8a91dab7d6235affede33f5735c2b886a8badf2,excluded-no-touch
+gmfbh6yqhrgcovmxmbhbttl3cu,Tavily API Key 1,tavily-api,OK,58,b3e7fd851dd6a50835c2454d697c73a26a68e06ee53d7601c6cf3e013377aea0,drill-no-rotation-old=new

@@ -1,0 +1,57 @@
+{
+  "id": "gmfbh6yqhrgcovmxmbhbttl3cu",
+  "title": "Tavily API Key 1",
+  "tags": ["fleet", "search", "tavily"],
+  "version": 1,
+  "vault": {
+    "id": "eee7kcwy46ut2qvwytxw6nmdhi",
+    "name": "Cursor_IronClaw"
+  },
+  "category": "LOGIN",
+  "last_edited_by": "JZAYQAAGQZHU5PEREESZ35FDNQ",
+  "created_at": "2026-03-28T03:09:45Z",
+  "updated_at": "2026-03-28T03:09:45Z",
+  "additional_information": "tavily-fleet",
+  "sections": [
+    {
+      "id": "Section_5qoaoo2g4jwqglpt7vyibjdts4"
+    }
+  ],
+  "fields": [
+    {
+      "id": "username",
+      "type": "STRING",
+      "purpose": "USERNAME",
+      "label": "username",
+      "value": "tavily-fleet",
+      "reference": "op://Cursor_IronClaw/Tavily API Key 1/username"
+    },
+    {
+      "id": "password",
+      "type": "CONCEALED",
+      "purpose": "PASSWORD",
+      "label": "password",
+      "reference": "op://Cursor_IronClaw/Tavily API Key 1/password",
+      "password_details": {
+        "strength": "TERRIBLE"
+      }
+    },
+    {
+      "id": "notesPlain",
+      "type": "STRING",
+      "purpose": "NOTES",
+      "label": "notesPlain",
+      "reference": "op://Cursor_IronClaw/Tavily API Key 1/notesPlain"
+    },
+    {
+      "id": "h34jji3b6surq3z5sxr25g7cia",
+      "section": {
+        "id": "Section_5qoaoo2g4jwqglpt7vyibjdts4"
+      },
+      "type": "CONCEALED",
+      "label": "credential",
+      "value": "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",
+      "reference": "op://Cursor_IronClaw/Tavily API Key 1/Section_5qoaoo2g4jwqglpt7vyibjdts4/credential"
+    }
+  ]
+}

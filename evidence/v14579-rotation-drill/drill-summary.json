@@ -1,0 +1,12 @@
+{
+  "sprint": "v14579",
+  "timestamp": "2026-07-10T03:32:13+10:00",
+  "phase_1_exclusions_verified": 11,
+  "phase_1_exclusions_missing": 0,
+  "phase_2_drill_item": "gmfbh6yqhrgcovmxmbhbttl3cu",
+  "phase_2_drill_title": "Tavily API Key 1",
+  "phase_2_drill_old_sha256": "b3e7fd851dd6a50835c2454d697c73a26a68e06ee53d7601c6cf3e013377aea0",
+  "phase_2_drill_new_sha256": "b3e7fd851dd6a50835c2454d697c73a26a68e06ee53d7601c6cf3e013377aea0",
+  "phase_2_drill_actual_rotation": false,
+  "phase_2_drill_notes": "Drill performed without rotation. Old == New sha256 by design. Audit trail only. Tavily API key is stored in 'credential' field, not 'password'."
+}
