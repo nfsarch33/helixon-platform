@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-07-10T07:35:00+10:00",
+  "items": [
+    {
+      "uuid": "vygyluc6uiuhqj4kee4ygy527m",
+      "title": "wsl1_win11 tailscale auth key expire on 27 Jun 2026",
+      "category": "LOGIN",
+      "fields": [
+        {
+          "label": "username",
+          "type": "STRING",
+          "value_len": 10
+        },
+        {
+          "label": "password",
+          "type": "CONCEALED",
+          "value_len": 62
+        },
+        {
+          "label": "notesPlain",
+          "type": "STRING",
+          "value_len": 106
+        }
+      ],
+      "notesPlain": ""
+    },
+    {
+      "uuid": "s2h64ocrkfye2fr4lszgwcbijm",
+      "title": "wsl2_win11 tailscale auth key expire on 27 Jun 2026",
+      "category": "LOGIN",
+      "fields": [
+        {
+          "label": "password",
+          "type": "CONCEALED",
+          "value_len": 62
+        },
+        {
+          "label": "username",
+          "type": "STRING",
+          "value_len": 10
+        },
+        {
+          "label": "notesPlain",
+          "type": "STRING",
+          "value_len": 114
+        }
+      ],
+      "notesPlain": ""
+    }
+  ]
+}
