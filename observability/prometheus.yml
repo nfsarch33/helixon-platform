@@ -1,68 +1,75 @@
-# prometheus.yml — Helixon observability sidecar config.
-#
-# Loaded by the Prometheus container started via
-# `docker run -p 9090:9090 -v $PWD/prometheus.yml:/etc/prometheus/prometheus.yml
-#         -v $PWD/alerts:/etc/prometheus/alerts
-#         prom/prometheus:latest`.
-#
-# Authored: 2026-07-15 (v14512 Pair-5 MVP).
-
+# Prometheus scrape config for the Helixon fleet.
 global:
   scrape_interval: 30s
   evaluation_interval: 30s
   external_labels:
     cluster: helixon-fleet
-    sprint: v14512
-
-rule_files:
-  - /etc/prometheus/alerts/prometheus-helixon-alerts.yml
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets: ["alertmanager:9093"]
+    region: sydney
 
 scrape_configs:
-  # control-plane HTTP /metrics endpoint (v14508 healthz + readyz deliverable).
-  - job_name: helixon-control-plane
-    metrics_path: /metrics
-    scheme: http
-    static_configs:
-      - targets: ["127.0.0.1:8080"]
-        labels:
-          component: control-plane
-          sprint: v14512
-
-  # qwen36 cells (one target per llama.cpp / vLLM cell).
-  - job_name: qwen36-cells
-    metrics_path: /metrics
-    scheme: http
-    static_configs:
-      - targets:
-          - "127.0.0.1:8001"   # C1
-          - "127.0.0.1:8002"   # C2
-          - "127.0.0.1:8003"   # C3
-          - "127.0.0.1:8004"   # C4
-          - "127.0.0.1:8005"   # C5
-          - "127.0.0.1:8010"   # C7
-        labels:
-          component: qwen36
-          team: helixon-platform
-
-  # agentrace SDK on the Helixon fleet agents (one per persona).
-  - job_name: agentrace-fleet
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - "127.0.0.1:9101"
-          - "127.0.0.1:9102"
-          - "127.0.0.1:9103"
-          - "127.0.0.1:9104"
-        labels:
-          component: agentrace
-          team: helixon-fleet
-
-  # Prometheus itself.
   - job_name: prometheus
     static_configs:
-      - targets: ["localhost:9090"]
+      - targets: ['127.0.0.1:9090']
+
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['127.0.0.1:9100']
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ['127.0.0.1:9093']
+
+  - job_name: svcregistryd
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:7777']
+
+  - job_name: engramd
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:8280']
+
+  - job_name: sprintboard-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:9400']
+
+  - job_name: llm-router
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:8080']
+
+  - job_name: helixon_fleet_node
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - '100.84.108.92:9100'   # wsl1 (self)
+          - '100.110.82.5:9100'    # wsl2
+          - '100.79.227.40:9100'   # wsl4
+          - '100.73.98.10:9100'    # wsl3
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '100\.(.+?)\.(.+?)\.(.+?):.+'
+        target_label: tailscale_ip
+        replacement: '${1}.${2}.${3}'
+      - source_labels: [__address__]
+        regex: '100\.84\.108\.92:.+'
+        target_label: alias
+        replacement: wsl1
+      - source_labels: [__address__]
+        regex: '100\.110\.82\.5:.+'
+        target_label: alias
+        replacement: wsl2
+      - source_labels: [__address__]
+        regex: '100\.79\.227\.40:.+'
+        target_label: alias
+        replacement: wsl4
+      - source_labels: [__address__]
+        regex: '100\.73\.98\.10:.+'
+        target_label: alias
+        replacement: wsl3
+
+  - job_name: prometheus-pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ['127.0.0.1:9091']
