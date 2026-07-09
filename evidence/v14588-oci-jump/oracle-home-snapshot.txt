@@ -1,0 +1,101 @@
+- generic
+  - generic
+    - banner
+      - list
+        - listitem [level=1]
+          - link "Skip to content" [ref=e6]
+        - listitem [level=1]
+          - link "Accessibility Policy" [ref=e7]
+      - generic
+        - generic
+          - navigation "Main Menu" [ref=e1]
+            - button "Menu" [expanded=false, ref=e8]
+              - StaticText "Menu"
+          - link "Oracle Home" [ref=e2]
+            - image
+        - search
+          - combobox "Search Oracle.com" [expanded=false, ref=e28]
+        - generic
+          - generic
+            - button "Select country" [ref=e9]
+              - image "United States selected"
+          - button "Sign in" [expanded=false, ref=e10]
+          - link "Contact us" [ref=e3]
+    - main
+      - StaticText ""
+      - StaticText "Cloud"
+      - LabelText
+        - StaticText "Cloud Account Name"
+        - StaticText ""
+      - textbox [ref=e4]
+      - link "Next" [ref=e11]
+      - paragraph
+        - StaticText "Forgot your cloud account name? "
+        - link "Open a live chat" [ref=e12]
+        - LineBreak "\n"
+      - separator
+      - strong
+        - StaticText "Not an Oracle Cloud customer yet?"
+      - link "Sign Up" [ref=e13]
+      - heading "Leverage sovereign AI for critical workloads" [level=4, ref=e14]
+      - paragraph
+        - StaticText "Achieve data governance, residency, and regulatory compliance with the help of Oracle’s sovereign AI solutions. Leverage robust, end-to-end security and advanced controls for developing, deploying, and managing AI models in sensitive and regulated environments."
+      - link "Learn more about sovereign AI" [ref=e29]
+      - heading "Lead the Change: Innovate with AI Built Into Your Database. Everywhere." [level=4, ref=e5]
+      - paragraph
+        - StaticText "Discover how to deliver enterprise-grade AI securely, cost-effectively, and at scale by bringing AI to where your data lives."
+      - link "Access the webinar for Oracle AI Database webinar " [ref=e15]
+        - StaticText "Access the webinar"
+        - StaticText "  "
+        - StaticText "for Oracle AI Database webinar"
+        - StaticText "  "
+    - contentinfo
+      - generic
+        - list
+          - listitem [level=1]
+            - link "© 2026 Oracle" [ref=e16]
+          - listitem [level=1]
+            - ListMarker
+            - link "Privacy" [ref=e17]
+            - StaticText " / "
+            - link "Do Not Sell My Info" [ref=e18]
+          - listitem [level=1]
+            - ListMarker
+            - complementary "Open Cookie Preferences Modal"
+              - link "Cookie Preferences, opens a dedicated popup modal window" [ref=e30]
+                - StaticText "Cookie Preferences"
+          - listitem [level=1]
+            - ListMarker
+            - link "Ad Choices" [ref=e19]
+          - listitem [level=1]
+            - ListMarker
+            - link "Careers" [ref=e20]
+          - listitem [level=1]
+            - ListMarker
+            - link "Subscribe to emails" [ref=e21]
+          - listitem [level=1]
+            - ListMarker
+            - link "Integrity Helpline" [ref=e22]
+          - listitem [level=1]
+            - ListMarker
+            - link "Contact Us" [ref=e23]
+        - list
+          - listitem [level=1]
+            - ListMarker
+            - link "Facebook" [ref=e24]
+              - StaticText "Facebook"
+          - listitem [level=1]
+            - ListMarker
+            - link "Follow Oracle on X" [ref=e25]
+              - StaticText "X"
+          - listitem [level=1]
+            - ListMarker
+            - link "Oracle on LinkedIn" [ref=e26]
+              - StaticText "LinkedIn"
+          - listitem [level=1]
+            - ListMarker
+            - link "Watch Oracle on YouTube" [ref=e27]
+              - StaticText "YouTube"
+  - generic
+    - StaticText "  "
+    - StaticText "  "

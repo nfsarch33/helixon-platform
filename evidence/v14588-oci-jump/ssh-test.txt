@@ -1,0 +1,42 @@
+=== v14588 SSH reachability test ===
+Date: 2026-07-09T20:57:53Z
+From: desktop-12ro1af-wsl1 (100.84.108.92)
+
+--- ping oracle-jump (100.93.242.75) ---
+PING 100.93.242.75 (100.93.242.75) 56(84) bytes of data.
+64 bytes from 100.93.242.75: icmp_seq=1 ttl=64 time=19.2 ms
+64 bytes from 100.93.242.75: icmp_seq=2 ttl=64 time=17.3 ms
+64 bytes from 100.93.242.75: icmp_seq=3 ttl=64 time=17.1 ms
+
+--- 100.93.242.75 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 17.104/17.839/19.155/0.932 ms
+
+--- ping oci-sydney-jump (100.124.160.73) ---
+PING 100.124.160.73 (100.124.160.73) 56(84) bytes of data.
+
+--- 100.124.160.73 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2049ms
+
+
+--- SSH oracle-jump publickey ---
+debug1: Connection established.
+debug3: kex_input_ext_info: extension publickey-hostbound@openssh.com
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: Authentications that can continue: publickey
+debug3: start over, passed a different list publickey
+debug3: preferred gssapi-with-mic,publickey,keyboard-interactive,password
+debug3: authmethod_lookup publickey
+debug3: authmethod_is_enabled publickey
+debug1: Next authentication method: publickey
+debug1: Offering public key: /home/jaslian/.ssh/fleet_lan ED25519 SHA256:4ngaUT06CcIJeplKVMvXD58XB0Y8u7CdzIXYiJP8xjs explicit
+debug2: we sent a publickey packet, wait for reply
+debug1: Authentications that can continue: publickey
+ubuntu@100.93.242.75: Permission denied (publickey).
+
+--- SSH oci-sydney-jump publickey ---
+ssh: connect to host 100.124.160.73 port 22: Connection timed out
+
+--- tailscale status (oracle-jump / oci-sydney-jump reachable?) ---
+100.124.160.73   oci-sydney-jump         jaslian@  linux    active; relay "syd"; offline, last seen 64d ago, tx 14352 rx 0  
+100.93.242.75    oracle-jump             jaslian@  linux    active; direct 159.13.40.202:41641, tx 7940912 rx 7285928       
