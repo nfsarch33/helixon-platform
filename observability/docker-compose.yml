@@ -1,0 +1,59 @@
+# Docker Compose for the Helixon fleet observability stack.
+# Brings up: prometheus, alertmanager (local), grafana (with provisioned dashboards),
+# node-exporter, and tailscale-exporter.
+#
+# Run: docker compose -f observability/docker-compose.yml up -d
+#
+# All containers use host network so they bind to 127.0.0.1 directly,
+# matching the convention used by svcregistryd / alertmanager / engramd.
+
+version: "3.9"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    network_mode: host
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../cursor-global-kb/grafana:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    network_mode: host
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+
+  tailscale-exporter:
+    image: gcsmith/tailscale-exporter:latest
+    network_mode: host
+    environment:
+      - TAILSCALE_TAILNET=${TAILSCALE_TAILNET:-}
+      - TAILSCALE_API_KEY=${TAILSCALE_API_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  grafana-data:
