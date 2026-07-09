@@ -1,0 +1,45 @@
+# Sentrux audit configuration for the Helixon fleet platform.
+# This config is the canonical reference; the GitLab pipeline reads
+# the same file via $SENTRUX_CONFIG.
+
+audit:
+  branch_policy:
+    require_main_first: false
+    allow_long_running: 24h
+  rules:
+    - id: no-direct-main-push
+      description: "No direct push to main"
+      action: deny
+      when:
+        ref: "refs/heads/main"
+        source: "push"
+    - id: no-plaintext-secrets
+      description: "No 1Password secrets in plaintext"
+      action: deny
+      when:
+        pattern: "1Password|op://|OPSANOPSANOPSAN"
+        severity: critical
+    - id: registry-sot-required
+      description: "Every service must be in registry.yaml"
+      action: warn
+      when:
+        check: "registra:all-registered"
+    - id: llm-router-token-required
+      description: "LLM router must require auth token"
+      action: deny
+      when:
+        check: "llm-router:auth-disabled"
+    - id: engram-embed-url-required
+      description: "Engram must have embed_url configured"
+      action: deny
+      when:
+        check: "engramd:embed-url-missing"
+
+reporters:
+  - kind: gitlab
+    project_id: "${CI_PROJECT_ID}"
+  - kind: file
+    path: "sentrux-report.json"
+  - kind: slack
+    webhook: "${SENTRUX_SLACK_WEBHOOK}"
+    only_on: [fail]
