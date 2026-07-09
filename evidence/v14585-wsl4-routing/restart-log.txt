@@ -1,0 +1,26 @@
+=== restart llm-router.service ===
+● llm-router.service - LLM Cluster Router (Helixon fleet central) (v14547)
+     Loaded: loaded (/home/jaslian/.config/systemd/user/llm-router.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-07-09 18:01:04 AEST; 11h ago
+       Docs: https://github.com/helixon/llm-cluster-router
+   Main PID: 3186129 (llm-router)
+      Tasks: 13 (limit: 154372)
+     Memory: 5.9M (peak: 12.9M)
+        CPU: 6.161s
+     CGroup: /user.slice/user-1001.slice/user@1001.service/app.slice/llm-router.service
+             └─3186129 /home/jaslian/local/bin/llm-router serve -c /home/jaslian/Code/cursor-global-kb/configs/llm-cluster-router.yml
+restart exit: 0
+● llm-router.service - LLM Cluster Router (Helixon fleet central) (v14547)
+     Loaded: loaded (/home/jaslian/.config/systemd/user/llm-router.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-07-10 05:21:17 AEST; 3s ago
+       Docs: https://github.com/helixon/llm-cluster-router
+    Process: 1808424 ExecStartPre=/bin/sh -c export OP_SERVICE_ACCOUNT_TOKEN=$(cat /home/jaslian/.config/op/service-account-token) && /home/jaslian/local/bin/secrets-bootstrap --service llm-router --out /run/user/1001/llm-router-env (code=exited, status=0/SUCCESS)
+   Main PID: 1808445 (llm-router)
+      Tasks: 8 (limit: 154372)
+     Memory: 22.5M (peak: 25.8M)
+        CPU: 77ms
+     CGroup: /user.slice/user-1001.slice/user@1001.service/app.slice/llm-router.service
+
+=== http probe ===
+/healthz HTTP 200
+/v1/models HTTP 200

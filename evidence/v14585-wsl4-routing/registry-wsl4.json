@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-07-10T06:20:11+10:00",
+  "registra_list_wsl4": [
+    vllm-c1-awq                 llm-cell            wsl4  0.0.0.0         8004   /health        v14534
+    vllm-c5-wsl4-7b-awq         llm-cell            wsl4  100.79.227.40   8001   /health        v14585
+  ],
+  "registra_cells": [
+    "C7    wsl1  rtx3090-dual  qwen36-27b-mtp-q8      llama-server  8010   ready",
+    "C2    wsl1  rtx3090       qwen36-27b-q4          llama-server  8011   ready",
+    "C1    wsl4  rtx3090       qwen36-27b-int4        vllm          8004   not_yet",
+    "C6    wsl1  rtx2070       nomic-embed-text-v1.5  ollama        11434  ready",
+  ],
+  "registra_show_vllm_c5": {
+  "name": "vllm-c5-wsl4-7b-awq",
+  "kind": "llm-cell",
+  "primary_node": "wsl4",
+  "address": "100.79.227.40",
+  "port": 8001,
+  "health_path": "/health",
+  "binary": "vllm 0.23.0-82c094fc",
+  "owner_sprint": "v14585",
+  "source": "evidence/v14584-wsl4-llama/wsl4-vllm-api.txt",
+  "tags": [
+    "llm",
+    "wsl4",
+    "vllm",
+    "awq",
+    "7b",
+    "tier-1"
+  ],
+  "status": "registered"
+}
+}

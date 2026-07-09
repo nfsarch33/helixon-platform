@@ -1,0 +1,59 @@
+# Helixon llm-cluster-router config (v14534)
+# Routes OpenAI-compatible requests to the qwen36-matrix cells.
+# Self-hosted only (forbidden upstream list enforced by main.go).
+
+listen: ":8787"
+metrics_addr: ":9091"
+debug_addr: ":6060"
+log_level: info
+
+defaults:
+  max_queue_depth: 8
+  max_concurrency: 2
+  request_timeout: 120s
+  max_body_size: 1048576
+  circuit:
+    threshold: 5
+    cooldown: 30s
+
+health_check:
+  interval: 15s
+  timeout: 5s
+  path: /health
+  unhealthy_threshold: 3
+
+nodes:
+  # C7: Qwen3.6-27B-MTP Q8_0 (primary) on dual RTX 3090
+  - name: c7-wsl1
+    url: "http://localhost:8010"
+    model: "Qwen3.6-27B-MTP-Q8_0"
+    tier: 0..3
+    max_concurrency: 4
+    tags: [primary, qwen, q8, mtp]
+
+  # C2: Qwen3.6-27B Q4_K_M (draft) on RTX 3090
+  - name: c2-wsl1
+    url: "http://localhost:8011"
+    model: "Qwen3.6-27B-Q4_K_M"
+    tier: 0..2
+    max_concurrency: 2
+    tags: [draft, qwen, q4]
+
+  # C6: nomic-embed-text-v1.5 (embedding) on RTX 2070
+  - name: c6-wsl1-embed
+    url: "http://localhost:11434/v1"
+    model: "nomic-embed-text:v1.5"
+    tier: 0..3
+    max_concurrency: 1
+    tags: [embedding, nomic]
+
+# Routing rules
+routes:
+  - match: { path: "/v1/embeddings" }
+    target: c6-wsl1-embed
+  - match: { path: "/v1/chat/completions", header: { "X-Tier": "0" } }
+    target: c7-wsl1
+  - match: { path: "/v1/chat/completions", header: { "X-Tier": "3" } }
+    target: c7-wsl1
+  - match: { path: "/v1/chat/completions" }
+    target: c7-wsl1  # default

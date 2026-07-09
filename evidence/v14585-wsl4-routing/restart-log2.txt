@@ -1,0 +1,17 @@
+=== waiting 20s for health checks ===
+
+=== router state ===
+/healthz HTTP 200
+/v1/models HTTP 200
+
+=== routing tests ===
+--- tier-0 (wsl1) ---
+curl: (22) The requested URL returned error: 503
+--- tier-1 (wsl4) ---
+curl: (22) The requested URL returned error: 503
+--- tier-3 (wsl4) ---
+curl: (22) The requested URL returned error: 503
+--- default ---
+curl: (22) The requested URL returned error: 503
+--- embeddings (c6) ---
+curl: (22) The requested URL returned error: 404

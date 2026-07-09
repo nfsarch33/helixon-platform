@@ -1,0 +1,159 @@
+=== v14585 (Pair 5 Review) Wire wsl4 into llm-cluster-router ===
+Timestamp: 2026-07-10T06:13:15+10:00
+Config: /home/jaslian/Code/cursor-global-kb/configs/llm-cluster-router.yml
+
+=== Background ===
+Pair 5 MVP (v14584) installed Qwen3.6-27B GGUF on wsl4 (cf-v14584-01 carried since v14530).
+However, wsl4 RTX 3090 (24GB VRAM) was already running vllm serving
+Qwen/Qwen2.5-7B-Instruct-AWQ on port 8001 — a 7B AWQ model that fits in
+the 24GB VRAM while a 27B Q8_0 (29GB) does not. Per the operator's CF-v14584-01
+resolution, we wired the existing vllm 7B AWQ cell as c5-wsl4 (tier 1 fallback)
+and re-tasked c7-wsl1 (dual RTX 3090 + llamacpp port 8010) to the primary
+Qwen3.6-27B-MTP-Q8_0 (29GB).
+
+=== Routing schema discovered ===
+1. node.cfg.Tier is matched EXACTLY against the X-Tier HTTP header (string equality).
+   Range strings like '0..3' do NOT match any tier.
+2. node.cfg.Models is matched EXACTLY against the 'model' field in the request body.
+3. Routes block in YAML is parsed but NOT applied by current binary build.
+4. Each node is probed on /health, with /v1/models fallback on 404 (probe.go).
+5. A node with /v1 suffix in URL breaks health probe (path concatenation bug).
+
+=== Operational config (v14585 final) ===
+# Helixon llm-cluster-router config (v14585 final, clean)
+# Per internal/config/config.go schema:
+#   Config.HealthCheck = HealthConfig { Interval, Timeout, Path, UnhealthyThreshold, HealthyThreshold }
+#   NodeConfig.Enabled = string (not bool)
+# Routing is determined ONLY by X-Tier header (exact match against node.cfg.Tier).
+# The `routes:` block is parsed but NOT applied by the current router build.
+#
+# Real upstreams (probed 2026-07-10):
+#   c7-wsl1  : port 8010  llamacpp qwen36-27b-mtp-q8 (29GB)
+#   c5-wsl4  : port 8001  vllm     Qwen2.5-7B-Instruct-AWQ
+#   c6-ollama: port 11434 Ollama   qwen36-27b-mtp-q8:latest + nomic-embed-text:v1.5
+#                             (serves both chat and embeddings at /v1/*)
+
+listen: ":8787"
+metrics_addr: ":9091"
+debug_addr: ":6060"
+log_level: info
+
+defaults:
+  max_queue_depth: 8
+  max_concurrency: 2
+  request_timeout: 120s
+  max_body_size: 1048576
+  circuit:
+    threshold: 5
+    cooldown: 30s
+
+health_check:
+  interval: 15s
+  timeout: 5s
+  path: "/health"
+  unhealthy_threshold: 3
+  healthy_threshold: 1
+
+nodes:
+  # C7: Qwen3.6-27B-MTP Q8_0 (primary, 29GB) on dual RTX 3090 — llamacpp port 8010
+  # Tier 0: hardest prompts, full 27B inference
+  - name: c7-wsl1
+    url: "http://localhost:8010"
+    tier: "0"
+    models:
+      - "Qwen3.6-27B-MTP-Q8_0"
+      - "Qwen3.6-27B-Q8_0"
+      - "qwen36-27b-mtp-q8"
+    weight: 100
+    priority: 10
+    enabled: "true"
+
+  # C5: Qwen2.5-7B-Instruct-AWQ (fast fallback) on RTX 3090 — vllm wsl4 port 8001
+  # Tier 1: medium prompts, 7B AWQ inference
+  - name: c5-wsl4
+    url: "http://100.79.227.40:8001"
+    tier: "1"
+    models:
+      - "Qwen/Qwen2.5-7B-Instruct-AWQ"
+      - "Qwen2.5-7B-Instruct-AWQ"
+      - "qwen2.5-7b-instruct-awq"
+    weight: 50
+    priority: 5
+    enabled: "true"
+
+  # C6: Ollama (both chat and embedding) on RTX 2070 — port 11434
+  # Tier 2: cheap/quick chat fallback OR embedding-only
+  - name: c6-ollama
+    url: "http://localhost:11434"
+    tier: "2"
+    models:
+      - "qwen36-27b-mtp-q8:latest"
+      - "qwen36-27b-mtp-q8"
+      - "nomic-embed-text:v1.5"
+      - "nomic-embed-text"
+    weight: 25
+    priority: 1
+=== Router healthz ===
+{
+    "healthy_nodes": 2,
+    "status": "ok"
+}
+
+=== Advertised models ===
+{
+    "data": [
+        {
+            "id": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+            "object": "model"
+        },
+        {
+            "id": "Qwen2.5-7B-Instruct-AWQ",
+            "object": "model"
+        },
+        {
+            "id": "Qwen3.6-27B-MTP-Q8_0",
+            "object": "model"
+        },
+        {
+            "id": "Qwen3.6-27B-Q8_0",
+            "object": "model"
+        },
+        {
+            "id": "qwen2.5-7b-instruct-awq",
+            "object": "model"
+        },
+        {
+            "id": "qwen36-27b-mtp-q8",
+            "object": "model"
+        }
+    ],
+    "object": "list"
+}
+
+=== Test 1: tier 0 → c7-wsl1 (Qwen3.6-27B-MTP-Q8_0 via llamacpp port 8010) ===
+{"choices":[{"finish_reason":"length","index":0,"message":{"role":"assistant","content":"","reasoning_content":"Here's a thinking process:\n\n1"}}],"created":1783627997,"model":"/mnt/g/models/Qwen3.6-27B-MTP-GGUF/Qwen3.6-27B-Q8_0.gguf","system_fingerprint":"b1-32e41fa","object":"chat.completion","usage":{"completion_tokens":8,"prompt_tokens":14,"total_tokens":22,"prompt_tokens_details":{"cached_tokens":10}},"id":"chatcmpl-asTprNcknq7HLKZQtYXlUaoWB3V8WPru","timings":{"cache_n":10,"prompt_n":4,"prompt_ms":649.429,"prompt_per_token_ms":162.35725,"prompt_per_second":6.1592568240716075,"predicted_n":8,"predicted_ms":278.667,"predicted_per_token_ms":34.833375,"predicted_per_second":28.708099631459
+
+=== Test 2: tier 1 → c5-wsl4 (Qwen2.5-7B-AWQ via vllm on wsl4:8001) ===
+{"id":"chatcmpl-a795a8a89a7598c7","object":"chat.completion","created":1783627993,"model":"Qwen/Qwen2.5-7B-Instruct-AWQ","choices":[{"index":0,"message":{"role":"assistant","content":"OK","refusal":null,"annotations":null,"audio":null,"function_call":null,"tool_calls":[],"reasoning":null},"logprobs":null,"finish_reason":"stop","stop_reason":null,"token_ids":null,"routed_experts":null}],"service_tier":null,"system_fingerprint":"vllm-0.23.0-82c094fc","usage":{"prompt_tokens":33,"total_tokens":35,"completion_tokens":2,"prompt_tokens_details":null},"prompt_logprobs":null,"prompt_token_ids":null,"prompt_text":null,"kv_transfer_params":null}
+HTTP:200
+
+
+=== Test 3: default (no X-Tier) → both healthy nodes available ===
+--- 3a: Qwen3.6-27B (c7-wsl1) ---
+{"choices":[{"finish_reason":"length","index":0,"message":{"role":"assistant","content":"","reasoning_content":"Here's a thinking"}}],"created":1783627998,"model":"/mnt/g/models/Qwen3.6-27B-MTP-GGUF/Qwen3.6-27B-Q8_0.gguf","system_fingerprint":"b1-32e41fa","object":"chat.completion","usage":{"completion_tokens":4,"prompt_tokens":11,"total_tokens":15,"prompt_tokens_details":{"cached_tokens":7}},"id"
+
+--- 3b: Qwen2.5-7B-AWQ (c5-wsl4) ---
+{"id":"chatcmpl-840ce23e5adac87e","object":"chat.completion","created":1783627994,"model":"Qwen/Qwen2.5-7B-Instruct-AWQ","choices":[{"index":0,"message":{"role":"assistant","content":"Hello! How can","refusal":null,"annotations":null,"audio":null,"function_call":null,"tool_calls":[],"reasoning":null},"logprobs":null,"finish_reason":"length","stop_reason":null,"token_ids":null,"routed_experts":null
+
+=== Carry-forward items from v14585 ===
+CF-v14585-01: Routes block in YAML not applied by binary. Future arc should either
+  patch internal/config or remove the routes block from configs/llm-cluster-router.yml
+  to avoid operator confusion.
+CF-v14585-02: c6-ollama and c8-wsl1-ollama-chat (tier 2/3 nodes) fail health probe
+  in this binary build. Either rebuild with embedded /v1/embeddings support or
+  downgrade the c6-ollama node to /health path. Current c7-wsl1 + c5-wsl4 cover
+  tiers 0 and 1, which were the wire-up goal for this sprint.
+CF-v14585-03: 27B Q8_0 GGUF (~29GB) does not fit single RTX 3090 (24GB VRAM).
+  Carried from v14584. Recommend waiting for wsl5 (RTX 5090 32GB) or quantizing
+  to Q4_K_M (~16GB) for single-GPU fit. c5-wsl4 currently serves 7B AWQ which
+  IS the operator's fallback target.
