@@ -1,0 +1,14 @@
+{
+  "Self": {
+    "HostName": "DESKTOP-12RO1AF",
+    "TailscaleIPs": ["100.84.108.92"]
+  },
+  "win4": {
+    "HostName": "desktop-p5bul0f-win4",
+    "DNSName": "desktop-p5bul0f-win4.tail447712.ts.net",
+    "TailscaleIPs": ["100.93.107.109"],
+    "OS": "windows",
+    "Online": true,
+    "LastSeen": "active"
+  }
+}
