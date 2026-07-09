@@ -41,3 +41,5 @@ email-vendor-rotation
 tests/.gitignore
 tests/__pycache__/
 __pycache__/
+evidence/v14546-plaintext-scan.json
+evidence/*/plaintext-scan*.json
