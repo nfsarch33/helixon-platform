@@ -1,0 +1,75 @@
+=== ArgoCD sync verification (post-wsl3 join) ===
+Date: 2026-07-09T22:45:22+10:00
+
+--- apps summary ---
+NAME                  SYNC     HEALTH    REVISION
+apps                  Synced   Healthy   a4747487ac2f2ca789796a6b841e5dfde6704c4f
+helixon-platform      Synced   Healthy   a4747487ac2f2ca789796a6b841e5dfde6704c4f
+helixon-sprintboard   Synced   Healthy   a4747487ac2f2ca789796a6b841e5dfde6704c4f
+
+--- ArgoCD pods ---
+NAME                                                READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                     1/1     Running   0          6h10m
+argocd-applicationset-controller-5b9675dd86-5ql4v   1/1     Running   0          6h10m
+argocd-redis-b97648d6d-s2xsn                        1/1     Running   0          6h10m
+argocd-repo-server-666d565b88-7lsxq                 1/1     Running   0          6h10m
+argocd-server-5d78df69bf-9xlbr                      1/1     Running   0          6h10m
+
+--- Cluster nodes (was 3, now 4 with wsl3) ---
+NAME              STATUS   ROLES           AGE     VERSION        LABELS
+desktop-0s5prj9   Ready    <none>          10h     v1.36.2+k3s1   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=k3s,beta.kubernetes.io/os=linux,helixon.io/node-alias=wsl2,helixon.io/role=fleet-agent,helixon.io/tier=secondary,kubernetes.io/arch=amd64,kubernetes.io/hostname=desktop-0s5prj9,kubernetes.io/os=linux,node.kubernetes.io/instance-type=k3s
+desktop-12ro1af   Ready    control-plane   11h     v1.36.2+k3s1   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=k3s,beta.kubernetes.io/os=linux,helixon.io/node-alias=wsl1,helixon.io/role=control-plane,helixon.io/tier=primary,kubernetes.io/arch=amd64,kubernetes.io/hostname=desktop-12ro1af,kubernetes.io/os=linux,node-role.kubernetes.io/control-plane=true,node.kubernetes.io/instance-type=k3s
+desktop-p5bul0f   Ready    <none>          7h40m   v1.36.2+k3s1   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=k3s,beta.kubernetes.io/os=linux,helixon.io/gpu=rtx3090,helixon.io/node-alias=wsl4,helixon.io/role=llm-node,helixon.io/tier=primary,kubernetes.io/arch=amd64,kubernetes.io/hostname=desktop-p5bul0f,kubernetes.io/os=linux,node.kubernetes.io/instance-type=k3s
+wsl3              Ready    <none>          10m     v1.36.2+k3s1   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/instance-type=k3s,beta.kubernetes.io/os=linux,helixon.io/gpu=rtx5070ti,helixon.io/node-alias=wsl3,helixon.io/role=dev-planning,helixon.io/tier=primary,kubernetes.io/arch=amd64,kubernetes.io/hostname=wsl3,kubernetes.io/os=linux,node.kubernetes.io/instance-type=k3s
+
+--- apps.yaml source-of-truth ---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: helixon
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Helixon platform + sprintboard
+  sourceRepos:
+    - git://100.84.108.92:9418/helixon-platform.git
+    - https://github.com/nfsarch33/helixon-platform.git
+    - https://gitlab.helixon.local/helixon/sprintboard.git
+    - '*'
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: false
+  roles:
+    - name: admin
+      policies:
+        - '*'
+      groups:
+        - system:cluster-admins
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: helixon-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+
+--- Re-sync trigger: hard refresh app-of-apps ---
+Refreshing app 'apps' to re-sync against the 4-node cluster
+application.argoproj.io/apps patched
+
+--- Wait for sync, check status ---
+NAME                  SYNC     HEALTH
+apps                  Synced   Healthy
+helixon-platform      Synced   Healthy
+helixon-sprintboard   Synced   Healthy
