@@ -1,0 +1,14 @@
+---
+# Trivy configuration for helixon-platform.
+#
+# v17702-4 (CF-v17612-10): evidence/ contains 1Password export artifacts
+# with intentionally redacted `********************` placeholders. Trivy's
+# AWS-access-key-id heuristic produces false positives on those literal
+# mask strings, so we exclude the entire evidence/ tree from scanning.
+#
+# Owner: cursor-parent. Reviewed 2026-07-10 (Helixon Platform coverage lift).
+
+scan:
+  skip-dirs:
+    - evidence/
+    - "**/evidence/"
