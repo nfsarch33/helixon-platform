@@ -1,9 +1,12 @@
-// Agentrace + metrics emit for LoopGuard. v17003-4.
-//
-// LoopTripEvent is appended to a NDJSON log file at ~/logs/runx/agentrace-mcp.ndjson
-// (or whatever path the agent runner configures). The schema is intentionally
-// compatible with the existing agentrace schema in internal/helixon/tooldispatch
-// (timestamp, event_type, agent_id, tool) plus loop-guard-specific fields.
+// Package loopguard detects repeating tool-call hashes within a sliding time
+// window and surfaces ErrLoopDetected when the configurable threshold is
+// exceeded. agentrace.go in this package emits LoopTripEvent entries
+// (v17003-4) to ~/logs/runx/agentrace-mcp.ndjson; the schema is
+// intentionally compatible with the existing agentrace schema in
+// internal/helixon/tooldispatch (timestamp, event_type, agent_id, tool)
+// plus loop-guard-specific fields, so downstream Grafana panels
+// (loopguard_trips_total, loopguard_trip_dwell_ms) continue to render
+// without schema changes.
 //
 // Author/Machine-Id: cursor-parent@win3-wsl3
 package loopguard

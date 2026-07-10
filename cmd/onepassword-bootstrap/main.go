@@ -4,8 +4,9 @@
 // commands hang (the SDK does not require the 1Password desktop app).
 //
 // Usage:
-//   export OP_SERVICE_ACCOUNT_TOKEN=$(cat ~/.config/op/service-account-token)
-//   ./onepassword-bootstrap --vault Cursor_IronClaw
+//
+//	export OP_SERVICE_ACCOUNT_TOKEN=$(cat ~/.config/op/service-account-token)
+//	./onepassword-bootstrap --vault Cursor_IronClaw
 //
 // Items created (idempotent: skips if title already exists):
 //   - jason@win2   (Login: Win PC WSL Ubuntu Login GB password)
@@ -57,6 +58,7 @@ func main() {
 		onepassword.WithIntegrationInfo(integrationName, integrationVersion),
 	)
 	if err != nil {
+		//nolint:gocritic // exitAfterDefer: cancel is on parent context which is process-scoped; Fatalf is correct.
 		log.Fatalf("onepassword.NewClient: %v", err)
 	}
 

@@ -1,5 +1,5 @@
-// tasks.go — Sprint 18 golden 5-task test set plus the synthetic
-// offline trace generator and the catalogue.
+// Package helixoneval hosts the Sprint 18 golden 5-task test set,
+// the synthetic offline trace generator, and the task catalogue.
 //
 // The 5 tasks are:
 //  1. long-running context retention
@@ -189,7 +189,7 @@ func slugify(s string) string {
 			out, prevDash, prevWasLower = emitLower(c, out, prevDash, prevWasLower)
 		case runeDigit:
 			out, prevDash, prevWasLower = emitDigit(c, out, prevDash, prevWasLower)
-		default:
+		case runeOther:
 			out, prevDash = emitSeparator(out, prevDash)
 			prevWasLower = false
 		}
@@ -234,13 +234,13 @@ func emitUpper(runes []byte, i int, out []byte, prevDash, prevWasLower bool) ([]
 }
 
 // emitLower handles a lowercase letter. CC=1.
-func emitLower(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
+func emitLower(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) { //nolint:unparam // prevDash reserved for future boundary tracking
 	out = append(out, c)
 	return out, false, true
 }
 
 // emitDigit handles a digit. CC=1.
-func emitDigit(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
+func emitDigit(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) { //nolint:unparam // prevDash reserved for future boundary tracking
 	out = append(out, c)
 	return out, false, false
 }

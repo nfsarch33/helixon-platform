@@ -47,9 +47,9 @@ func (c MCPStdioConfig) withDefaults() MCPStdioConfig {
 // safe to call from a single goroutine; concurrent writes to Out are
 // serialised.
 type MCPStdioAdapter struct {
-	mcp    *MCPChannel
-	cfg    MCPStdioConfig
-	logger *slog.Logger
+	mcp     *MCPChannel
+	cfg     MCPStdioConfig
+	logger  *slog.Logger
 	writeMu sync.Mutex
 	closeMu sync.Mutex
 	closed  bool
@@ -90,8 +90,8 @@ func (a *MCPStdioAdapter) Serve(ctx context.Context, _ helixonHandler) error {
 	scanner.Buffer(make([]byte, 0, 64*1024), a.cfg.MaxLineBytes)
 
 	for scanner.Scan() {
-		if ctx.Err() != nil {
-			return nil
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		line := scanner.Bytes()
 		if len(line) == 0 {

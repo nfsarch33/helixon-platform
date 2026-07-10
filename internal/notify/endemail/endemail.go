@@ -170,13 +170,8 @@ func markdownToPlainText(md string) string {
 			b.WriteString(line)
 			b.WriteString("\n")
 		default:
-			if inCode {
-				b.WriteString(line)
-				b.WriteString("\n")
-			} else {
-				b.WriteString(line)
-				b.WriteString("\n")
-			}
+			b.WriteString(line)
+			b.WriteString("\n")
 		}
 	}
 	if inCode {

@@ -10,6 +10,8 @@ import (
 
 // parseTime is a tiny RFC3339 wrapper that t.Fatal's on parse error so
 // test setup stays readable.
+//
+//nolint:unparam // s parameter is kept flexible so tests can override the timestamp string in future time-window tests.
 func parseTime(t *testing.T, s string) time.Time {
 	t.Helper()
 	tt, err := time.Parse(time.RFC3339, s)
@@ -68,11 +70,11 @@ func TestRubricIDs_AreStableAndUnique(t *testing.T) {
 // the EventRegistrar schema and is fine for human-readable IDs.
 func TestSlugify_Stable(t *testing.T) {
 	cases := map[string]string{
-		"long-running context retention":      "long-running-context-retention",
-		"self-improvement loop termination":  "self-improvement-loop-termination",
-		"multi-step coding":                   "multi-step-coding",
-		"eval rubric application":             "eval-rubric-application",
-		"PlanSync PR creation":                "plan-sync-pr-creation",
+		"long-running context retention":    "long-running-context-retention",
+		"self-improvement loop termination": "self-improvement-loop-termination",
+		"multi-step coding":                 "multi-step-coding",
+		"eval rubric application":           "eval-rubric-application",
+		"PlanSync PR creation":              "plan-sync-pr-creation",
 	}
 	for in, want := range cases {
 		if got := slugify(in); got != want {

@@ -5,14 +5,14 @@
 //
 // The DecideWith pipeline becomes:
 //
-//   1. DecideInput arrives from Cursor.
-//   2. contextmode.Trim (strip ANSI / base64; truncate).
-//   3. rtx.Cache.Lookup(replay_id)  → if hit, replay cached Output.
-//   4. tier classifier (existing).
-//   5. cell picker (existing).
-//   6. headroom.Check(cell, trimmed_prompt_tokens) → if reject, return
-//      Output with DecisionLabel="rejected".
-//   7. rtx.Cache.Store on the way out (best-effort).
+//  1. DecideInput arrives from Cursor.
+//  2. contextmode.Trim (strip ANSI / base64; truncate).
+//  3. rtx.Cache.Lookup(replay_id)  → if hit, replay cached Output.
+//  4. tier classifier (existing).
+//  5. cell picker (existing).
+//  6. headroom.Check(cell, trimmed_prompt_tokens) → if reject, return
+//     Output with DecisionLabel="rejected".
+//  7. rtx.Cache.Store on the way out (best-effort).
 //
 // The wire format (DecideInput / Output) is unchanged so the v14511
 // hook installer keeps working.
@@ -33,9 +33,9 @@ var _ = strings.HasPrefix // keep imports tidy if future edits drop strings
 // EnforceConfig wires the v14515 helpers into DecideWith. A zero value
 // disables enforcement (preserves v14511 behaviour).
 type EnforceConfig struct {
-	RTX         *rtx.Cache      // nil → no caching
-	ContextOpts contextmode.Options // zero → defaults
-	RejectOversized bool          // true → return DecisionLabel="rejected"
+	RTX             *rtx.Cache          // nil → no caching
+	ContextOpts     contextmode.Options // zero → defaults
+	RejectOversized bool                // true → return DecisionLabel="rejected"
 }
 
 // EnforceOutput is what DecideWith returns when enforcement kicks in.

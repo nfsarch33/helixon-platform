@@ -103,7 +103,7 @@ func (c *ClaudeCLIClient) Complete(ctx context.Context, req CompletionRequest) (
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("%w: claude cli timed out after %s", ErrLLMTimeout, c.timeout)
 		}
-		return nil, fmt.Errorf("%w: claude cli: %v", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: claude cli: %w", ErrLLMClient, err)
 	}
 
 	return parseClaudeCLIOutput(output)

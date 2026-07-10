@@ -133,8 +133,8 @@ func TestRoute_Tier3PrefersSpeculative(t *testing.T) {
 
 func TestRoute_Tier3NoSpeculativeFallsBackToLargest(t *testing.T) {
 	m := &Matrix{SchemaVersion: 1, Cells: map[string]Cell{
-		"MID":   {ID: "MID", Status: "ready", MinFreeMib: 8192, MaxModelLen: 16384},
-		"BIG":   {ID: "BIG", Status: "ready", MinFreeMib: 49152, MaxModelLen: 65536},
+		"MID": {ID: "MID", Status: "ready", MinFreeMib: 8192, MaxModelLen: 16384},
+		"BIG": {ID: "BIG", Status: "ready", MinFreeMib: 49152, MaxModelLen: 65536},
 	}}
 	pick, err := Pick(m, Tier3)
 	require.NoError(t, err)
@@ -143,8 +143,8 @@ func TestRoute_Tier3NoSpeculativeFallsBackToLargest(t *testing.T) {
 
 func TestRoute_Tier2PrefersVLLM(t *testing.T) {
 	m := &Matrix{SchemaVersion: 1, Cells: map[string]Cell{
-		"GGUF":  {ID: "GGUF", Status: "ready", MaxModelLen: 65536, MinFreeMib: 4096, Engine: "llama.cpp"},
-		"VLLM":  {ID: "VLLM", Status: "ready", MaxModelLen: 65536, MinFreeMib: 4096, Engine: "vllm"},
+		"GGUF": {ID: "GGUF", Status: "ready", MaxModelLen: 65536, MinFreeMib: 4096, Engine: "llama.cpp"},
+		"VLLM": {ID: "VLLM", Status: "ready", MaxModelLen: 65536, MinFreeMib: 4096, Engine: "vllm"},
 	}}
 	pick, err := Pick(m, Tier2)
 	require.NoError(t, err)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -78,6 +77,8 @@ func writeFixtureMatrix(t *testing.T) string {
 // funnelled via SetOut / SetErr; child commands that use
 // cmd.OutOrStdout() inherit the root's writer so this is sufficient
 // (no os.Stdout swap needed, so the test is race-safe with -race).
+//
+//nolint:unparam // env parameter is kept for future env-var tests; signature stability outweighs the linter flag.
 func runWith(args []string, env map[string]string) (stdout string, stderr string, err error) {
 	root := newRootCmd()
 	var out, errBuf bytes.Buffer
@@ -192,7 +193,5 @@ func TestVersion_Prints(t *testing.T) {
 }
 
 func init() {
-	// pin the runtime reference so the go-vet happy when we keep
-	// runtime.GOROOT in the binary but never call it.
-	_ = runtime.GOROOT
+	// test scaffolding; no runtime pin needed
 }

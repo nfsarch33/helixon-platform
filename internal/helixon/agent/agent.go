@@ -1,3 +1,4 @@
+// Package agent implements the Helixon agent runtime: lifecycle, state, and tool dispatch.
 package agent
 
 import (

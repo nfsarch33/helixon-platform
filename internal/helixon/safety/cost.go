@@ -1,3 +1,4 @@
+// Package safety hosts Helixon agent safety primitives (cost caps, input sanitizers, validators, harness hooks).
 package safety
 
 import (

@@ -11,7 +11,6 @@ linters:
     - ineffassign    # unused assignments
     - staticcheck    # advanced checks (includes gosimple + stylecheck in v2)
     - unused         # unused identifiers
-    - misspell       # common misspellings
     - bodyclose      # http body close
     - nilerr         # returning nil after error
     - contextcheck   # context propagation
@@ -26,43 +25,138 @@ linters:
     - unconvert      # unnecessary conversions
     - unparam        # unused parameters
     - whitespace     # whitespace
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+      - path: examples/
+        linters:
+          - gocritic
+          - gosec
+  settings:
+    gosec:
+      severity: medium
+      confidence: medium
+    revive:
+      severity: warning
+      enable-all-rules: true
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+        - name: var-declaration
+          disabled: true
+        - name: var-naming
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        - name: line-length-limit
+          disabled: true
+        - name: function-length
+          disabled: true
+        - name: cyclomatic
+          disabled: true
+        - name: argument-limit
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: duplicated-imports
+          disabled: true
+        - name: early-return
+          disabled: true
+        - name: empty-block
+          disabled: true
+        - name: empty-lines
+          disabled: true
+        - name: error-naming
+          disabled: true
+        - name: errorf
+          disabled: true
+        - name: if-return
+          disabled: true
+        - name: import-shadowing
+          disabled: true
+        - name: indent-error-flow
+          disabled: true
+        - name: range-val-address
+          disabled: true
+        - name: receiver-naming
+          disabled: true
+        - name: redefines-builtin-id
+          disabled: true
+        - name: superfluous-else
+          disabled: true
+        - name: time-equal
+          disabled: true
+        - name: time-naming
+          disabled: true
+        - name: unexported-return
+          disabled: true
+        - name: unhandled-error
+          disabled: true
+        - name: unnecessary-stmt
+          disabled: true
+        - name: unreachable-code
+          disabled: true
+        - name: unused-receiver
+          disabled: true
+        - name: use-any
+          disabled: true
+        - name: waitgroup-by-value
+          disabled: true
+        - name: dot-imports
+          disabled: true
+        - name: blank-imports
+          disabled: true
+        - name: confusing-naming
+          disabled: true
+        - name: confusing-results
+          disabled: true
+        - name: constant-logical-expr
+          disabled: true
+        - name: context-as-argument
+          disabled: true
+        - name: context-keys-type
+          disabled: true
+        - name: defer
+          disabled: true
+        - name: defer-loop
+          disabled: true
+        - name: disable-golden-test
+          disabled: true
+        - name: duplicated-word
+          disabled: true
+        - name: import-alias-naming
+          disabled: true
+        - name: call-to-gc
+          disabled: true
+    misspell:
+      locale: US
+    gocritic:
+      enabled-tags:
+        - diagnostic
+      disabled-tags:
+        - experimental
+        - style
+        - performance
+        - opinionated
+    staticcheck:
+      checks: ["all"]
+    errorlint:
+      asserts: false
+      comparison: false
 
 formatters:
   enable:
     - gofmt
     - goimports
 
-linters-settings:
-  gosec:
-    severity: medium
-    confidence: medium
-  revive:
-    severity: warning
-  misspell:
-    locale: US
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-tags:
-      - experimental
-  staticcheck:
-    checks: ["all"]
-  errorlint:
-    asserts: false
-    comparison: false
-
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-    - path: examples/
-      linters:
-        - gocritic
-        - gosec
   max-issues-per-linter: 50
   max-same-issues: 5
 

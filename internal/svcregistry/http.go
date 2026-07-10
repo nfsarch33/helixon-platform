@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -23,7 +22,6 @@ import (
 type HTTPServer struct {
 	reg *Registry
 
-	mu  sync.RWMutex
 	mux *http.ServeMux
 }
 

@@ -86,12 +86,12 @@ func TestDecide_RouterErrorFallsBackToLocalhost(t *testing.T) {
 
 func TestOutputJSON_MatchesContract(t *testing.T) {
 	out := Output{
-		SprintID:    "v14511",
-		DecisionLabel: "tier2",
-		CellID:      "C1",
-		BaseURL:     "http://x/v1",
-		HookMode:    "redirect",
-		Reason:      "test",
+		SprintID:       "v14511",
+		DecisionLabel:  "tier2",
+		CellID:         "C1",
+		BaseURL:        "http://x/v1",
+		HookMode:       "redirect",
+		Reason:         "test",
 		CapturedPrompt: "ping",
 	}
 	bb, err := json.Marshal(&out)

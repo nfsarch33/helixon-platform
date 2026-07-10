@@ -5,14 +5,16 @@
 // Authored: 2026-07-15 (v14513 Pair-5 Review).
 //
 // Usage:
-//   helixon-slo-ack --alertmanager http://localhost:9093 \
-//     --incidents session-handoffs/incidents.ndjson \
-//     --ack-window 5m --sprint v14513
+//
+//	helixon-slo-ack --alertmanager http://localhost:9093 \
+//	  --incidents session-handoffs/incidents.ndjson \
+//	  --ack-window 5m --sprint v14513
 //
 // Exit codes:
-//   0  no firing P0 alerts
-//   2  one or more P0 alerts were acked
-//   3  alertmanager unreachable
+//
+//	0  no firing P0 alerts
+//	2  one or more P0 alerts were acked
+//	3  alertmanager unreachable
 package main
 
 import (
@@ -22,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,11 +32,11 @@ import (
 
 // Silence is the subset of the Alertmanager v2 silence payload we need.
 type Silence struct {
-	Matchers []Matcher `json:"matchers"`
-	StartsAt time.Time `json:"startsAt"`
-	EndsAt   time.Time `json:"endsAt"`
-	CreatedBy string   `json:"createdBy"`
-	Comment   string   `json:"comment"`
+	Matchers  []Matcher `json:"matchers"`
+	StartsAt  time.Time `json:"startsAt"`
+	EndsAt    time.Time `json:"endsAt"`
+	CreatedBy string    `json:"createdBy"`
+	Comment   string    `json:"comment"`
 }
 
 // Matcher is a single label equality match.
@@ -61,14 +62,14 @@ type Alert struct {
 
 // Incident is one row appended to incidents.ndjson.
 type Incident struct {
-	TS            string `json:"ts"`
-	Alertname     string `json:"alertname"`
-	Severity      string `json:"severity"`
-	Sprint        string `json:"sprint"`
-	AckWithinMin  int    `json:"ack_within_min"`
-	RootCause     string `json:"root_cause,omitempty"`
-	Runbook       string `json:"runbook,omitempty"`
-	SilenceID     string `json:"silence_id"`
+	TS           string `json:"ts"`
+	Alertname    string `json:"alertname"`
+	Severity     string `json:"severity"`
+	Sprint       string `json:"sprint"`
+	AckWithinMin int    `json:"ack_within_min"`
+	RootCause    string `json:"root_cause,omitempty"`
+	Runbook      string `json:"runbook,omitempty"`
+	SilenceID    string `json:"silence_id"`
 }
 
 func main() {
@@ -157,8 +158,8 @@ func ackAlert(amURL string, a Alert, window time.Duration, sprintID, createdBy, 
 			{Name: "alertname", Value: alertname, IsRegex: false, IsEqual: true},
 			{Name: "severity", Value: severity, IsRegex: false, IsEqual: true},
 		},
-		StartsAt: now,
-		EndsAt:   now.Add(window),
+		StartsAt:  now,
+		EndsAt:    now.Add(window),
 		CreatedBy: createdBy,
 		Comment:   fmt.Sprintf("auto-ack by %s for sprint %s", createdBy, sprintID),
 	}
@@ -218,17 +219,9 @@ func appendNDJSON(path string, row Incident) error {
 	return nil
 }
 
-// URL helper kept around for the test suite.
-func mustURL(raw string) *url.URL {
-	u, err := url.Parse(raw)
-	if err != nil {
-		panic(err)
-	}
-	return u
-}
-
-// Used by tests to assert ordering
-func _sortAlertsByName(in []Alert) []Alert {
+// SortAlertsByName returns a copy of in sorted by alertname label. Exported
+// for the test suite.
+func SortAlertsByName(in []Alert) []Alert {
 	out := append([]Alert{}, in...)
 	for i := 0; i < len(out); i++ {
 		for j := i + 1; j < len(out); j++ {

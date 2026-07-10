@@ -16,11 +16,11 @@ type fakeRuntime struct {
 	tools     int
 }
 
-func (f *fakeRuntime) AgentID() string                { return f.id }
-func (f *fakeRuntime) Phase() string                  { return f.phase }
-func (f *fakeRuntime) HeartbeatEvery() time.Duration  { return f.heartbeat }
-func (f *fakeRuntime) ChannelCount() int              { return f.channels }
-func (f *fakeRuntime) RegisteredToolCount() int       { return f.tools }
+func (f *fakeRuntime) AgentID() string               { return f.id }
+func (f *fakeRuntime) Phase() string                 { return f.phase }
+func (f *fakeRuntime) HeartbeatEvery() time.Duration { return f.heartbeat }
+func (f *fakeRuntime) ChannelCount() int             { return f.channels }
+func (f *fakeRuntime) RegisteredToolCount() int      { return f.tools }
 
 func TestHandler_GETReturnsRuntimeSummary(t *testing.T) {
 	t.Parallel()

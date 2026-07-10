@@ -59,7 +59,8 @@ func (g *LoopGuard) Observe(hash string) error {
 	cutoff := now.Add(-g.window)
 
 	// Append the new observation, then drop any older than the window.
-	times := append(g.buckets[hash], now)
+	g.buckets[hash] = append(g.buckets[hash], now)
+	times := g.buckets[hash]
 	kept := times[:0]
 	for _, t := range times {
 		if t.After(cutoff) {

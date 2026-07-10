@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nfsarch33/helixon-platform/internal/helixon-eval"
+	helixoneval "github.com/nfsarch33/helixon-platform/internal/helixon-eval"
 )
 
 var (
@@ -89,10 +89,10 @@ func newListTasksCmd() *cobra.Command {
 
 func newRunCmd() *cobra.Command {
 	var (
-		task     string
-		runAll   bool
-		models   []string
-		asJSON   bool
+		task      string
+		runAll    bool
+		models    []string
+		asJSON    bool
 		threshold float64
 	)
 	cmd := &cobra.Command{
@@ -144,12 +144,12 @@ func newRunCmd() *cobra.Command {
 
 func newReportCmd() *cobra.Command {
 	var (
-		task     string
-		runAll   bool
-		models   []string
-		outFile  string
-		threshold float64 = 0.7
-		asJSON   bool
+		task      string
+		runAll    bool
+		models    []string
+		outFile   string
+		threshold = 0.7
+		asJSON    bool
 	)
 	cmd := &cobra.Command{
 		Use:   "report",

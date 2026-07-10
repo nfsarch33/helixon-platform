@@ -13,6 +13,7 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
 )
 
+//nolint:unparam // vendor string is parameterised to keep the test flexible for multi-vendor assertions in future tests.
 func newStubClient(vendor string, calls *atomic.Int32) Client {
 	return &stubClient{vendor: vendor, calls: calls}
 }

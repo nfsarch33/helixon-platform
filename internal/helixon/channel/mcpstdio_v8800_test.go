@@ -33,6 +33,7 @@ func (b *safeBuf) String() string {
 	return b.buf.String()
 }
 
+//nolint:unparam // second return (channel) is kept for future tests that need both adapter and channel handles.
 func newAdapter(t *testing.T, in io.Reader, out io.Writer) (*MCPStdioAdapter, *MCPChannel) {
 	t.Helper()
 	mcp := NewMCPChannel(nil)

@@ -61,9 +61,9 @@ func (f *SprintProgressFetcher) Fetch(ctx context.Context) (*SprintProgressRespo
 	}
 
 	var raw struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		Tickets  []struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		Tickets []struct {
 			Status string `json:"status"`
 		} `json:"tickets"`
 		Total    int `json:"total"`

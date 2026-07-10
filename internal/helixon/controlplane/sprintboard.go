@@ -106,7 +106,7 @@ func (c *SprintboardClient) ClaimTicket(ctx context.Context, ticketID string) er
 func (c *SprintboardClient) CompleteTicket(ctx context.Context, ticketID, evidence string) error {
 	data, _ := json.Marshal(map[string]string{
 		"agent_id": c.cfg.AgentName,
-		"evidence":   evidence,
+		"evidence": evidence,
 	})
 	path := fmt.Sprintf("/api/v1/tickets/%s/complete", ticketID)
 	_, err := c.doPost(ctx, path, data)
@@ -139,6 +139,7 @@ func (c *SprintboardClient) SprintStatus(ctx context.Context, sprintID string) (
 	return status, nil
 }
 
+//nolint:unparam // body is required by the contract; one caller reads the response, the others discard.
 func (c *SprintboardClient) doPost(ctx context.Context, path string, body []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+path, bytes.NewReader(body))
 	if err != nil {

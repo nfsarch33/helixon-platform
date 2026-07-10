@@ -21,10 +21,10 @@ import (
 // stubMem0 is a minimal in-memory Mem0Client used by the federation tests.
 // Production callers wire a real HTTP-backed implementation.
 type stubMem0 struct {
-	mu       sync.Mutex
-	added    []string
-	results  []Mem0Result
-	addErr   error
+	mu        sync.Mutex
+	added     []string
+	results   []Mem0Result
+	addErr    error
 	searchErr error
 }
 

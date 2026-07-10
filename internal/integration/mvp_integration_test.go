@@ -29,7 +29,6 @@ import (
 
 // fakeTool simulates a downstream provider that fails N times then succeeds.
 type fakeTool struct {
-	mu         sync.Mutex
 	calls      int32
 	failNTimes int32
 }

@@ -132,7 +132,7 @@ func (r *TieredRouter) Complete(ctx context.Context, req CompletionRequest) (*Co
 	}
 
 	if lastErr != nil {
-		return nil, fmt.Errorf("%w: %v", ErrAllProvidersFailed, lastErr)
+		return nil, fmt.Errorf("%w: %w", ErrAllProvidersFailed, lastErr)
 	}
 	return nil, ErrAllProvidersFailed
 }
