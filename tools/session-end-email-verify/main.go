@@ -33,30 +33,45 @@ func main() {
 	sentruxScore := fs.Int("sentrux-score", 6944, "current helixon-platform Sentrux Q score")
 	fs.Parse(os.Args[1:])
 
+	os.Exit(runVerify(verifyOptions{
+		DryRun:       *dryRun,
+		Plan:         *plan,
+		SentruxScore: *sentruxScore,
+	}))
+}
+
+// verifyOptions is the structured input for runVerify.
+type verifyOptions struct {
+	DryRun       bool
+	Plan         string
+	SentruxScore int
+}
+
+// runVerify performs the v16711-5 self-test and returns the exit code.
+func runVerify(o verifyOptions) int {
 	binaryPath := os.Getenv("NOTIFY_FALLBACK")
 	if binaryPath == "" {
 		binaryPath = os.Getenv("HOME") + "/Code/helixon-platform/bin/send-end-email"
 	}
-
 	// Sanity: do not call network in dry-run (--dry-run is forwarded).
 	args := []string{
-		"--plan", *plan,
-		"--subject", fmt.Sprintf("[END] plan v16711-verify %s", *plan),
+		"--plan", o.Plan,
+		"--subject", fmt.Sprintf("[END] plan v16711-verify %s", o.Plan),
 		"--body-file", os.Getenv("HOME") + "/Code/cursor-global-kb/reports/research/v16600-end-email-body.md",
 		"--idempotency-key", "v16711-verify-" + fmt.Sprintf("%d", time.Now().Unix()),
-		"--job-id", *plan + "-verify",
+		"--job-id", o.Plan + "-verify",
 	}
-	if *dryRun {
+	if o.DryRun {
 		args = append(args, "--dry-run")
 	}
 
 	auditEvent := map[string]any{
 		"ts":            time.Now().UTC().Format(time.RFC3339),
 		"event":         "session_end_email_verify",
-		"plan":          *plan,
-		"dry_run":       *dryRun,
+		"plan":          o.Plan,
+		"dry_run":       o.DryRun,
 		"binary_path":   binaryPath,
-		"sentrux_score": *sentruxScore,
+		"sentrux_score": o.SentruxScore,
 		"args":          args,
 	}
 
@@ -65,25 +80,32 @@ func main() {
 		auditEvent["error"] = err.Error()
 		out, _ := json.MarshalIndent(auditEvent, "", "  ")
 		fmt.Println(string(out))
-		os.Exit(2)
+		return 2
 	}
 
-	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = os.Environ() // inherit; binary will refuse to send without keys
-	out, err := cmd.CombinedOutput()
+	out, err := invokeBinary(binaryPath, args)
 	if err != nil {
 		auditEvent["result"] = "verify_failed"
 		auditEvent["error"] = err.Error()
 		auditEvent["output"] = string(out)
 		auditJSON, _ := json.MarshalIndent(auditEvent, "", "  ")
 		fmt.Println(string(auditJSON))
-		os.Exit(1)
+		return 1
 	}
 
 	auditEvent["result"] = "verified"
 	auditEvent["output_tail"] = tail(string(out), 1000)
 	auditJSON, _ := json.MarshalIndent(auditEvent, "", "  ")
 	fmt.Println(string(auditJSON))
+	return 0
+}
+
+// invokeBinary runs binaryPath with args, returning combined output and the
+// non-nil error from CombinedOutput on failure. Extracted for testability.
+func invokeBinary(binaryPath string, args []string) ([]byte, error) {
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = os.Environ()
+	return cmd.CombinedOutput()
 }
 
 func tail(s string, max int) string {
