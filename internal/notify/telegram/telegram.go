@@ -89,7 +89,7 @@ func (c *Client) SendMessageTo(ctx context.Context, chatID, text string) error {
 		return fmt.Errorf("telegram: chat ID required")
 	}
 	if c.metrics != nil {
-		c.metrics.IncAttempt(metrics.VendorTelegram)
+		c.metrics.IncAttempt(ctx, metrics.VendorTelegram)
 	}
 	msg := Message{
 		ChatID:    chatID,
@@ -108,34 +108,34 @@ func (c *Client) SendMessageTo(ctx context.Context, chatID, text string) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.httpc.Do(req)
 	if err != nil {
-		if c.metrics != nil {
-			c.metrics.IncSend(metrics.VendorTelegram, metrics.StatusDeadLetter)
-		}
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		if c.metrics != nil {
-			c.metrics.IncSend(metrics.VendorTelegram, metrics.StatusBadRequest)
-		}
-		return fmt.Errorf("telegram: HTTP %d: %s", resp.StatusCode, string(body))
-	}
-	var mr MessageResponse
-	if err := json.NewDecoder(resp.Body).Decode(&mr); err != nil {
-		if c.metrics != nil {
-			c.metrics.IncSend(metrics.VendorTelegram, metrics.StatusDeadLetter)
-		}
-		return err
-	}
-	if !mr.OK {
-		if c.metrics != nil {
-			c.metrics.IncSend(metrics.VendorTelegram, metrics.StatusBadRequest)
-		}
-		return fmt.Errorf("telegram: API error: %s", mr.Description)
-	}
 	if c.metrics != nil {
-		c.metrics.IncSend(metrics.VendorTelegram, metrics.StatusSuccess)
+		c.metrics.IncSend(ctx, metrics.VendorTelegram, metrics.StatusDeadLetter)
 	}
-	return nil
+	return err
+}
+defer resp.Body.Close()
+if resp.StatusCode != http.StatusOK {
+	body, _ := io.ReadAll(resp.Body)
+	if c.metrics != nil {
+		c.metrics.IncSend(ctx, metrics.VendorTelegram, metrics.StatusBadRequest)
+	}
+	return fmt.Errorf("telegram: HTTP %d: %s", resp.StatusCode, string(body))
+}
+var mr MessageResponse
+if err := json.NewDecoder(resp.Body).Decode(&mr); err != nil {
+	if c.metrics != nil {
+		c.metrics.IncSend(ctx, metrics.VendorTelegram, metrics.StatusDeadLetter)
+	}
+	return err
+}
+if !mr.OK {
+	if c.metrics != nil {
+		c.metrics.IncSend(ctx, metrics.VendorTelegram, metrics.StatusBadRequest)
+	}
+	return fmt.Errorf("telegram: API error: %s", mr.Description)
+}
+if c.metrics != nil {
+	c.metrics.IncSend(ctx, metrics.VendorTelegram, metrics.StatusSuccess)
+}
+return nil
 }

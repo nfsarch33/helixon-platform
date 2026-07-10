@@ -43,10 +43,9 @@ func loadConfig(path string) (*parsedConfig, error) {
 	return cfg, nil
 }
 
-// parseLines dispatches a single line of the config. Returns false if the
-// caller should stop iterating (currently always returns true; reserved for
-// future early-exit). It updates currentKey in place if a key list is being
-// built.
+// parseLines dispatches a single line of the config.
+//
+//nolint:unparam // return is reserved for future early-exit; currently always returns true.
 func parseLines(cfg *parsedConfig, line string, currentKey **vendorKey) bool {
 	trim := strings.TrimSpace(line)
 	if trim == "" || strings.HasPrefix(trim, "#") {
@@ -81,7 +80,7 @@ func parseLines(cfg *parsedConfig, line string, currentKey **vendorKey) bool {
 // On nested-key line, mutates current and returns it.
 // Returns ok=false only if a nested-key line arrives with current==nil
 // (caller should never feed such input).
-func parseKeyListItem(cfg *parsedConfig, line string, current *vendorKey) (*vendorKey, bool) {
+func parseKeyListItem(cfg *parsedConfig, line string, current *vendorKey) (*vendorKey, bool) { //nolint:unparam // cfg reserved for future cross-line validation
 	trim := strings.TrimSpace(line)
 	if strings.HasPrefix(trim, "- alias:") {
 		alias := strings.TrimSpace(strings.TrimPrefix(trim, "- alias:"))

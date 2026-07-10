@@ -57,10 +57,11 @@ func (r *Runtime) RunWithSignal(parent context.Context, shutdownBudget time.Dura
 		}
 	}
 
+	//nolint:contextcheck // intentional detach; parent ctx is cancelled by Run's return
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), shutdownBudget)
 	defer cancelShutdown()
 
-	shutErr := r.Shutdown(shutdownCtx)
+	shutErr := r.Shutdown(shutdownCtx) //nolint:contextcheck
 	switch {
 	case ranErr != nil && !errors.Is(ranErr, context.Canceled):
 		return ranErr

@@ -41,14 +41,14 @@ type Suite struct {
 
 // SuiteResult aggregates the outcomes of all Cases in a Suite.
 type SuiteResult struct {
-	Name       string       `json:"name"`
-	TotalCases int          `json:"total_cases"`
-	Passed     int          `json:"passed"`
-	Failed     int          `json:"failed"`
-	Warned     int          `json:"warned"`
-	Verdict    Verdict      `json:"verdict"`
+	Name       string        `json:"name"`
+	TotalCases int           `json:"total_cases"`
+	Passed     int           `json:"passed"`
+	Failed     int           `json:"failed"`
+	Warned     int           `json:"warned"`
+	Verdict    Verdict       `json:"verdict"`
 	Duration   time.Duration `json:"duration"`
-	Cases      []CaseResult `json:"cases"`
+	Cases      []CaseResult  `json:"cases"`
 }
 
 // RunnerConfig configures the evaluation runner.

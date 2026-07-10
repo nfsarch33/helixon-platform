@@ -65,14 +65,14 @@ func main() {
 			tsIP = n.TailscaleIP
 		}
 		body := map[string]any{
-			"name":         s.Name,
-			"host":         s.Address,
-			"port":         s.Port,
-			"protocol":     "http",
-			"owner":        *owner,
-			"status":       "up",
+			"name":          s.Name,
+			"host":          s.Address,
+			"port":          s.Port,
+			"protocol":      "http",
+			"owner":         *owner,
+			"status":        "up",
 			"last_seen_iso": time.Now().UTC().Format(time.RFC3339),
-			"tailscale_ip": tsIP,
+			"tailscale_ip":  tsIP,
 		}
 		if *dryRun {
 			logger.Info("would-register", "name", s.Name, "port", s.Port, "ts_ip", tsIP)

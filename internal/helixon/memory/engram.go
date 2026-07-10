@@ -1,3 +1,4 @@
+// Package memory hosts the Helixon agent memory layer (Engram client + agent helpers).
 package memory
 
 import (
@@ -169,7 +170,7 @@ func (c *EngramClient) doPost(ctx context.Context, path string, body []byte) ([]
 
 		resp, err := c.http.Do(req)
 		if err != nil {
-			lastErr = fmt.Errorf("%w: %s", ErrEngramUnavailable, err)
+			lastErr = fmt.Errorf("%w: %w", ErrEngramUnavailable, err)
 			continue
 		}
 
@@ -201,7 +202,7 @@ func (c *EngramClient) doGet(ctx context.Context, path string) ([]byte, error) {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrEngramUnavailable, err)
+		return nil, fmt.Errorf("%w: %w", ErrEngramUnavailable, err)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))

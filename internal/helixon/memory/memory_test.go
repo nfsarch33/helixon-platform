@@ -283,7 +283,9 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 	require.NotNil(t, mem)
 	assert.Equal(t, "mem-write-001", mem.ID)
 	assert.Equal(t, "v8000-overnight memory", mem.Content)
-	msgs, _ := posted["messages"].([]interface{}); firstMsg, _ := msgs[0].(map[string]interface{}); assert.Equal(t, "v8000-overnight memory", firstMsg["content"])
+	msgs, _ := posted["messages"].([]interface{})
+	firstMsg, _ := msgs[0].(map[string]interface{})
+	assert.Equal(t, "v8000-overnight memory", firstMsg["content"])
 	assert.Equal(t, "claude-code", posted["app_id"])
 
 	// FTS mirror landed locally.

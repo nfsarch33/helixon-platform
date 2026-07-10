@@ -5,7 +5,12 @@ package builtins_test
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon/builtins"
@@ -213,5 +218,148 @@ func TestSprintboardTool_NilClientArgs(t *testing.T) {
 		if err == nil {
 			t.Errorf("op=%q: expected error; got nil", op)
 		}
+	}
+}
+
+// v17609-2: Sprintboard dispatch via httptest server. Exercises the
+// actual handler paths (sprintboardRegister, sprintboardClaim,
+// sprintboardComplete, sprintboardStatus) with a real SprintboardClient.
+// Lifts sprintboard* from 0% to high coverage.
+func TestSprintboardTool_DispatchViaHTTPServer(t *testing.T) {
+	var (
+		mu         sync.Mutex
+		gotPaths   []string
+		gotBodies  []string
+		sprintJSON = `{"id":"v17609","status":"active","tickets":[]}`
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		gotPaths = append(gotPaths, r.URL.Path)
+		body, _ := io.ReadAll(r.Body)
+		gotBodies = append(gotBodies, string(body))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/sprints/v17609"):
+			_, _ = w.Write([]byte(sprintJSON))
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}
+	}))
+	defer srv.Close()
+
+	cfg := controlplane.SprintboardConfig{
+		BaseURL:   srv.URL,
+		AgentName: "test-agent",
+	}
+	client := controlplane.NewSprintboardClient(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	def := builtins.SprintboardTool(client)
+	ctx := context.Background()
+
+	// register
+	out, err := def.Handler(ctx, map[string]any{"op": "register"})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if !strings.Contains(out, `"op":"register"`) {
+		t.Fatalf("register output: %s", out)
+	}
+
+	// claim
+	out, err = def.Handler(ctx, map[string]any{"op": "claim", "ticket_id": "v17609-2"})
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	if !strings.Contains(out, `"ticket_id":"v17609-2"`) {
+		t.Fatalf("claim output: %s", out)
+	}
+
+	// complete
+	out, err = def.Handler(ctx, map[string]any{"op": "complete", "ticket_id": "v17609-2", "evidence": "tests green"})
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if !strings.Contains(out, `"ticket_id":"v17609-2"`) {
+		t.Fatalf("complete output: %s", out)
+	}
+
+	// sprint_status
+	out, err = def.Handler(ctx, map[string]any{"op": "sprint_status", "sprint_id": "v17609"})
+	if err != nil {
+		t.Fatalf("sprint_status: %v", err)
+	}
+	if !strings.Contains(out, `"id":"v17609"`) {
+		t.Fatalf("sprint_status output: %s", out)
+	}
+
+	// unknown op
+	_, err = def.Handler(ctx, map[string]any{"op": "nope"})
+	if err == nil {
+		t.Fatal("expected error for unknown op")
+	}
+
+	// claim without ticket_id
+	_, err = def.Handler(ctx, map[string]any{"op": "claim"})
+	if err == nil {
+		t.Fatal("expected error for claim missing ticket_id")
+	}
+
+	// complete without ticket_id
+	_, err = def.Handler(ctx, map[string]any{"op": "complete"})
+	if err == nil {
+		t.Fatal("expected error for complete missing ticket_id")
+	}
+
+	// sprint_status without sprint_id
+	_, err = def.Handler(ctx, map[string]any{"op": "sprint_status"})
+	if err == nil {
+		t.Fatal("expected error for sprint_status missing sprint_id")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(gotPaths) < 4 {
+		t.Fatalf("expected >=4 paths hit; got %v", gotPaths)
+	}
+	wantSubs := []string{"/agents", "/tickets/v17609-2/claim", "/tickets/v17609-2/complete", "/sprints/v17609"}
+	for _, want := range wantSubs {
+		found := false
+		for _, p := range gotPaths {
+			if strings.Contains(p, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("path %q not hit; got %v", want, gotPaths)
+		}
+	}
+	// Verify bodies contain agent_id (proves the actual call flowed through)
+	hasAgent := false
+	for _, b := range gotBodies {
+		if strings.Contains(b, `"agent_id":"test-agent"`) {
+			hasAgent = true
+			break
+		}
+	}
+	if !hasAgent {
+		t.Errorf("no request body contained agent_id; got %v", gotBodies)
+	}
+}
+
+// v17609-2: SprintboardClient network failures surface as errors
+// (registers the doPost error path that wasn't previously exercised).
+func TestSprintboardClient_RegisterFailureSurfacesError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"boom"}`))
+	}))
+	defer srv.Close()
+
+	cfg := controlplane.SprintboardConfig{BaseURL: srv.URL, AgentName: "x"}
+	c := controlplane.NewSprintboardClient(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := c.Register(context.Background()); err == nil {
+		t.Fatal("expected register error on 500")
 	}
 }

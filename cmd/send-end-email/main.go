@@ -171,6 +171,7 @@ func main() {
 		auditEvent["error"] = err.Error()
 		out, _ := json.MarshalIndent(auditEvent, "", "  ")
 		fmt.Println(string(out))
+		//nolint:gocritic // exitAfterDefer: db.Close runs in shutdown path; os.Exit here is correct (top-level error).
 		os.Exit(2)
 	}
 

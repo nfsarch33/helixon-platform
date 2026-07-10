@@ -54,11 +54,11 @@ type TaskAssignment struct {
 
 // TaskResult is the completion payload sent back to the gateway.
 type TaskResult struct {
-	TaskID   string `json:"task_id"`
-	Status   string `json:"status"`
-	Output   any    `json:"output"`
-	Error    string `json:"error,omitempty"`
-	Elapsed  string `json:"elapsed,omitempty"`
+	TaskID  string `json:"task_id"`
+	Status  string `json:"status"`
+	Output  any    `json:"output"`
+	Error   string `json:"error,omitempty"`
+	Elapsed string `json:"elapsed,omitempty"`
 }
 
 // A2AClient communicates with the A2A gateway for agent registration and task coordination.
@@ -118,6 +118,7 @@ func (c *A2AClient) Deregister(ctx context.Context, agentID string) error {
 	return err
 }
 
+//nolint:unparam // body is required by the contract even though all current callers pass POST bodies that are discarded; signature stability wins.
 func (c *A2AClient) doPost(ctx context.Context, path string, body []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.GatewayURL+path, bytes.NewReader(body))
 	if err != nil {

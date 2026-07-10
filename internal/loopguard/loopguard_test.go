@@ -6,6 +6,7 @@
 package loopguard
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -41,7 +42,7 @@ func TestLoopGuard_CircuitBreaksAfter3Repeats(t *testing.T) {
 		t.Fatalf("2nd: %v", err)
 	}
 	// 3rd triggers ErrLoopDetected.
-	if err := lg.Observe(hash); err != ErrLoopDetected {
+	if err := lg.Observe(hash); !errors.Is(err, ErrLoopDetected) {
 		t.Fatalf("3rd: want ErrLoopDetected, got %v", err)
 	}
 }
@@ -89,7 +90,7 @@ func TestLoopGuard_ConfigurableThreshold(t *testing.T) {
 		}
 	}
 	// 5th trips.
-	if err := lg.Observe(hash); err != ErrLoopDetected {
+	if err := lg.Observe(hash); !errors.Is(err, ErrLoopDetected) {
 		t.Fatalf("Observe 5/5: want ErrLoopDetected, got %v", err)
 	}
 }

@@ -1,4 +1,4 @@
-// report.go — Sprint 18 HelixonEval report types and scoring.
+// Package helixoneval hosts the Sprint 18 HelixonEval report types and scoring.
 package helixoneval
 
 import (
@@ -15,21 +15,21 @@ import (
 // Report.Aggregate method is the second of the four spec'd TDD
 // targets (Registry.Add, Registry.Run, Report.Aggregate, Report.Score).
 type Report struct {
-	GeneratedAt   time.Time           `json:"generated_at"`
-	Sprint        string              `json:"sprint"`
-	Cases         []Case              `json:"cases"`
-	ModelStats    map[Model]ModelStat `json:"model_stats"`
-	OverallScore  float64             `json:"overall_score"`
-	Pass          bool                `json:"pass"`
-	Threshold     float64             `json:"threshold"`
+	GeneratedAt  time.Time           `json:"generated_at"`
+	Sprint       string              `json:"sprint"`
+	Cases        []Case              `json:"cases"`
+	ModelStats   map[Model]ModelStat `json:"model_stats"`
+	OverallScore float64             `json:"overall_score"`
+	Pass         bool                `json:"pass"`
+	Threshold    float64             `json:"threshold"`
 }
 
 // ModelStat is the per-model aggregate: count, mean score, p50 steps.
 type ModelStat struct {
-	Count     int     `json:"count"`
-	MeanScore float64 `json:"mean_score"`
-	MedianSteps int   `json:"median_steps"`
-	Completions int    `json:"completions"`
+	Count       int     `json:"count"`
+	MeanScore   float64 `json:"mean_score"`
+	MedianSteps int     `json:"median_steps"`
+	Completions int     `json:"completions"`
 }
 
 // Aggregate consumes the supplied Registry, groups Cases by Model, and

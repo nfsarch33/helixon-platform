@@ -119,6 +119,7 @@ func main() {
 	}
 
 	// Telegram path with 3-strike fallback (v17508-4)
+	//nolint:gocritic // ifElseChain: two conditions are simpler as if/else if than a switch with bool expressions.
 	if *via == "telegram" || *via == "both" {
 		if *tgToken == "" || *tgChatID == "" {
 			audit["telegram_blocker"] = "telegram bot token or chat ID not configured in 1Password (CF-2026-0708-010 partial)"

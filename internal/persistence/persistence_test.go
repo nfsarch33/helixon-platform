@@ -3,6 +3,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -49,7 +50,7 @@ func TestPersist_ResumeNoState(t *testing.T) {
 	p := NewPersist(be)
 
 	_, err := p.Resume(ctx, "unknown-agent")
-	if err != ErrNoState {
+	if !errors.Is(err, ErrNoState) {
 		t.Fatalf("want ErrNoState, got %v", err)
 	}
 }

@@ -5,19 +5,19 @@
 //
 // Subcommands:
 //
-//   cursor-tools list                  # print the canonical inventory
-//   cursor-tools doctor                # ping every server, exit non-zero on any FAIL
-//   cursor-tools restore --server <id> # re-emit a server's config block
-//   cursor-tools config                # print the merged cursor-config mcp.json
-//   cursor-tools doctor --json         # machine-readable doctor output
-//   cursor-tools version
+//	cursor-tools list                  # print the canonical inventory
+//	cursor-tools doctor                # ping every server, exit non-zero on any FAIL
+//	cursor-tools restore --server <id> # re-emit a server's config block
+//	cursor-tools config                # print the merged cursor-config mcp.json
+//	cursor-tools doctor --json         # machine-readable doctor output
+//	cursor-tools version
 //
 // Exit codes:
 //
-//   0  every ping returned "ok" or the command completed cleanly
-//   1  one or more servers failed to ping (doctor)
-//   2  config or inventory file missing or unreadable
-//   3  unknown subcommand
+//	0  every ping returned "ok" or the command completed cleanly
+//	1  one or more servers failed to ping (doctor)
+//	2  config or inventory file missing or unreadable
+//	3  unknown subcommand
 package main
 
 import (

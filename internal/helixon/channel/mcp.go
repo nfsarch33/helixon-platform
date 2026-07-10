@@ -1,3 +1,4 @@
+// Package channel implements the Helixon agent I/O channels (MCP, stdio REPL, WebSocket).
 package channel
 
 import (

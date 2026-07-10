@@ -15,21 +15,21 @@ import (
 	"fmt"
 )
 
-// Cell budget table. Values are in tokens, conservative defaults.
+// DefaultBudgets is the conservative token-budget table per cell.
 var DefaultBudgets = map[string]Budget{
-	"qwen36-27b-q4":   {Context: 32_000, ReservedResponse: 1024, ReservedSystem: 512},
-	"qwen36-27b-q8":   {Context: 32_000, ReservedResponse: 2048, ReservedSystem: 512},
-	"qwen36-27b-mtp":  {Context: 32_000, ReservedResponse: 2048, ReservedSystem: 512},
-	"opus-class-remote": {Context: 200_000, ReservedResponse: 4096, ReservedSystem: 1024},
+	"qwen36-27b-q4":       {Context: 32_000, ReservedResponse: 1024, ReservedSystem: 512},
+	"qwen36-27b-q8":       {Context: 32_000, ReservedResponse: 2048, ReservedSystem: 512},
+	"qwen36-27b-mtp":      {Context: 32_000, ReservedResponse: 2048, ReservedSystem: 512},
+	"opus-class-remote":   {Context: 200_000, ReservedResponse: 4096, ReservedSystem: 1024},
 	"sonnet-class-remote": {Context: 200_000, ReservedResponse: 4096, ReservedSystem: 1024},
-	"local-echo":        {Context: 8_000, ReservedResponse: 256, ReservedSystem: 64},
+	"local-echo":          {Context: 8_000, ReservedResponse: 256, ReservedSystem: 64},
 }
 
 // Budget describes a cell's token capacity.
 type Budget struct {
-	Context           int
-	ReservedResponse  int
-	ReservedSystem    int
+	Context          int
+	ReservedResponse int
+	ReservedSystem   int
 }
 
 // Available returns the number of tokens available for prompt +

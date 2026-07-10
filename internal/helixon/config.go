@@ -23,13 +23,13 @@ import (
 //	timeout: "5m"
 //	heartbeat_every: "60s"
 type FileConfig struct {
-	AgentID        string         `yaml:"agent_id"`
-	SystemPrompt   string         `yaml:"system_prompt"`
-	SessionDSN     string         `yaml:"session_dsn"`
-	MaxIterations  int            `yaml:"max_iterations"`
-	MaxTokens      int            `yaml:"max_tokens"`
-	Timeout        string         `yaml:"timeout"`
-	HeartbeatEvery string         `yaml:"heartbeat_every"`
+	AgentID        string                `yaml:"agent_id"`
+	SystemPrompt   string                `yaml:"system_prompt"`
+	SessionDSN     string                `yaml:"session_dsn"`
+	MaxIterations  int                   `yaml:"max_iterations"`
+	MaxTokens      int                   `yaml:"max_tokens"`
+	Timeout        string                `yaml:"timeout"`
+	HeartbeatEvery string                `yaml:"heartbeat_every"`
 	Provider       ProviderConfig        `yaml:"provider"`
 	Sprintboard    SprintboardFileConfig `yaml:"sprintboard"`
 }

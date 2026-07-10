@@ -59,31 +59,31 @@ type Matrix struct {
 // ollama_alias) are stored as-is so a missing field on disk reads as
 // the empty string / zero.
 type Cell struct {
-	ID             string `yaml:"-"`
-	Node           string `yaml:"node"`
-	GPUClass       string `yaml:"gpu_class"`
-	GPUSlot        string `yaml:"gpu_slot"`
-	ModelID        string `yaml:"model_id"`
-	Repo           string `yaml:"repo"`
-	Revision       string `yaml:"revision"`
-	File           string `yaml:"file"`
-	ExpectedBytes  int64  `yaml:"expected_bytes"`
-	ActualBytes    int64  `yaml:"actual_bytes"`
-	ActualSHA256   string `yaml:"actual_sha256"`
-	Status         string `yaml:"status"`
-	Engine         string `yaml:"engine"`
-	HostPort       int    `yaml:"host_port"`
-	MaxModelLen    int    `yaml:"max_model_len"`
-	MinFreeMib     int    `yaml:"min_free_mib"`
-	LocalPath      string `yaml:"local_path"`
-	TensorSplit    string `yaml:"tensor_split,omitempty"`
-	NGPULayers     int    `yaml:"n_gpu_layers,omitempty"`
-	ContextSize    int    `yaml:"context_size,omitempty"`
-	SpecType       string `yaml:"spec_type,omitempty"`
-	SpecDraftNMax  int    `yaml:"spec_draft_n_max,omitempty"`
-	UseMmap        bool   `yaml:"use_mmap"`
-	UseMlock       bool   `yaml:"use_mlock"`
-	OllamaAlias    string `yaml:"ollama_alias,omitempty"`
+	ID            string `yaml:"-"`
+	Node          string `yaml:"node"`
+	GPUClass      string `yaml:"gpu_class"`
+	GPUSlot       string `yaml:"gpu_slot"`
+	ModelID       string `yaml:"model_id"`
+	Repo          string `yaml:"repo"`
+	Revision      string `yaml:"revision"`
+	File          string `yaml:"file"`
+	ExpectedBytes int64  `yaml:"expected_bytes"`
+	ActualBytes   int64  `yaml:"actual_bytes"`
+	ActualSHA256  string `yaml:"actual_sha256"`
+	Status        string `yaml:"status"`
+	Engine        string `yaml:"engine"`
+	HostPort      int    `yaml:"host_port"`
+	MaxModelLen   int    `yaml:"max_model_len"`
+	MinFreeMib    int    `yaml:"min_free_mib"`
+	LocalPath     string `yaml:"local_path"`
+	TensorSplit   string `yaml:"tensor_split,omitempty"`
+	NGPULayers    int    `yaml:"n_gpu_layers,omitempty"`
+	ContextSize   int    `yaml:"context_size,omitempty"`
+	SpecType      string `yaml:"spec_type,omitempty"`
+	SpecDraftNMax int    `yaml:"spec_draft_n_max,omitempty"`
+	UseMmap       bool   `yaml:"use_mmap"`
+	UseMlock      bool   `yaml:"use_mlock"`
+	OllamaAlias   string `yaml:"ollama_alias,omitempty"`
 }
 
 // LoadFile reads and validates a qwen36-matrix.yaml file from disk.

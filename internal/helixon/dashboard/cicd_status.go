@@ -31,10 +31,10 @@ type CICDStatusResponse struct {
 
 // CICDStatusFetcher queries GitLab for recent pipeline statuses.
 type CICDStatusFetcher struct {
-	gitlabURL   string
+	gitlabURL    string
 	privateToken string
-	projectID   string
-	client      *http.Client
+	projectID    string
+	client       *http.Client
 }
 
 // CICDConfig configures the GitLab CI/CD fetcher.

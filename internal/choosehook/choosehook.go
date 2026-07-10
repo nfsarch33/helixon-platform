@@ -53,7 +53,7 @@ type DecideInput struct {
 // stdout to decide what to do (redirect | annotate | abstain).
 type Output struct {
 	SprintID       string  `json:"sprint_id"`
-	DecisionLabel  string  `json:"decision_label"`     // tier0|tier1|tier2|tier3|no_decision
+	DecisionLabel  string  `json:"decision_label"` // tier0|tier1|tier2|tier3|no_decision
 	CellID         string  `json:"cell_id,omitempty"`
 	BaseURL        string  `json:"base_url,omitempty"`
 	HookMode       string  `json:"hook_mode"`
@@ -175,15 +175,15 @@ func decide(in DecideInput, router Router) Output {
 func costEvent(out Output, tier Tier, outcome string) costobs.Event {
 	model := modelFromCell(out.CellID)
 	return costobs.Event{
-		SprintID:       out.SprintID,
-		JobID:          out.CapturedPrompt,
-		CellID:         out.CellID,
-		Model:          model,
-		ModelTier:      int(tier),
-		JobType:        "cursor.beforeSubmitPrompt",
-		Outcome:        outcome,
-		EstCostUSD:     costobs.EstimateCostUSD(model, 64, 256),
-		EstInputTokens: 64,
+		SprintID:        out.SprintID,
+		JobID:           out.CapturedPrompt,
+		CellID:          out.CellID,
+		Model:           model,
+		ModelTier:       int(tier),
+		JobType:         "cursor.beforeSubmitPrompt",
+		Outcome:         outcome,
+		EstCostUSD:      costobs.EstimateCostUSD(model, 64, 256),
+		EstInputTokens:  64,
 		EstOutputTokens: 256,
 	}
 }

@@ -60,7 +60,6 @@ type parsedConfig struct {
 
 type parsedRecipients struct {
 	primary string
-	cc      []string
 }
 
 func main() {
@@ -190,6 +189,7 @@ func sendCmd(args []string) {
 		client = notify.NewBrevoClient(notify.BrevoConfig{APIKey: apiKey})
 	default:
 		fmt.Fprintf(os.Stderr, "unsupported vendor: %s\n", pick.Vendor)
+		//nolint:gocritic // exitAfterDefer: cancel is on parent context; os.Exit is correct for unsupported vendor.
 		os.Exit(3)
 	}
 

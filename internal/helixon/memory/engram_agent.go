@@ -10,10 +10,10 @@ import (
 
 // AgentMemoryConfig configures how memory is used during agent conversations.
 type AgentMemoryConfig struct {
-	AppID          string
-	UserID         string
-	MaxContext     int
-	Logger         *slog.Logger
+	AppID      string
+	UserID     string
+	MaxContext int
+	Logger     *slog.Logger
 }
 
 func (c AgentMemoryConfig) withDefaults() AgentMemoryConfig {

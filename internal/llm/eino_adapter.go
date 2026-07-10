@@ -108,18 +108,17 @@ func (a *EinoModelAdapter) resolveTools(opts *model.Options) ([]Tool, error) {
 
 func toolInfoToLLMTool(ti *schema.ToolInfo) (Tool, error) {
 	var params json.RawMessage
-	if ti.ParamsOneOf != nil {
-		js, err := ti.ParamsOneOf.ToJSONSchema()
+	//nolint:staticcheck // QF1008: ParamsOneOf is an embedded field on upstream schema.ToolInfo; keep the explicit selector for readability when the field is unset in older callers.
+	js, err := ti.ParamsOneOf.ToJSONSchema()
+	if err != nil {
+		return Tool{}, fmt.Errorf("tool %q: params to jsonschema: %w", ti.Name, err)
+	}
+	if js != nil {
+		b, err := json.Marshal(js)
 		if err != nil {
-			return Tool{}, fmt.Errorf("tool %q: params to jsonschema: %w", ti.Name, err)
+			return Tool{}, fmt.Errorf("tool %q: marshal jsonschema: %w", ti.Name, err)
 		}
-		if js != nil {
-			b, err := json.Marshal(js)
-			if err != nil {
-				return Tool{}, fmt.Errorf("tool %q: marshal jsonschema: %w", ti.Name, err)
-			}
-			params = b
-		}
+		params = b
 	}
 	return Tool{
 		Type: "function",
