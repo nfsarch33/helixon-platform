@@ -71,27 +71,35 @@ type DoctorReport struct {
 }
 
 func main() {
-	if len(os.Args) < 2 {
+	os.Exit(runMain(os.Args[1:]))
+}
+
+// runMain is the testable entry point: dispatches on argv[0] and
+// returns the desired process exit code.
+func runMain(argv []string) int {
+	if len(argv) < 1 {
 		usage()
-		os.Exit(3)
+		return 3
 	}
-	switch os.Args[1] {
+	switch argv[0] {
 	case "list":
-		cmdList()
+		return cmdList()
 	case "doctor":
-		cmdDoctor(os.Args[2:])
+		return cmdDoctor(argv[1:])
 	case "restore":
-		cmdRestore(os.Args[2:])
+		return cmdRestore(argv[1:])
 	case "config":
-		cmdConfig()
+		return cmdConfig()
 	case "version", "--version", "-v":
 		fmt.Println("cursor-tools 0.1.0 (v14514)")
+		return 0
 	case "help", "--help", "-h":
 		usage()
+		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand: %s\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown subcommand: %s\n", argv[0])
 		usage()
-		os.Exit(3)
+		return 3
 	}
 }
 
@@ -130,11 +138,11 @@ func loadInventory(path string) (*Inventory, error) {
 	return &inv, nil
 }
 
-func cmdList() {
+func cmdList() int {
 	inv, err := loadInventory(inventoryPath())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		return 2
 	}
 	fmt.Printf("inventory: %s\n  version: %d\n  updated: %s\n  servers: %d\n\n",
 		inventoryPath(), inv.Version, inv.UpdatedAt, len(inv.Servers))
@@ -147,18 +155,22 @@ func cmdList() {
 		fmt.Fprintf(w, "  %s\t%s\t%s\n", s.ID, s.Command, state)
 	}
 	w.Flush()
+	return 0
 }
 
-func cmdDoctor(args []string) {
-	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+func cmdDoctor(args []string) int {
+	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "emit JSON instead of human text")
 	concurrency := fs.Int("concurrency", 4, "max concurrent pings")
-	fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 3
+	}
 
 	inv, err := loadInventory(inventoryPath())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		return 2
 	}
 
 	results := runDoctor(inv, *concurrency)
@@ -200,8 +212,9 @@ func cmdDoctor(args []string) {
 		w.Flush()
 	}
 	if failed > 0 {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // runDoctor pings each server concurrently. Pings are stubbed via
@@ -262,19 +275,22 @@ func countState(rs []DoctorResult, state string) int {
 	return n
 }
 
-func cmdRestore(args []string) {
-	fs := flag.NewFlagSet("restore", flag.ExitOnError)
+func cmdRestore(args []string) int {
+	fs := flag.NewFlagSet("restore", flag.ContinueOnError)
 	id := fs.String("server", "", "server id to restore (required)")
 	out := fs.String("out", "", "write JSON snippet to this file (default stdout)")
-	fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 3
+	}
 	if *id == "" {
 		fmt.Fprintln(os.Stderr, "--server is required")
-		os.Exit(3)
+		return 3
 	}
 	inv, err := loadInventory(inventoryPath())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		return 2
 	}
 	for _, s := range inv.Servers {
 		if s.ID == *id {
@@ -282,16 +298,16 @@ func cmdRestore(args []string) {
 			if *out != "" {
 				if err := os.WriteFile(*out, []byte(snippet), 0o644); err != nil {
 					fmt.Fprintln(os.Stderr, err)
-					os.Exit(2)
+					return 2
 				}
-				return
+				return 0
 			}
 			fmt.Print(snippet)
-			return
+			return 0
 		}
 	}
 	fmt.Fprintf(os.Stderr, "server %q not found in inventory\n", *id)
-	os.Exit(3)
+	return 3
 }
 
 // buildCursorSnippet converts an internal Server entry to the
@@ -314,13 +330,14 @@ func buildCursorSnippet(s Server) string {
 	return string(body) + "\n"
 }
 
-func cmdConfig() {
+func cmdConfig() int {
 	body, err := os.ReadFile(configPath())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		return 2
 	}
 	fmt.Println(string(body))
+	return 0
 }
 
 // lookPath is a tiny wrapper around exec.LookPath so the package

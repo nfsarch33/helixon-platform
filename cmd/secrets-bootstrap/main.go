@@ -1,19 +1,20 @@
 // secrets-bootstrap — read 1Password secrets via op CLI.
 //
 // Usage:
-//   secrets-bootstrap vault item field [--export VAR]
-//   secrets-bootstrap --service NAME --out FILE
+//
+//	secrets-bootstrap vault item field [--export VAR]
+//	secrets-bootstrap --service NAME --out FILE
 //
 // v14547: Added --service/--out mode for systemd EnvironmentFile generation.
 package main
 
 import (
 	"bufio"
-	"regexp"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -44,7 +45,7 @@ var serviceMap = map[string][]EnvEntry{
 	},
 	"fleet-agent": {
 		{EnvVar: "OPENAI_BASE_URL", Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_BASE_URL=(.+)$`},
-		{EnvVar: "OPENAI_API_KEY",  Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_API_KEY=(.+)$`},
+		{EnvVar: "OPENAI_API_KEY", Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_API_KEY=(.+)$`},
 	},
 }
 
@@ -57,42 +58,90 @@ func main() {
 	listServices := flag.Bool("list", false, "list known service names and exit")
 	flag.Parse()
 
-	if *showVersion {
+	os.Exit(dispatch(cliArgs{
+		ShowVersion:  *showVersion,
+		ListServices: *listServices,
+		ServiceName:  *serviceName,
+		OutPath:      *outPath,
+		TimeoutSec:   *timeoutSec,
+		ExportVar:    *exportVar,
+		Args:         flag.Args(),
+	}))
+}
+
+// cliArgs is the structured input to dispatch, derived from CLI flags.
+type cliArgs struct {
+	ShowVersion  bool
+	ListServices bool
+	ServiceName  string
+	OutPath      string
+	TimeoutSec   int
+	ExportVar    string
+	Args         []string
+}
+
+// dispatch handles the main CLI logic for testing.
+//
+// Return values:
+//
+//	0 — success (or handled exit like --version / --list)
+//	1 — opRead failure
+//	2 — usage / configuration error
+func dispatch(a cliArgs) int {
+	if a.ShowVersion {
 		fmt.Printf("secrets-bootstrap %s\n", version)
-		os.Exit(0)
+		return 0
 	}
 
-	if *listServices {
-		for name := range serviceMap {
-			fmt.Println(name)
-		}
-		os.Exit(0)
+	if a.ListServices {
+		listServiceNames()
+		return 0
 	}
 
-	if *serviceName != "" {
-		if *outPath == "" {
+	if a.ServiceName != "" {
+		if a.OutPath == "" {
 			fmt.Fprintln(os.Stderr, "--out is required with --service")
-			os.Exit(2)
+			return 2
 		}
-		bootstrapServiceEnv(*serviceName, *outPath, *timeoutSec)
-		return
+		if err := bootstrapServiceEnv(a.ServiceName, a.OutPath, a.TimeoutSec); err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return 1
+		}
+		return 0
 	}
 
-	args := flag.Args()
-	if len(args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: secrets-bootstrap <vault> <item> <field> [--export VAR]")
-		fmt.Fprintln(os.Stderr, "       secrets-bootstrap --service NAME --out FILE [--list]")
-		os.Exit(2)
+	if len(a.Args) != 3 {
+		printUsage(os.Stderr)
+		return 2
 	}
-	vault, item, field := args[0], args[1], args[2]
-	val, err := opRead(vault, item, field, *timeoutSec)
+	vault, item, field := a.Args[0], a.Args[1], a.Args[2]
+	val, err := opRead(vault, item, field, a.TimeoutSec)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, redact(fmt.Sprintf("op read failed: %v", err)))
-		os.Exit(1)
+		return 1
 	}
+	printValueAndExport(val, a.ExportVar)
+	return 0
+}
+
+// printUsage emits the standard usage banner to the given writer.
+func printUsage(w *os.File) {
+	fmt.Fprintln(w, "usage: secrets-bootstrap <vault> <item> <field> [--export VAR]")
+	fmt.Fprintln(w, "       secrets-bootstrap --service NAME --out FILE [--list]")
+}
+
+// printValueAndExport emits the secret value and optional export statement.
+func printValueAndExport(val, exportVar string) {
 	fmt.Print(val)
-	if *exportVar != "" {
-		fmt.Printf("\nexport %s=%q", *exportVar, val)
+	if exportVar != "" {
+		fmt.Printf("\nexport %s=%q", exportVar, val)
+	}
+}
+
+// listServiceNames prints all known service names to stdout (extracted for testability).
+func listServiceNames() {
+	for name := range serviceMap {
+		fmt.Println(name)
 	}
 }
 
@@ -102,14 +151,22 @@ func opRead(vault, item, field string, timeoutSec int) (string, error) {
 		return "", fmt.Errorf("OP_SERVICE_ACCOUNT_TOKEN not set; cannot proceed")
 	}
 	ref := fmt.Sprintf("op://%s/%s/%s", vault, item, field)
-	cmd := exec.Command("op", "read", ref)
-	cmd.Env = append(os.Environ(), "OP_SERVICE_ACCOUNT_TOKEN="+token)
+	return opReadWithExecutor(ref, timeoutSec, defaultOpExecutor(token, ref))
+}
+
+// opExecutor abstracts the op CLI invocation for testability.
+type opExecutor func() ([]byte, error)
+
+// opReadWithExecutor runs an op-read with a bounded timeout using a caller-
+// supplied executor (returns stdout bytes and an error). Returns ("", error)
+// on timeout. Exposed for tests.
+func opReadWithExecutor(ref string, timeoutSec int, run opExecutor) (string, error) {
 	done := make(chan struct {
 		val string
 		err error
 	}, 1)
 	go func() {
-		out, err := cmd.Output()
+		out, err := run()
 		if err != nil {
 			done <- struct {
 				val string
@@ -126,8 +183,16 @@ func opRead(vault, item, field string, timeoutSec int) (string, error) {
 	case r := <-done:
 		return r.val, r.err
 	case <-time.After(time.Duration(timeoutSec) * time.Second):
-		_ = cmd.Process.Kill()
 		return "", fmt.Errorf("op read %q timed out after %ds", ref, timeoutSec)
+	}
+}
+
+// defaultOpExecutor returns a real opExecutor that invokes the `op` CLI.
+func defaultOpExecutor(token, ref string) opExecutor {
+	return func() ([]byte, error) {
+		cmd := exec.Command("op", "read", ref)
+		cmd.Env = append(os.Environ(), "OP_SERVICE_ACCOUNT_TOKEN="+token)
+		return cmd.Output()
 	}
 }
 
@@ -146,11 +211,11 @@ func extractFromNotes(notes, pattern string) (string, error) {
 	return strings.TrimSpace(m[1]), nil
 }
 
-func bootstrapServiceEnv(name, outPath string, timeoutSec int) {
+func bootstrapServiceEnv(name, outPath string, timeoutSec int) error {
 	entries, ok := serviceMap[name]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown service %q (use --list to see known services)\n", name)
-		os.Exit(2)
+		return fmt.Errorf("unknown service %q", name)
 	}
 	if dir := parentDir(outPath); dir != "" {
 		_ = os.MkdirAll(dir, 0700)
@@ -159,50 +224,67 @@ func bootstrapServiceEnv(name, outPath string, timeoutSec int) {
 	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open %s: %v\n", tmpPath, err)
-		os.Exit(1)
+		return fmt.Errorf("open %s: %w", tmpPath, err)
 	}
 	w := bufio.NewWriter(f)
 	fmt.Fprintf(w, "# Generated by secrets-bootstrap %s at %s for service %q\n", version, time.Now().UTC().Format(time.RFC3339), name)
 	for _, e := range entries {
-		// For "notesPlain" extraction, read notesPlain as raw text, then parse.
-		field := e.Field
-		if field == "_extract" {
-			field = "notesPlain"
-		}
-		val, err := opRead(e.Vault, e.Item, field, timeoutSec)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "skip %s: %v\n", e.EnvVar, redact(err.Error()))
-			fmt.Fprintf(w, "# %s=<unavailable: %s>\n", e.EnvVar, redact(err.Error()))
-			continue
-		}
-		if e.Extract != "" {
-			extracted, eerr := extractFromNotes(val, e.Extract)
-			if eerr != nil {
-				fmt.Fprintf(os.Stderr, "skip %s: %v\n", e.EnvVar, redact(eerr.Error()))
-				fmt.Fprintf(w, "# %s=<extract failed>\n", e.EnvVar)
-				continue
-			}
-			val = extracted
-		}
-		fmt.Fprintf(w, "%s=%q\n", e.EnvVar, val)
+		line := formatEnvLine(e, timeoutSec)
+		fmt.Fprint(w, line)
 	}
 	if err := w.Flush(); err != nil {
 		fmt.Fprintf(os.Stderr, "flush: %v\n", err)
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
-		os.Exit(1)
+		return fmt.Errorf("flush: %w", err)
 	}
 	if err := f.Close(); err != nil {
 		fmt.Fprintf(os.Stderr, "close: %v\n", err)
 		_ = os.Remove(tmpPath)
-		os.Exit(1)
+		return fmt.Errorf("close: %w", err)
 	}
 	if err := os.Rename(tmpPath, outPath); err != nil {
 		fmt.Fprintf(os.Stderr, "rename: %v\n", err)
 		_ = os.Remove(tmpPath)
-		os.Exit(1)
+		return fmt.Errorf("rename: %w", err)
 	}
 	_ = syscall.Chmod(outPath, 0600)
+	return nil
+}
+
+// resolveField maps "_extract" sentinel field to "notesPlain" for op-read API.
+func resolveField(field string) string {
+	if field == "_extract" {
+		return "notesPlain"
+	}
+	return field
+}
+
+// formatEnvLine renders a single EnvEntry as a quoted KEY="value" line (or a
+// "# KEY=<unavailable>" comment when the op read fails). Exposed for tests
+// that do not want to call opRead for real.
+func formatEnvLine(e EnvEntry, timeoutSec int) string {
+	val, err := opRead(e.Vault, e.Item, resolveField(e.Field), timeoutSec)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "skip %s: %v\n", e.EnvVar, redact(err.Error()))
+		return fmt.Sprintf("# %s=<unavailable: %s>\n", e.EnvVar, redact(err.Error()))
+	}
+	return formatEnvLineFromValue(e, val)
+}
+
+// formatEnvLineFromValue renders the env line given a successfully read value.
+// This split is intentional so tests can cover the post-opRead logic without
+// invoking the op CLI.
+func formatEnvLineFromValue(e EnvEntry, val string) string {
+	if e.Extract != "" {
+		extracted, eerr := extractFromNotes(val, e.Extract)
+		if eerr != nil {
+			fmt.Fprintf(os.Stderr, "skip %s: %v\n", e.EnvVar, redact(eerr.Error()))
+			return fmt.Sprintf("# %s=<extract failed>\n", e.EnvVar)
+		}
+		val = extracted
+	}
+	return fmt.Sprintf("%s=%q\n", e.EnvVar, val)
 }
 
 func parentDir(p string) string {

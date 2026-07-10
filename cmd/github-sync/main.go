@@ -94,19 +94,24 @@ func emitEvent(ev map[string]any) error {
 }
 
 func main() {
-	cfg, err := parseSyncArgs(os.Args[1:])
+	os.Exit(runMain(os.Args[1:]))
+}
+
+// runMain is the testable entry point for github-sync.
+func runMain(argv []string) int {
+	cfg, err := parseSyncArgs(argv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "github-sync: %v\n", err)
-		os.Exit(2)
+		return 2
 	}
 
 	if cfg.DryRun {
 		ev := buildSyncEvent(cfg, "dry-run", "no-op: --dry-run=true (default)")
 		if err := emitEvent(ev); err != nil {
 			fmt.Fprintf(os.Stderr, "github-sync: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
-		return
+		return 0
 	}
 
 	// Real sync path (NOT IMPLEMENTED in v16714; deferred to v16718 closeout).
@@ -115,6 +120,7 @@ func main() {
 	ev := buildSyncEvent(cfg, "skipped", "real sync path not yet implemented; v16718 closeout work")
 	if err := emitEvent(ev); err != nil {
 		fmt.Fprintf(os.Stderr, "github-sync: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

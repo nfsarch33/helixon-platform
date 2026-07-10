@@ -128,3 +128,45 @@ func TestEmitSyncEvent_StructuredJSON(t *testing.T) {
 		t.Errorf("round-trip lost event field")
 	}
 }
+
+func TestRunMain_DryRun(t *testing.T) {
+	if code := runMain([]string{"--source", "src.git", "--target", "tgt.git", "--dry-run"}); code != 0 {
+		t.Errorf("expected 0 for dry-run, got %d", code)
+	}
+}
+
+func TestRunMain_DefaultDryRun(t *testing.T) {
+	if code := runMain([]string{"--source", "src.git", "--target", "tgt.git"}); code != 0 {
+		t.Errorf("expected 0 (default dry-run), got %d", code)
+	}
+}
+
+func TestRunMain_NoDryRun(t *testing.T) {
+	if code := runMain([]string{"--source", "src.git", "--target", "tgt.git", "--dry-run=false"}); code != 0 {
+		t.Errorf("expected 0 for skipped path, got %d", code)
+	}
+}
+
+func TestRunMain_MissingSource(t *testing.T) {
+	if code := runMain([]string{"--target", "tgt.git"}); code != 2 {
+		t.Errorf("expected 2 for missing source, got %d", code)
+	}
+}
+
+func TestRunMain_MissingTarget(t *testing.T) {
+	if code := runMain([]string{"--source", "src.git"}); code != 2 {
+		t.Errorf("expected 2 for missing target, got %d", code)
+	}
+}
+
+func TestRunMain_BlankBranch(t *testing.T) {
+	if code := runMain([]string{"--source", "src.git", "--target", "tgt.git", "--branch", "   "}); code != 2 {
+		t.Errorf("expected 2 for blank branch, got %d", code)
+	}
+}
+
+func TestRunMain_BadFlag(t *testing.T) {
+	if code := runMain([]string{"--bogus"}); code != 2 {
+		t.Errorf("expected 2 for unknown flag, got %d", code)
+	}
+}
