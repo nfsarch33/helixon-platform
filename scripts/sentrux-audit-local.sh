@@ -154,6 +154,98 @@ else
 fi
 
 # ============================================================
+# v14594-v14595 new checks (10 total)
+# ============================================================
+
+# Check 10: win4 LAN discovery evidence present (CF-v14577-02)
+if [ -f /home/jaslian/Code/cursor-global-kb/evidence/v14595-mesh/mesh-direct.json ]; then
+  check v14595-mesh-evidence-present PASS "v14595-mesh/mesh-direct.json committed"
+else
+  check v14595-mesh-evidence-present FAIL "v14595-mesh/mesh-direct.json missing"
+fi
+# v14594 evidence (READMEs only; mesh matrix is at v14595-mesh)
+if [ -f /home/jaslian/Code/cursor-global-kb/evidence/v14594-win4-lan/README.md ]; then
+  check v14594-evidence-present PASS "v14594-win4-lan/README.md committed"
+else
+  check v14594-evidence-present FAIL "v14594-win4-lan/README.md missing"
+fi
+
+# Check 11: nodes.yaml at v10 (v14594 closing)
+nodes_ver=$(grep -oE 'v[0-9]+ -- 2026-07-10' /home/jaslian/Code/cursor-global-kb/fleet/nodes.yaml | tail -1 | grep -oE 'v[0-9]+' | grep -oE '[0-9]+')
+if [ "${nodes_ver:-0}" -ge 10 ]; then
+  check nodes-yaml-v10 PASS "nodes.yaml at v$nodes_ver (>= v10)"
+else
+  check nodes-yaml-v10 FAIL "nodes.yaml at v${nodes_ver:-0} (< v10)"
+fi
+
+# Check 12: wsl4 SSH via fleet_lan pubkey (CF-v14593-01 prerequisite)
+if ssh -o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o BatchMode=yes wsl4 'whoami' 2>&1 | grep -q jason; then
+  check wsl4-fleet-lan-ssh PASS "wsl4 SSH via fleet_lan works"
+else
+  check wsl4-fleet-lan-ssh FAIL "wsl4 SSH via fleet_lan broken"
+fi
+
+# Check 13: wsl2/wsl3/wsl4 SSH mesh from wsl1 (all OK)
+mesh_ok=0
+for tgt in wsl2 laptop-qbf2fuls-wsl3 wsl4; do
+  if ssh -o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o BatchMode=yes "$tgt" 'whoami' 2>&1 | grep -q jason; then
+    mesh_ok=$((mesh_ok + 1))
+  fi
+done
+if [ "$mesh_ok" -eq 3 ]; then
+  check wsl-mesh-3of3 PASS "wsl1 -> wsl2/wsl3/wsl4 SSH mesh 3/3"
+else
+  check wsl-mesh-3of3 FAIL "wsl1 -> wsl2/wsl3/wsl4 SSH mesh only $mesh_ok/3"
+fi
+
+# Check 14: llm-cluster-router config has auth_token (CF-v14593-01)
+auth_lines=$(grep -E "auth_token|require_auth" /home/jaslian/Code/cursor-global-kb/configs/llm-cluster-router.yml 2>/dev/null | wc -l | head -1)
+auth_lines=${auth_lines:-0}
+if [ "$auth_lines" -gt 0 ]; then
+  check llm-router-auth-explicit PASS "llm-cluster-router.yml has $auth_lines auth directives"
+else
+  check llm-router-auth-explicit FAIL "llm-cluster-router.yml has no auth directives"
+fi
+
+# Check 15: llm-cluster-router config has LLM_ROUTER_TOKEN env binding
+if grep -q "LLM_ROUTER_TOKEN" /home/jaslian/Code/cursor-global-kb/configs/llm-cluster-router.yml 2>/dev/null; then
+  check llm-router-token-env-bound PASS "auth_token.env = LLM_ROUTER_TOKEN"
+else
+  check llm-router-token-env-bound FAIL "auth_token.env != LLM_ROUTER_TOKEN"
+fi
+
+# Check 16: secrets-bootstrap has LLM_ROUTER_TOKEN (HF UUID hfri3ziy...)
+if grep -q "hfri3ziy6cjfec4xha7wkfkkri" /home/jaslian/Code/helixon-platform/cmd/secrets-bootstrap/main.go 2>/dev/null; then
+  check secrets-bootstrap-llm-token PASS "secrets-bootstrap binds LLM_ROUTER_TOKEN from hfri3ziy..."
+else
+  check secrets-bootstrap-llm-token FAIL "secrets-bootstrap missing LLM_ROUTER_TOKEN binding"
+fi
+
+# Check 17: 1Password item reachable (hfri3ziy6cjfec4xha7wkfkkri)
+if ps aux | grep -E "op (daemon|item)" | grep -v grep | awk '{print $2}' | xargs -r kill -9 2>/dev/null; then
+  if OP_SERVICE_ACCOUNT_TOKEN=$(cat ~/.config/op/service-account-token) \
+       op item get hfri3ziy6cjfec4xha7wkfkkri --vault Cursor_IronClaw --format=json >/dev/null 2>&1; then
+    check op-item-llm-router-reachable PASS "1Password item hfri3ziy... reachable"
+  else
+    check op-item-llm-router-reachable FAIL "1Password item hfri3ziy... unreachable"
+  fi
+fi
+
+# Check 18: wsl1 -> win1 LAN SSH works (via fleet_lan)
+if ssh -o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o BatchMode=yes desktop-12ro1af-win1 'whoami' 2>&1 | grep -q jaslian; then
+  check win1-lan-ssh PASS "wsl1 -> win1 SSH via fleet_lan works"
+else
+  check win1-lan-ssh FAIL "wsl1 -> win1 SSH via fleet_lan broken"
+fi
+
+# Check 19: wsl1 -> win3 LAN SSH works (via fleet_lan, keynear user)
+if ssh -o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o BatchMode=yes -l keynear 100.101.215.57 'whoami' 2>&1 | grep -q keynear; then
+  check win3-lan-ssh PASS "wsl1 -> win3 SSH via fleet_lan works (keynear user)"
+else
+  check win3-lan-ssh FAIL "wsl1 -> win3 SSH via fleet_lan broken"
+fi
+
+# ============================================================
 # Aggregate verdict
 # ============================================================
 
