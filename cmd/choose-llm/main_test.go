@@ -77,7 +77,6 @@ func writeFixtureMatrix(t *testing.T) string {
 // funnelled via SetOut / SetErr; child commands that use
 // cmd.OutOrStdout() inherit the root's writer so this is sufficient
 // (no os.Stdout swap needed, so the test is race-safe with -race).
-//
 //nolint:unparam // env parameter is kept for future env-var tests; signature stability outweighs the linter flag.
 func runWith(args []string, env map[string]string) (stdout string, stderr string, err error) {
 	root := newRootCmd()

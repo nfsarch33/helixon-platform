@@ -1,20 +1,19 @@
 // secrets-bootstrap — read 1Password secrets via op CLI.
 //
 // Usage:
-//
-//	secrets-bootstrap vault item field [--export VAR]
-//	secrets-bootstrap --service NAME --out FILE
+//   secrets-bootstrap vault item field [--export VAR]
+//   secrets-bootstrap --service NAME --out FILE
 //
 // v14547: Added --service/--out mode for systemd EnvironmentFile generation.
 package main
 
 import (
 	"bufio"
+	"regexp"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -45,7 +44,7 @@ var serviceMap = map[string][]EnvEntry{
 	},
 	"fleet-agent": {
 		{EnvVar: "OPENAI_BASE_URL", Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_BASE_URL=(.+)$`},
-		{EnvVar: "OPENAI_API_KEY", Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_API_KEY=(.+)$`},
+		{EnvVar: "OPENAI_API_KEY",  Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_API_KEY=(.+)$`},
 	},
 }
 

@@ -10,7 +10,6 @@ import (
 
 // parseTime is a tiny RFC3339 wrapper that t.Fatal's on parse error so
 // test setup stays readable.
-//
 //nolint:unparam // s parameter is kept flexible so tests can override the timestamp string in future time-window tests.
 func parseTime(t *testing.T, s string) time.Time {
 	t.Helper()
