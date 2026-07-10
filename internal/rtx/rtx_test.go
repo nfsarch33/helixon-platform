@@ -35,13 +35,13 @@ func TestCache_StoreAndLookup(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := Record{
-		Key:      Key("p", "s"),
-		Prompt:   "p",
+		Key:       Key("p", "s"),
+		Prompt:    "p",
 		StateHash: "s",
-		Tier:     Tier2,
-		CellID:   "qwen36-27b-q8",
-		Response: "hello back",
-		CostUSD:  0.01,
+		Tier:      Tier2,
+		CellID:    "qwen36-27b-q8",
+		Response:  "hello back",
+		CostUSD:   0.01,
 	}
 	if err := c.Store(rec); err != nil {
 		t.Fatal(err)
@@ -59,13 +59,13 @@ func TestCache_ReplayIDBypassesPrompt(t *testing.T) {
 	dir := t.TempDir()
 	c, _ := New(Options{Path: filepath.Join(dir, "rtx.ndjson")})
 	if err := c.Store(Record{
-		Key:      Key("first prompt", "state-A"),
-		Prompt:   "first prompt",
+		Key:       Key("first prompt", "state-A"),
+		Prompt:    "first prompt",
 		StateHash: "state-A",
-		ReplayID: "agent-loop-7",
-		Tier:     Tier1,
-		CellID:   "local-4b",
-		Response: "answer-1",
+		ReplayID:  "agent-loop-7",
+		Tier:      Tier1,
+		CellID:    "local-4b",
+		Response:  "answer-1",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -110,12 +110,12 @@ func TestCache_ConcurrentStore(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		go func(i int) {
 			done <- c.Store(Record{
-				Key:      Key("prompt", "state") + string(rune('a'+i)),
-				Prompt:   "prompt",
+				Key:       Key("prompt", "state") + string(rune('a'+i)),
+				Prompt:    "prompt",
 				StateHash: "state",
-				Tier:     Tier1,
-				CellID:   "cell",
-				Response: "ok",
+				Tier:      Tier1,
+				CellID:    "cell",
+				Response:  "ok",
 			})
 		}(i)
 	}

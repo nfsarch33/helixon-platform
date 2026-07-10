@@ -6,19 +6,19 @@ import (
 )
 
 var (
-	shellCommandRe   = regexp.MustCompile("(?m)^\\s*[$#>]\\s*(rm|del|kill|shutdown|reboot|sudo|chmod|chown|mkfs|dd\\s|format)\\s")
-	envVarLeakRe     = regexp.MustCompile(`(?i)(OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET|GITHUB_TOKEN|DATABASE_URL|DB_PASSWORD)\s*[=:]\s*\S+`)
-	filePathLeakRe   = regexp.MustCompile(`(/etc/passwd|/etc/shadow|\.env|\.ssh/id_rsa|credentials\.json)`)
-	privateIPRe      = regexp.MustCompile(`\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b`)
-	connectionStrRe  = regexp.MustCompile(`(?i)(postgres|mysql|mongodb|redis)://[^\s]+`)
+	shellCommandRe  = regexp.MustCompile(`(?m)^\s*[$#>]\s*(rm|del|kill|shutdown|reboot|sudo|chmod|chown|mkfs|dd\s|format)\s`)
+	envVarLeakRe    = regexp.MustCompile(`(?i)(OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET|GITHUB_TOKEN|DATABASE_URL|DB_PASSWORD)\s*[=:]\s*\S+`)
+	filePathLeakRe  = regexp.MustCompile(`(/etc/passwd|/etc/shadow|\.env|\.ssh/id_rsa|credentials\.json)`)
+	privateIPRe     = regexp.MustCompile(`\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b`)
+	connectionStrRe = regexp.MustCompile(`(?i)(postgres|mysql|mongodb|redis)://[^\s]+`)
 )
 
 // SanitizeResult describes what was cleaned from the output.
 type SanitizeResult struct {
-	Output          string   `json:"output"`
-	RedactedCount   int      `json:"redacted_count"`
-	RedactedTypes   []string `json:"redacted_types,omitempty"`
-	ShellLeakFound  bool     `json:"shell_leak_found"`
+	Output         string   `json:"output"`
+	RedactedCount  int      `json:"redacted_count"`
+	RedactedTypes  []string `json:"redacted_types,omitempty"`
+	ShellLeakFound bool     `json:"shell_leak_found"`
 }
 
 // OutputSanitizer removes dangerous or sensitive content from agent output.

@@ -19,14 +19,14 @@
 //
 // Usage:
 //
-//   choose-llm pick --tier=0|1|2|3 [--matrix=PATH] [--host-override=H]
+//	choose-llm pick --tier=0|1|2|3 [--matrix=PATH] [--host-override=H]
 //
 // Exit codes:
 //
-//   0 -- a cell was picked. Output is JSON; see pickOutput.
-//   2 -- no ready cell matched (operator must flip status to ready).
-//   3 -- bad flag / subcommand (usage error).
-//   4 -- matrix file unreadable / schema mismatch.
+//	0 -- a cell was picked. Output is JSON; see pickOutput.
+//	2 -- no ready cell matched (operator must flip status to ready).
+//	3 -- bad flag / subcommand (usage error).
+//	4 -- matrix file unreadable / schema mismatch.
 //
 // Stdin/stdout: no stdin is read; all I/O is via flags + the matrix
 // file. Output is ALWAYS valid JSON for the pick subcommand so the
@@ -35,6 +35,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -107,11 +108,11 @@ func buildHooksJSON(binary string, flagLine string) string {
 		"hooks": map[string]any{
 			"beforeSubmitPrompt": []map[string]any{
 				{
-					"name":       "helixon choose-llm",
-					"type":       "command",
-					"command":    binary,
-					"args":       strings.Fields(flagLine),
-					"stdin":      true,
+					"name":        "helixon choose-llm",
+					"type":        "command",
+					"command":     binary,
+					"args":        strings.Fields(flagLine),
+					"stdin":       true,
 					"description": "Routes the prompt to the cheapest ready qwen36 cell. Reads {prompt: string, hook_mode?: 'redirect'|'annotate'} from stdin; writes {decision_label, base_url, cell_id, hook_mode, reason} to stdout.",
 				},
 			},
@@ -135,9 +136,9 @@ submission to the qwen36 tier router.`,
 
 func newHookInstallCmd() *cobra.Command {
 	var (
-		out   string
+		out    string
 		binary string
-		flags string
+		flags  string
 	)
 	cmd := &cobra.Command{
 		Use:   "install",
@@ -204,7 +205,7 @@ func exitCodeFor(err error) int {
 	if err == nil {
 		return 0
 	}
-	if err == qwen36.ErrNoReadyCell {
+	if errors.Is(err, qwen36.ErrNoReadyCell) {
 		return 2
 	}
 	// cobra errors wrap the flag with the input name; treat any

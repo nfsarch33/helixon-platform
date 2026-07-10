@@ -9,9 +9,9 @@
 //
 // Exit codes:
 //
-//   0 -- all 10 prompts ran (some may have failed the rubric).
-//   2 -- failure to load matrix or prompts file.
-//   3 -- bad flag.
+//	0 -- all 10 prompts ran (some may have failed the rubric).
+//	2 -- failure to load matrix or prompts file.
+//	3 -- bad flag.
 //
 // In real-CUDA mode (--no-mock), the runner issues HTTP calls to
 // the chosen cell's base_url via the internal/retry helper. v14511
@@ -20,11 +20,11 @@
 //
 // References:
 //
-//   eval-harness/design.md
-//   eval-harness/prompts-10.json
-//   internal/llm/qwen36/{matrix,router}.go
-//   internal/smoke/{smoke,smoke_test}.go
-//   internal/retry  (foundation for real-mode retries; v14511)
+//	eval-harness/design.md
+//	eval-harness/prompts-10.json
+//	internal/llm/qwen36/{matrix,router}.go
+//	internal/smoke/{smoke,smoke_test}.go
+//	internal/retry  (foundation for real-mode retries; v14511)
 package main
 
 import (
@@ -69,9 +69,9 @@ to point at a custom fixture.`,
 
 func newRunCmd() *cobra.Command {
 	var (
-		matrixPath  string
-		promptsPath string
-		mock        bool
+		matrixPath   string
+		promptsPath  string
+		mock         bool
 		hostOverride string
 	)
 	cmd := &cobra.Command{
@@ -89,13 +89,13 @@ func newRunCmd() *cobra.Command {
 			results := runMock(m, prompts)
 			board := smoke.Aggregate(results)
 			out := struct {
-				SprintID       string             `json:"sprint_id"`
-				Mock           bool               `json:"mock"`
-				Matrix         string             `json:"matrix_path"`
-				Prompts        string             `json:"prompts_path"`
-				Scoreboard     smoke.Scoreboard   `json:"scoreboard"`
-				Results        []smoke.Result     `json:"results"`
-				HostOverride   string             `json:"host_override,omitempty"`
+				SprintID     string           `json:"sprint_id"`
+				Mock         bool             `json:"mock"`
+				Matrix       string           `json:"matrix_path"`
+				Prompts      string           `json:"prompts_path"`
+				Scoreboard   smoke.Scoreboard `json:"scoreboard"`
+				Results      []smoke.Result   `json:"results"`
+				HostOverride string           `json:"host_override,omitempty"`
 			}{
 				SprintID:     "v14510",
 				Mock:         mock,

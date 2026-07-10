@@ -215,12 +215,12 @@ func (c *Client) Complete(ctx context.Context, req CompletionRequest) (*Completi
 func (c *Client) doRequest(ctx context.Context, apiReq completionAPIRequest) (*CompletionResponse, error) {
 	body, err := json.Marshal(apiReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: marshal request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: marshal request: %w", ErrLLMClient, err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%w: build request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: build request: %w", ErrLLMClient, err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -231,13 +231,13 @@ func (c *Client) doRequest(ctx context.Context, apiReq completionAPIRequest) (*C
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: %w", ErrLLMClient, err)
 	}
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, int64(maxResponseSize+1)))
 	_ = resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("%w: read response: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: read response: %w", ErrLLMClient, err)
 	}
 
 	if len(respBody) > maxResponseSize {
@@ -254,7 +254,7 @@ func (c *Client) doRequest(ctx context.Context, apiReq completionAPIRequest) (*C
 
 	var result CompletionResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("%w: decode response: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: decode response: %w", ErrLLMClient, err)
 	}
 
 	return &result, nil
@@ -329,24 +329,24 @@ func (c *OllamaClient) Complete(ctx context.Context, req CompletionRequest) (*Co
 
 	body, err := json.Marshal(apiReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: marshal request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: marshal request: %w", ErrLLMClient, err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/chat", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%w: build request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: build request: %w", ErrLLMClient, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: %w", ErrLLMClient, err)
 	}
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, int64(maxResponseSize+1)))
 	_ = resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("%w: read response: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: read response: %w", ErrLLMClient, err)
 	}
 
 	if resp.StatusCode >= 400 {
@@ -355,7 +355,7 @@ func (c *OllamaClient) Complete(ctx context.Context, req CompletionRequest) (*Co
 
 	var result ollamaChatResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("%w: decode response: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: decode response: %w", ErrLLMClient, err)
 	}
 
 	return &CompletionResponse{

@@ -220,9 +220,10 @@ func (s *Server) Serve(ctx context.Context) error {
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
+		//nolint:contextcheck // intentional detach; parent ctx is already cancelled
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		_ = srv.Shutdown(shutdownCtx) //nolint:contextcheck
 		return nil
 	}
 }
@@ -411,7 +412,7 @@ func decodeMessageRequest(r *http.Request) (messageRequest, error) {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		return req, fmt.Errorf("invalid request body: %v", err)
+		return req, fmt.Errorf("invalid request body: %w", err)
 	}
 	if strings.TrimSpace(req.Content) == "" {
 		return req, errors.New("content is required")

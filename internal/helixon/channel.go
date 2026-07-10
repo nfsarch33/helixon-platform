@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -168,7 +167,6 @@ type WebSocketChannel struct {
 	cfg    WebSocketChannelConfig
 	server *http.Server
 	logger *slog.Logger
-	mu     sync.Mutex
 }
 
 // NewWebSocketChannel creates a WebSocket channel for real-time streaming.

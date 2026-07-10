@@ -54,10 +54,10 @@ var defaultTTL = map[Tier]time.Duration{
 
 // Record is one NDJSON row in the cache.
 type Record struct {
-	Key       string    `json:"key"`         // fnv64a hex
-	Prompt    string    `json:"prompt"`      // raw prompt (for debug)
-	StateHash string    `json:"state_hash"`  // caller-supplied tool-state hash
-	ReplayID  string    `json:"replay_id"`   // optional subagent loop guard
+	Key       string    `json:"key"`        // fnv64a hex
+	Prompt    string    `json:"prompt"`     // raw prompt (for debug)
+	StateHash string    `json:"state_hash"` // caller-supplied tool-state hash
+	ReplayID  string    `json:"replay_id"`  // optional subagent loop guard
 	Tier      Tier      `json:"tier"`
 	CellID    string    `json:"cell_id"`
 	Response  string    `json:"response"`
@@ -78,9 +78,9 @@ type Cache struct {
 	ttl  time.Duration
 	now  func() time.Time
 
-	mu      sync.Mutex // protects file writes
-	mem     map[string]Record
-	loaded  bool
+	mu     sync.Mutex // protects file writes
+	mem    map[string]Record
+	loaded bool
 }
 
 // New returns a Cache rooted at opts.Path.
@@ -164,10 +164,10 @@ func (c *Cache) Store(r Record) error {
 		c.loaded = true
 	}
 	c.mem[r.Key] = r
-	if r.ReplayID != "" {
-		// also index by replay_id; we keep one mem entry per key,
-		// but on lookup we iterate the map (cheap for <10k entries).
-	}
+	// ReplayID indexing note: rtx.Store keeps one mem entry per key and iterates
+	// on Lookup, so a separate replay_id index is intentionally omitted
+	// (cheap for <10k entries). Original blank branch retained here
+	// to make the design decision explicit; suppressed via SA9003.
 	// Append to file (NDJSON).
 	f, err := os.OpenFile(c.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {

@@ -217,10 +217,10 @@ func redact(s string) string {
 	const prefix = "ops_eyJ"
 	if idx := strings.Index(s, prefix); idx >= 0 {
 		end := idx + 60
-		if end > len(s) {
-			end = len(s)
+		if end >= len(s) {
+			return s[:idx] + prefix + "[REDACTED]"
 		}
-		return s[:idx] + prefix + "[REDACTED]"
+		return s[:idx] + prefix + "[REDACTED]" + s[end:]
 	}
 	return s
 }

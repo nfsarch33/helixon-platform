@@ -72,8 +72,8 @@ type Event struct {
 // mutex serialises the fmt.Fprint call so we never interleave the
 // bytes of two events on the wire.
 type Writer struct {
-	mu sync.Mutex
-	w  io.Writer
+	mu  sync.Mutex
+	w   io.Writer
 	enc *json.Encoder
 }
 

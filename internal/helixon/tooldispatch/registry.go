@@ -128,7 +128,7 @@ func (r *Registry) ExecuteToolResult(ctx context.Context, name string, argsJSON 
 			msg := ErrInvalidArguments.Error() + ": " + name + ": " + err.Error()
 			res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusError, "", msg, time.Since(start).Milliseconds(), 0)
 			res.IdempotencyKey = idemKey
-			return res, fmt.Errorf("%w: %s: %s", ErrInvalidArguments, name, err)
+			return res, fmt.Errorf("%w: %s: %w", ErrInvalidArguments, name, err)
 		}
 	}
 	if args == nil {
@@ -140,7 +140,7 @@ func (r *Registry) ExecuteToolResult(ctx context.Context, name string, argsJSON 
 			msg := ErrInvalidArguments.Error() + ": " + name + ": " + err.Error()
 			res := toolresult.NewToolResult(name, argsJSON, toolresult.StatusError, "", msg, time.Since(start).Milliseconds(), 0)
 			res.IdempotencyKey = idemKey
-			return res, fmt.Errorf("%w: %s: %s", ErrInvalidArguments, name, err)
+			return res, fmt.Errorf("%w: %s: %w", ErrInvalidArguments, name, err)
 		}
 	}
 
@@ -212,7 +212,7 @@ func validateArgs(schemaJSON json.RawMessage, args map[string]any) error {
 		Properties map[string]property `json:"properties"`
 	}
 	if err := json.Unmarshal(schemaJSON, &schema); err != nil {
-		return nil
+		return fmt.Errorf("invalid tool schema: %w", err)
 	}
 
 	for _, req := range schema.Required {

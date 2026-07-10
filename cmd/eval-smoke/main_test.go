@@ -160,6 +160,8 @@ type runnerOutput struct {
 }
 
 // runSmoke is the cobra CLI runner for cmd/eval-smoke.
+//
+//nolint:unparam // second return (stderr) is retained for symmetry with other CLI runners; tests ignore it intentionally.
 func runSmoke(args []string, env ...map[string]string) (string, string, error) {
 	root := newRootCmd()
 	var out, errBuf bytes.Buffer

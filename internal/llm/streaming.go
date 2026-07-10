@@ -86,17 +86,17 @@ func (c *Client) StreamComplete(ctx context.Context, req CompletionRequest, cb S
 
 	body, err := json.Marshal(apiReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: marshal request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: marshal request: %w", ErrLLMClient, err)
 	}
 
 	streamBody, err := addStreamFlag(body)
 	if err != nil {
-		return nil, fmt.Errorf("%w: add stream flag: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: add stream flag: %w", ErrLLMClient, err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(streamBody))
 	if err != nil {
-		return nil, fmt.Errorf("%w: build request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: build request: %w", ErrLLMClient, err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "text/event-stream")
@@ -106,7 +106,7 @@ func (c *Client) StreamComplete(ctx context.Context, req CompletionRequest, cb S
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: %w", ErrLLMClient, err)
 	}
 	defer resp.Body.Close()
 

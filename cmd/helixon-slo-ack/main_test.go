@@ -15,10 +15,18 @@ import (
 func TestFilter_SeverityAndState(t *testing.T) {
 	now := time.Now().UTC()
 	alerts := []Alert{
-		{Labels: map[string]string{"alertname": "A", "severity": "page"}, Status: struct{ State string `json:"state"` }{State: "active"}},
-		{Labels: map[string]string{"alertname": "B", "severity": "page"}, Status: struct{ State string `json:"state"` }{State: "suppressed"}},
-		{Labels: map[string]string{"alertname": "C", "severity": "notify"}, Status: struct{ State string `json:"state"` }{State: "active"}},
-		{Labels: map[string]string{"alertname": "D", "severity": "log"}, Status: struct{ State string `json:"state"` }{State: "active"}},
+		{Labels: map[string]string{"alertname": "A", "severity": "page"}, Status: struct {
+			State string `json:"state"`
+		}{State: "active"}},
+		{Labels: map[string]string{"alertname": "B", "severity": "page"}, Status: struct {
+			State string `json:"state"`
+		}{State: "suppressed"}},
+		{Labels: map[string]string{"alertname": "C", "severity": "notify"}, Status: struct {
+			State string `json:"state"`
+		}{State: "active"}},
+		{Labels: map[string]string{"alertname": "D", "severity": "log"}, Status: struct {
+			State string `json:"state"`
+		}{State: "active"}},
 	}
 	_ = now
 	p0 := filter(alerts, "page")
@@ -47,7 +55,9 @@ func TestAckAlert_DryRunAppendsNothing(t *testing.T) {
 
 	a := Alert{
 		Labels: map[string]string{"alertname": "Qwen36High5xx", "severity": "page"},
-		Status: struct{ State string `json:"state"` }{State: "active"},
+		Status: struct {
+			State string `json:"state"`
+		}{State: "active"},
 	}
 	if err := ackAlert(srv.URL, a, 5*time.Minute, "v14513", "test", inc, true); err != nil {
 		t.Fatalf("ackAlert dry-run failed: %v", err)
@@ -83,7 +93,9 @@ func TestAckAlert_WetRunPostsSilenceAndAppendsRow(t *testing.T) {
 
 	a := Alert{
 		Labels: map[string]string{"alertname": "ControlPlaneDown", "severity": "page"},
-		Status: struct{ State string `json:"state"` }{State: "active"},
+		Status: struct {
+			State string `json:"state"`
+		}{State: "active"},
 	}
 	if err := ackAlert(srv.URL, a, 5*time.Minute, "v14513", "test", inc, false); err != nil {
 		t.Fatalf("ackAlert wet-run failed: %v", err)
@@ -150,7 +162,9 @@ func TestListAlerts_Reachable(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]Alert{
-			{Labels: map[string]string{"alertname": "Foo", "severity": "page"}, Status: struct{ State string `json:"state"` }{State: "active"}},
+			{Labels: map[string]string{"alertname": "Foo", "severity": "page"}, Status: struct {
+				State string `json:"state"`
+			}{State: "active"}},
 		})
 	}))
 	defer srv.Close()

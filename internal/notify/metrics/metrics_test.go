@@ -2,6 +2,7 @@
 package metrics_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/nfsarch33/helixon-platform/internal/notify/metrics"
@@ -10,9 +11,9 @@ import (
 
 func TestRegistry_IncSend(t *testing.T) {
 	r := metrics.NewRegistry(noop.NewMeterProvider().Meter("t"))
-	r.IncSend(metrics.VendorResend, metrics.StatusSuccess)
-	r.IncSend(metrics.VendorResend, metrics.StatusSuccess)
-	r.IncSend(metrics.VendorResend, metrics.StatusBadRequest)
+	r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusSuccess)
+	r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusSuccess)
+	r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusBadRequest)
 	if got := r.StatusFor(metrics.VendorResend, metrics.StatusSuccess); got != 2 {
 		t.Errorf("StatusFor success: want 2, got %d", got)
 	}
@@ -23,9 +24,9 @@ func TestRegistry_IncSend(t *testing.T) {
 
 func TestRegistry_IncAttempt(t *testing.T) {
 	r := metrics.NewRegistry(noop.NewMeterProvider().Meter("t"))
-	r.IncAttempt(metrics.VendorResend)
-	r.IncAttempt(metrics.VendorResend)
-	r.IncAttempt(metrics.VendorBrevo)
+	r.IncAttempt(context.Background(), metrics.VendorResend)
+	r.IncAttempt(context.Background(), metrics.VendorResend)
+	r.IncAttempt(context.Background(), metrics.VendorBrevo)
 	snap := r.Snapshot()
 	if snap.Attempts[metrics.AttemptKey{Vendor: metrics.VendorResend}] != 2 {
 		t.Errorf("attempts resend: want 2, got %d", snap.Attempts[metrics.AttemptKey{Vendor: metrics.VendorResend}])
@@ -37,8 +38,8 @@ func TestRegistry_IncAttempt(t *testing.T) {
 
 func TestRegistry_ObserveSend(t *testing.T) {
 	r := metrics.NewRegistry(noop.NewMeterProvider().Meter("t"))
-	r.ObserveSend(metrics.VendorBrevo, metrics.StatusSuccess, 100)
-	r.ObserveSend(metrics.VendorBrevo, metrics.StatusSuccess, 250)
+	r.ObserveSend(context.Background(), metrics.VendorBrevo, metrics.StatusSuccess, 100)
+	r.ObserveSend(context.Background(), metrics.VendorBrevo, metrics.StatusSuccess, 250)
 	snap := r.Snapshot()
 	dur := snap.SendDur[metrics.SendKey{Vendor: metrics.VendorBrevo, Status: metrics.StatusSuccess}]
 	if dur != 350 {
@@ -48,10 +49,10 @@ func TestRegistry_ObserveSend(t *testing.T) {
 
 func TestRegistry_TotalByVendor(t *testing.T) {
 	r := metrics.NewRegistry(noop.NewMeterProvider().Meter("t"))
-	r.IncSend(metrics.VendorResend, metrics.StatusSuccess)
-	r.IncSend(metrics.VendorResend, metrics.StatusBadRequest)
-	r.IncSend(metrics.VendorResend, metrics.StatusDeadLetter)
-	r.IncSend(metrics.VendorBrevo, metrics.StatusSuccess)
+	r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusSuccess)
+	r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusBadRequest)
+	r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusDeadLetter)
+	r.IncSend(context.Background(), metrics.VendorBrevo, metrics.StatusSuccess)
 	if got := r.TotalByVendor(metrics.VendorResend); got != 3 {
 		t.Errorf("resend total: want 3, got %d", got)
 	}
@@ -62,9 +63,9 @@ func TestRegistry_TotalByVendor(t *testing.T) {
 
 func TestRegistry_NilMeterDoesNotPanic(t *testing.T) {
 	r := metrics.NewRegistry(nil)
-	r.IncSend(metrics.VendorResend, metrics.StatusSuccess)
-	r.ObserveSend(metrics.VendorResend, metrics.StatusSuccess, 1)
-	r.IncAttempt(metrics.VendorResend)
+	r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusSuccess)
+	r.ObserveSend(context.Background(), metrics.VendorResend, metrics.StatusSuccess, 1)
+	r.IncAttempt(context.Background(), metrics.VendorResend)
 	if r.StatusFor(metrics.VendorResend, metrics.StatusSuccess) != 1 {
 		t.Error("status counter should still work with nil meter")
 	}
@@ -76,8 +77,8 @@ func TestRegistry_ConcurrentIncrementsAreSafe(t *testing.T) {
 	done := make(chan struct{}, n)
 	for i := 0; i < n; i++ {
 		go func() {
-			r.IncSend(metrics.VendorResend, metrics.StatusSuccess)
-			r.IncAttempt(metrics.VendorResend)
+			r.IncSend(context.Background(), metrics.VendorResend, metrics.StatusSuccess)
+			r.IncAttempt(context.Background(), metrics.VendorResend)
 			done <- struct{}{}
 		}()
 	}

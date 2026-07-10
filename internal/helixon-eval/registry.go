@@ -26,35 +26,35 @@ import (
 type Model string
 
 const (
-	ModelQwen37Plus  Model = "qwen3.7-plus"
-	ModelQwen37Max   Model = "qwen3.7-max"
-	ModelMiniMaxM3   Model = "MiniMax-M3"
-	ModelOfflineFix  Model = "offline-fixture"
+	ModelQwen37Plus Model = "qwen3.7-plus"
+	ModelQwen37Max  Model = "qwen3.7-max"
+	ModelMiniMaxM3  Model = "MiniMax-M3"
+	ModelOfflineFix Model = "offline-fixture"
 )
 
 // Case is a single scored trace. Score is in [0,1] (mean of all applied
 // rubrics for the model). TerminationReason is one of "completed",
 // "self_improve_term", "max_steps", "error".
 type Case struct {
-	ID               string    `json:"id"`
-	Task             string    `json:"task"`
-	Model            Model     `json:"model"`
-	Score            float64   `json:"score"`
-	RubricScores     map[string]float64 `json:"rubric_scores"`
-	Steps            int       `json:"steps"`
-	TerminationReason string   `json:"termination_reason"`
-	StartedAt        time.Time `json:"started_at"`
-	DurationMS       int64     `json:"duration_ms"`
-	Source           string    `json:"source"` // "cache", "synth"
+	ID                string             `json:"id"`
+	Task              string             `json:"task"`
+	Model             Model              `json:"model"`
+	Score             float64            `json:"score"`
+	RubricScores      map[string]float64 `json:"rubric_scores"`
+	Steps             int                `json:"steps"`
+	TerminationReason string             `json:"termination_reason"`
+	StartedAt         time.Time          `json:"started_at"`
+	DurationMS        int64              `json:"duration_ms"`
+	Source            string             `json:"source"` // "cache", "synth"
 }
 
 // Registry holds Cases keyed by ID. It is safe for concurrent use by
 // multiple goroutines; the brief's spec calls for a 100-goroutine
 // concurrent register test (see v16122 regression template).
 type Registry struct {
-	mu     sync.RWMutex
-	cases  map[string]Case
-	order  []string // insertion order, used for deterministic Run output
+	mu    sync.RWMutex
+	cases map[string]Case
+	order []string // insertion order, used for deterministic Run output
 }
 
 // NewRegistry returns an empty Registry ready for Add/Run calls.

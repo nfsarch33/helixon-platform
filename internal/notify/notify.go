@@ -217,7 +217,7 @@ func (c *ResendClient) Send(ctx context.Context, m Email) error {
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("%w: marshal payload: %v", ErrPermanent, err)
+		return fmt.Errorf("%w: marshal payload: %w", ErrPermanent, err)
 	}
 
 	return c.doWithRetry(ctx, body, m)
@@ -226,7 +226,7 @@ func (c *ResendClient) Send(ctx context.Context, m Email) error {
 func (c *ResendClient) doWithRetry(ctx context.Context, body []byte, m Email) error {
 	endpoint, err := url.JoinPath(c.cfg.BaseURL, "/emails")
 	if err != nil {
-		return fmt.Errorf("%w: build endpoint: %v", ErrPermanent, err)
+		return fmt.Errorf("%w: build endpoint: %w", ErrPermanent, err)
 	}
 	actor := &resendActor{c: c, m: m, endpoint: endpoint}
 	return retryWithBackoff(ctx, c.cfg.MaxRetry+1, body, m, actor)
@@ -241,9 +241,9 @@ type resendActor struct {
 }
 
 // onAttempt increments the Resend per-attempt metric. CC=2.
-func (a *resendActor) onAttempt(_ int) {
+func (a *resendActor) onAttempt(ctx context.Context, _ int) {
 	if a.c.metrics != nil {
-		a.c.metrics.IncAttempt(metrics.VendorResend)
+		a.c.metrics.IncAttempt(ctx, metrics.VendorResend)
 	}
 }
 
@@ -263,7 +263,7 @@ func (a *resendActor) do(req *http.Request) (*http.Response, error) { return a.c
 func (a *resendActor) onSuccess(ctx context.Context, _ []byte) error {
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, nil)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusSuccess)
+		a.c.metrics.IncSend(ctx, metrics.VendorResend, metrics.StatusSuccess)
 	}
 	return nil
 }
@@ -275,7 +275,7 @@ func (a *resendActor) onBadRequest(ctx context.Context, status int, body []byte)
 	finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, status, sanitizeBody(body))
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusBadRequest)
+		a.c.metrics.IncSend(ctx, metrics.VendorResend, metrics.StatusBadRequest)
 	}
 	return finalErr
 }
@@ -283,10 +283,10 @@ func (a *resendActor) onBadRequest(ctx context.Context, status int, body []byte)
 // onTransportError records audit + emits dead-letter metric when the HTTP
 // call itself returned an error (network/timeout/cancelled). CC=4.
 func (a *resendActor) onTransportError(ctx context.Context, attempt int, err error) error {
-	finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+	finalErr := fmt.Errorf("%w: %d attempts: %w", ErrDeadLetter, attempt, err)
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusDeadLetter)
+		a.c.metrics.IncSend(ctx, metrics.VendorResend, metrics.StatusDeadLetter)
 	}
 	return finalErr
 }
@@ -297,7 +297,7 @@ func (a *resendActor) onTransientExhausted(ctx context.Context, attempt, status 
 	finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, status, attempt, sanitizeBody(body))
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorResend, metrics.StatusDeadLetter)
+		a.c.metrics.IncSend(ctx, metrics.VendorResend, metrics.StatusDeadLetter)
 	}
 	return finalErr
 }
@@ -444,7 +444,7 @@ func (c *BrevoClient) Send(ctx context.Context, m Email) error {
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("%w: marshal payload: %v", ErrPermanent, err)
+		return fmt.Errorf("%w: marshal payload: %w", ErrPermanent, err)
 	}
 
 	return c.doWithRetry(ctx, body, m)
@@ -455,7 +455,7 @@ func defaultBrevoSender() string { return "ops@cylrl.com.au" }
 func (c *BrevoClient) doWithRetry(ctx context.Context, body []byte, m Email) error {
 	endpoint, err := url.JoinPath(c.cfg.BaseURL, "/smtp/email")
 	if err != nil {
-		return fmt.Errorf("%w: build endpoint: %v", ErrPermanent, err)
+		return fmt.Errorf("%w: build endpoint: %w", ErrPermanent, err)
 	}
 	actor := &brevoActor{c: c, m: m, endpoint: endpoint}
 	return retryWithBackoff(ctx, c.cfg.MaxRetry+1, body, m, actor)
@@ -470,9 +470,9 @@ type brevoActor struct {
 }
 
 // onAttempt increments the Brevo per-attempt metric. CC=2.
-func (a *brevoActor) onAttempt(_ int) {
+func (a *brevoActor) onAttempt(ctx context.Context, _ int) {
 	if a.c.metrics != nil {
-		a.c.metrics.IncAttempt(metrics.VendorBrevo)
+		a.c.metrics.IncAttempt(ctx, metrics.VendorBrevo)
 	}
 }
 
@@ -492,7 +492,7 @@ func (a *brevoActor) do(req *http.Request) (*http.Response, error) { return a.c.
 func (a *brevoActor) onSuccess(ctx context.Context, _ []byte) error {
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, nil)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusSuccess)
+		a.c.metrics.IncSend(ctx, metrics.VendorBrevo, metrics.StatusSuccess)
 	}
 	return nil
 }
@@ -503,7 +503,7 @@ func (a *brevoActor) onBadRequest(ctx context.Context, status int, body []byte) 
 	finalErr := fmt.Errorf("%w: status %d: %s", ErrPermanent, status, sanitizeBody(body))
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusBadRequest)
+		a.c.metrics.IncSend(ctx, metrics.VendorBrevo, metrics.StatusBadRequest)
 	}
 	return finalErr
 }
@@ -511,10 +511,10 @@ func (a *brevoActor) onBadRequest(ctx context.Context, status int, body []byte) 
 // onTransportError records audit + emits dead-letter metric when the HTTP
 // call itself returned an error. CC=4.
 func (a *brevoActor) onTransportError(ctx context.Context, attempt int, err error) error {
-	finalErr := fmt.Errorf("%w: %d attempts: %v", ErrDeadLetter, attempt, err)
+	finalErr := fmt.Errorf("%w: %d attempts: %w", ErrDeadLetter, attempt, err)
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusDeadLetter)
+		a.c.metrics.IncSend(ctx, metrics.VendorBrevo, metrics.StatusDeadLetter)
 	}
 	return finalErr
 }
@@ -525,7 +525,7 @@ func (a *brevoActor) onTransientExhausted(ctx context.Context, attempt, status i
 	finalErr := fmt.Errorf("%w: status %d after %d attempts: %s", ErrDeadLetter, status, attempt, sanitizeBody(body))
 	a.c.recordAudit(ctx, a.m.IdempotencyKey, a.m.Subject, finalErr)
 	if a.c.metrics != nil {
-		a.c.metrics.IncSend(metrics.VendorBrevo, metrics.StatusDeadLetter)
+		a.c.metrics.IncSend(ctx, metrics.VendorBrevo, metrics.StatusDeadLetter)
 	}
 	return finalErr
 }
@@ -652,7 +652,6 @@ type IdempotencyStore struct {
 
 type idempotencyPromise struct {
 	done chan struct{}
-	err  error
 }
 
 // NewIdempotencyStore returns an empty in-memory store.
@@ -831,7 +830,7 @@ func Hash32(s string) uint32 {
 type retryActor interface {
 	// onAttempt is invoked at the start of each attempt. Actors use it to
 	// increment the per-vendor metrics counter (no return value).
-	onAttempt(attempt int)
+	onAttempt(ctx context.Context, attempt int)
 	buildRequest(ctx context.Context, body []byte) *http.Request
 	do(req *http.Request) (*http.Response, error)
 	onSuccess(ctx context.Context, body []byte) error
@@ -844,10 +843,10 @@ type retryActor interface {
 // retryWithBackoff drives the per-attempt loop. It is intentionally small
 // (CC ≤ 4) because every behavioural branch is delegated to the actor.
 // CC=4.
-func retryWithBackoff(ctx context.Context, maxAttempt int, body []byte, m Email, actor retryActor) error {
+func retryWithBackoff(ctx context.Context, maxAttempt int, body []byte, m Email, actor retryActor) error { //nolint:unparam // body parameter reserved for templated retry bodies in future path
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempt; attempt++ {
-		actor.onAttempt(attempt)
+		actor.onAttempt(ctx, attempt)
 
 		req := actor.buildRequest(ctx, body)
 		resp, err := actor.do(req)

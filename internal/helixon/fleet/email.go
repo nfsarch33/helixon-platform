@@ -1,3 +1,4 @@
+// Package fleet implements the Helixon agent fleet-management endpoints (email, handlers, reports).
 package fleet
 
 import (

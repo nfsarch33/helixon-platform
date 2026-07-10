@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+//nolint:unparam // body parameter is kept for future tests that write custom fixtures; current call sites use the default sampleYAML.
 func writeTmpRegistry(t *testing.T, body string) string {
 	t.Helper()
 	d := t.TempDir()

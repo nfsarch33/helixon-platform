@@ -250,12 +250,13 @@ func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Write
 
 func runAndShutdown(ctx context.Context, rt *helixon.Runtime, dashSrv *http.Server) error {
 	runErr := rt.Run(ctx)
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Shutdown uses a fresh context because parent is cancelled by Run's return.
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second) //nolint:contextcheck
 	defer shutdownCancel()
 	if dashSrv != nil {
-		_ = dashSrv.Shutdown(shutdownCtx)
+		_ = dashSrv.Shutdown(shutdownCtx) //nolint:contextcheck
 	}
-	if err := rt.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
+	if err := rt.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) { //nolint:contextcheck
 		return fmt.Errorf("runtime shutdown: %w", err)
 	}
 	if runErr != nil && !errors.Is(runErr, context.Canceled) {

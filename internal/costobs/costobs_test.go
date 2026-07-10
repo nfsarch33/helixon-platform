@@ -17,22 +17,23 @@ import (
 // Sample data lives here so every test reuses the same well-formed
 // fixture. We deliberately keep cost values in $0.0001 resolution
 // so the NDJSON stays readable in a tail.
+//nolint:unparam // model is parameterised so test callers can override for future multi-model fixtures; today they all use the same model.
 func sampleEvent(model string, tier int, inTok, outTok int, cellID string) Event {
 	return Event{
-		SchemaVersion:    SchemaVersion,
-		CapturedAt:       time.Date(2026, 7, 9, 1, 0, 0, 0, time.UTC),
-		SprintID:         "v14511",
-		JobID:            "job-001",
-		TenantID:         "tenant-A",
-		Env:              "dev",
-		CellID:           cellID,
-		Model:            model,
-		ModelTier:        tier,
-		EstInputTokens:   inTok,
-		EstOutputTokens:  outTok,
-		EstCostUSD:       estimateCostUSD(model, inTok, outTok),
-		JobType:          "llm.chat_completion",
-		Outcome:          "ok",
+		SchemaVersion:   SchemaVersion,
+		CapturedAt:      time.Date(2026, 7, 9, 1, 0, 0, 0, time.UTC),
+		SprintID:        "v14511",
+		JobID:           "job-001",
+		TenantID:        "tenant-A",
+		Env:             "dev",
+		CellID:          cellID,
+		Model:           model,
+		ModelTier:       tier,
+		EstInputTokens:  inTok,
+		EstOutputTokens: outTok,
+		EstCostUSD:      estimateCostUSD(model, inTok, outTok),
+		JobType:         "llm.chat_completion",
+		Outcome:         "ok",
 	}
 }
 

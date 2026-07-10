@@ -17,21 +17,21 @@ var (
 
 // HarnessConstraints defines the execution limits for an agent run.
 type HarnessConstraints struct {
-	MaxIterations   int
-	MaxTokensIn     int
-	MaxTokensOut    int
-	MaxCostUSD      float64
-	Timeout         time.Duration
+	MaxIterations int
+	MaxTokensIn   int
+	MaxTokensOut  int
+	MaxCostUSD    float64
+	Timeout       time.Duration
 }
 
 // DefaultConstraints returns sensible production defaults.
 func DefaultConstraints() HarnessConstraints {
 	return HarnessConstraints{
-		MaxIterations:   50,
-		MaxTokensIn:     500_000,
-		MaxTokensOut:    200_000,
-		MaxCostUSD:      5.0,
-		Timeout:         10 * time.Minute,
+		MaxIterations: 50,
+		MaxTokensIn:   500_000,
+		MaxTokensOut:  200_000,
+		MaxCostUSD:    5.0,
+		Timeout:       10 * time.Minute,
 	}
 }
 
@@ -132,10 +132,10 @@ func (h *HarnessState) Summary() HarnessSummary {
 
 // HarnessSummary is a point-in-time snapshot of harness state.
 type HarnessSummary struct {
-	Iterations int              `json:"iterations"`
-	TokensIn   int              `json:"tokens_in"`
-	TokensOut  int              `json:"tokens_out"`
-	CostUSD    float64          `json:"cost_usd"`
-	Elapsed    time.Duration    `json:"elapsed"`
+	Iterations int                `json:"iterations"`
+	TokensIn   int                `json:"tokens_in"`
+	TokensOut  int                `json:"tokens_out"`
+	CostUSD    float64            `json:"cost_usd"`
+	Elapsed    time.Duration      `json:"elapsed"`
 	Limits     HarnessConstraints `json:"limits"`
 }

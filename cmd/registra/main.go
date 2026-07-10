@@ -1,13 +1,14 @@
 // Command registra is the Helixon Service Registry CLI.
 //
 // Subcommands:
-//   list [--node=ALIAS] [--kind=KIND]   list services
-//   show NAME                            show one service
-//   nodes                                list fleet nodes
-//   cells                                list LLM cells
-//   credential TITLE                     look up a 1Password item by title
-//   health [--node=ALIAS]                probe http health endpoints
-//   summary                              human-readable summary
+//
+//	list [--node=ALIAS] [--kind=KIND]   list services
+//	show NAME                            show one service
+//	nodes                                list fleet nodes
+//	cells                                list LLM cells
+//	credential TITLE                     look up a 1Password item by title
+//	health [--node=ALIAS]                probe http health endpoints
+//	summary                              human-readable summary
 package main
 
 import (

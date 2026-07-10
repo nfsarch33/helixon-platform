@@ -14,6 +14,7 @@ func TestNewEinoAdapter_ImplementsToolCallingChatModel(t *testing.T) {
 	mock := NewMockProvider()
 	adapter := NewEinoAdapter(mock)
 
+	//nolint:staticcheck // QF1011: explicit type documents the interface contract under test.
 	var _ model.ToolCallingChatModel = adapter
 }
 

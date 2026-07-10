@@ -84,7 +84,7 @@ func TestTraceMiddleware_RecordsErrors(t *testing.T) {
 	_, callErr := tm.Wrap("sprintboard.claim", func() (string, error) {
 		return "", expectedErr
 	})
-	if callErr != expectedErr {
+	if !errors.Is(callErr, expectedErr) {
 		t.Fatalf("expected original error, got %v", callErr)
 	}
 

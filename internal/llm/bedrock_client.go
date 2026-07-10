@@ -1,3 +1,4 @@
+// Package llm provides unified LLM client abstractions (Bedrock, Claude CLI, Eino, mocks).
 package llm
 
 import (
@@ -102,7 +103,7 @@ func (c *BedrockClient) Complete(ctx context.Context, req CompletionRequest) (*C
 	}
 
 	var systemPrompt string
-	var msgs []bedrockMessage
+	msgs := make([]bedrockMessage, 0, len(req.Messages))
 	for _, m := range req.Messages {
 		if m.Role == "system" {
 			systemPrompt = m.Content
@@ -151,13 +152,13 @@ func (c *BedrockClient) Complete(ctx context.Context, req CompletionRequest) (*C
 func (c *BedrockClient) doRequest(ctx context.Context, modelID string, apiReq bedrockRequest) (*CompletionResponse, error) {
 	body, err := json.Marshal(apiReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: marshal request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: marshal request: %w", ErrLLMClient, err)
 	}
 
 	url := c.baseURL + "/model/" + modelID + "/invoke"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%w: build request: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: build request: %w", ErrLLMClient, err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -168,13 +169,13 @@ func (c *BedrockClient) doRequest(ctx context.Context, modelID string, apiReq be
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: %w", ErrLLMClient, err)
 	}
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, int64(maxResponseSize+1)))
 	_ = resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("%w: read response: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: read response: %w", ErrLLMClient, err)
 	}
 
 	if len(respBody) > maxResponseSize {
@@ -191,7 +192,7 @@ func (c *BedrockClient) doRequest(ctx context.Context, modelID string, apiReq be
 
 	var result bedrockResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("%w: decode response: %s", ErrLLMClient, err)
+		return nil, fmt.Errorf("%w: decode response: %w", ErrLLMClient, err)
 	}
 
 	var content string

@@ -1,8 +1,9 @@
 // Package controlplane adds /healthz HTTP endpoint for the v14506 MVP.
 //
 // This file introduces a minimal HTTP server that exposes:
-//   GET /healthz   -> 200 OK with {"status":"ok"} when DB pingable; 503 otherwise
-//   GET /readyz    -> 200 OK with readiness checks (DB + agentrace + sprintboard)
+//
+//	GET /healthz   -> 200 OK with {"status":"ok"} when DB pingable; 503 otherwise
+//	GET /readyz    -> 200 OK with readiness checks (DB + agentrace + sprintboard)
 //
 // It is intentionally lightweight: no router framework yet, no auth.
 // Future sprints (v14508+) will add chi router, JWT auth, and OTLP middleware.

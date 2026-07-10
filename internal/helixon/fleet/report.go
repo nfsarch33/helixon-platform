@@ -58,6 +58,8 @@ func GenerateDailyReport(agentID string, tasks []TaskRecord, start, end time.Tim
 		}
 
 		switch t.Status {
+		case TaskStatusPending, TaskStatusClaimed, TaskStatusRunning:
+			// in-flight; not yet counted in any outcome bucket
 		case TaskStatusCompleted:
 			report.Completed++
 			completedCount++
