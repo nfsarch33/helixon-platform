@@ -287,6 +287,48 @@ else
 fi
 
 # ============================================================
+# v14597 — fleet-registrar API + SprintBoard /healthz (4 checks)
+# ============================================================
+
+# Check 25: fleet-registrar API at :9104 /healthz OK
+if curl -sf http://127.0.0.1:9104/health -m 3 2>&1 | grep -q ok; then
+  check fleet-registrar-api-ok PASS "fleet-registrar API :9104 /healthz ok"
+else
+  check fleet-registrar-api-ok FAIL "fleet-registrar API :9104 /healthz not ok"
+fi
+
+# Check 26: AlertManager ingest endpoint accepts FleetDoctorFailing
+ingest_status=$(curl -s -X POST http://127.0.0.1:9104/api/v1/alerts/ingest \
+  -H 'Content-Type: application/json' \
+  -d '{"labels":{"alertname":"FleetDoctorFailing"},"status":"firing"}' \
+  -m 3 -o /dev/null -w '%{http_code}')
+if [ "$ingest_status" = "202" ]; then
+  check fleet-registrar-ingest-202 PASS "fleet-registrar /api/v1/alerts/ingest returns 202"
+else
+  check fleet-registrar-ingest-202 FAIL "fleet-registrar ingest returned $ingest_status (want 202)"
+fi
+
+# Check 27: SprintBoard /healthz responds within 3s
+if curl -sf http://127.0.0.1:9400/healthz -m 3 2>&1 | grep -q '"status":"ok"'; then
+  check sprintboard-healthz-ok PASS "SprintBoard /healthz returns ok"
+else
+  check sprintboard-healthz-ok FAIL "SprintBoard /healthz hangs or fails"
+fi
+
+# Check 28: SprintBoard /healthz survives 5 sequential calls (regression: Ping() Rows leak)
+leak_count=0
+for i in 1 2 3 4 5; do
+  if curl -sf http://127.0.0.1:9400/healthz -m 3 2>&1 | grep -q '"status":"ok"'; then
+    leak_count=$((leak_count + 1))
+  fi
+done
+if [ "$leak_count" -eq 5 ]; then
+  check sprintboard-healthz-no-leak PASS "SprintBoard /healthz 5/5 sequential calls OK (no Ping() Rows leak)"
+else
+  check sprintboard-healthz-no-leak FAIL "SprintBoard /healthz only $leak_count/5 calls OK (likely Ping() Rows leak)"
+fi
+
+# ============================================================
 # Aggregate verdict
 # ============================================================
 
