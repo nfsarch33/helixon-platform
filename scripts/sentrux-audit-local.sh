@@ -246,6 +246,47 @@ else
 fi
 
 # ============================================================
+# v14596 — svcregistry install + 26-char UUID canary (5 checks)
+# ============================================================
+
+# Check 20: svcregistryd systemd user unit is active
+if systemctl --user is-active svcregistryd.service 2>/dev/null | grep -q active; then
+  check svcregistryd-active PASS "svcregistryd.service is active"
+else
+  check svcregistryd-active FAIL "svcregistryd.service NOT active"
+fi
+
+# Check 21: svcregistryd HTTP /healthz responds
+if curl -sf http://127.0.0.1:7777/healthz 2>&1 | grep -q ok; then
+  check svcregistryd-healthz PASS "svcregistryd /healthz returns 200 ok"
+else
+  check svcregistryd-healthz FAIL "svcregistryd /healthz unreachable"
+fi
+
+# Check 22: 26-char UUID canary test passes (TDD guard)
+if cd /home/jaslian/Code/helixon-platform && go test ./internal/svcregistry/ -run TestService_Accepts26CharUUIDName -count=1 2>&1 | grep -qE "(^| )PASS: TestService_Accepts26CharUUIDName|ok[[:space:]]+github"; then
+  check svcregistryd-uuid-canary PASS "26-char UUID canary test passes"
+else
+  check svcregistryd-uuid-canary FAIL "26-char UUID canary test broken"
+fi
+
+# Check 23: registry has at least 18 services (matches plan target)
+svc_count=$(curl -sf http://127.0.0.1:7777/api/v1/services 2>&1 | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
+svc_count=${svc_count:-0}
+if [ "$svc_count" -ge 18 ]; then
+  check svcregistryd-services-18 PASS "registry has $svc_count services (>=18 target)"
+else
+  check svcregistryd-services-18 FAIL "registry has $svc_count services (<18 target)"
+fi
+
+# Check 24: svcregistry-bridge succeeds (idempotent, 0 failed)
+if /home/jaslian/local/bin/svcregistry-bridge -api http://127.0.0.1:7777 2>&1 | grep -q "failed=0"; then
+  check svcregistry-bridge-ok PASS "svcregistry-bridge ran with 0 failures"
+else
+  check svcregistry-bridge-ok FAIL "svcregistry-bridge reported failures"
+fi
+
+# ============================================================
 # Aggregate verdict
 # ============================================================
 
