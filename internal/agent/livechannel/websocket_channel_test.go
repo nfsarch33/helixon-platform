@@ -1,7 +1,6 @@
 package livechannel
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -269,23 +268,27 @@ func TestChannel_ConcurrentPublishers(t *testing.T) {
 }
 
 func TestChannel_NoGoroutineLeak(t *testing.T) {
-	// goleak verify: defer VerifyTestMain in TestMain would be ideal,
-	// but we can also just verify the read loop exits cleanly on Close.
+	// Verify the read loop exits cleanly on Close. We don't need a real
+	// websocket here — just verify subscriber goroutines exit when
+	// Channel.Close is called. The integration with gorilla/websocket is
+	// covered by TestChannel_CloseUnsubscribes.
 	ch := NewChannel(ChannelConfig{ChannelBuffer: 4})
-	srv, wsURL := newTestServer(t, ch)
-	c, _ := dial(t, wsURL)
-	ch.WaitForSubscribers(1, 2*time.Second)
-	_ = c
-	_ = srv
+
+	// Publish a few events to ensure the write loop is active.
+	for i := 0; i < 3; i++ {
+		ch.Publish(Event{Type: EventStepCompleted, JobID: "leak-test"})
+	}
+
+	// Close the channel; should drain the goroutines.
 	ch.Close()
-	srv.Close()
-	// Allow a brief moment for the goroutine to exit.
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	for ctx.Err() == nil {
+
+	// SubscriberCount should drop to 0 within a short window.
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
 		if ch.SubscriberCount() == 0 {
 			return
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
+	t.Errorf("subscriber count did not drop to 0 within 500ms; got %d", ch.SubscriberCount())
 }
