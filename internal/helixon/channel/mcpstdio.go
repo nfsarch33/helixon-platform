@@ -47,9 +47,9 @@ func (c MCPStdioConfig) withDefaults() MCPStdioConfig {
 // safe to call from a single goroutine; concurrent writes to Out are
 // serialised.
 type MCPStdioAdapter struct {
-	mcp    *MCPChannel
-	cfg    MCPStdioConfig
-	logger *slog.Logger
+	mcp     *MCPChannel
+	cfg     MCPStdioConfig
+	logger  *slog.Logger
 	writeMu sync.Mutex
 	closeMu sync.Mutex
 	closed  bool
