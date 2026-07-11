@@ -33,6 +33,7 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/dashboard"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/platform"
+	"github.com/nfsarch33/helixon-platform/internal/llm"
 )
 
 // runtimeView adapts *helixon.Runtime to dashboard.RuntimeView (Phase()
@@ -320,66 +321,97 @@ func newReplCmd() *cobra.Command {
 			if provErr != nil {
 				return fmt.Errorf("build provider: %w", provErr)
 			}
-			rt := helixon.NewRuntime(provider, cfg)
+			rt, setupErr := setupReplRuntime(cfg, provider)
+			if setupErr != nil {
+				return setupErr
+			}
 			ctx := cmd.Context()
-			if err := rt.Init(ctx); err != nil {
-				return fmt.Errorf("runtime init: %w", err)
-			}
-			if err := builtins.RegisterAll(rt.Registry(), builtins.Options{
-				Shell:     &builtins.ShellConfig{},
-				FileRead:  &builtins.FileReadConfig{},
-				FileWrite: &builtins.FileWriteConfig{},
-			}); err != nil {
-				return fmt.Errorf("register builtins: %w", err)
-			}
-			if err := rt.Configure(ctx); err != nil {
-				return fmt.Errorf("runtime configure: %w", err)
-			}
-
 			out := cmd.OutOrStdout()
+			fmt.Fprint(out, replPrompt(cfg.AgentID, rt.RegisteredToolCount(), provider == nil))
 			if provider == nil {
-				fmt.Fprintf(out, "helixon repl: agent_id=%q (no provider; echo mode) Ctrl-D to exit\n", cfg.AgentID)
-				scanner := bufio.NewScanner(cmd.InOrStdin())
-				for scanner.Scan() {
-					line := strings.TrimSpace(scanner.Text())
-					if line == "" {
-						continue
-					}
-					if line == ":quit" || line == ":exit" {
-						break
-					}
-					fmt.Fprintf(out, "echo: %s\n", line)
-				}
-				return scanner.Err()
+				return runReplEchoMode(out, cmd.InOrStdin())
 			}
-
-			fmt.Fprintf(out, "helixon repl: agent_id=%q tools=%d (Ctrl-D to exit)\n",
-				cfg.AgentID, rt.RegisteredToolCount())
-			scanner := bufio.NewScanner(cmd.InOrStdin())
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if line == "" {
-					continue
-				}
-				if line == ":quit" || line == ":exit" {
-					break
-				}
-				msg := helixon.IncomingMessage{
-					Channel: "repl",
-					Content: line,
-				}
-				resp, err := rt.HandleMessage(ctx, msg)
-				if err != nil {
-					fmt.Fprintf(out, "error: %v\n", err)
-					continue
-				}
-				fmt.Fprintf(out, "%s\n", resp)
-			}
-			return scanner.Err()
+			return runReplDispatchMode(out, cmd.InOrStdin(), ctx, rt)
 		},
 	}
 	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to YAML config (optional, defaults applied)")
 	return cmd
+}
+
+// setupReplRuntime builds a runtime from the config + provider and registers
+// the standard 3 builtin tools (Shell, FileRead, FileWrite). Extracted from
+// newReplCmd.RunE so the helper is independently testable.
+func setupReplRuntime(cfg helixon.RuntimeConfig, provider llm.Provider) (*helixon.Runtime, error) {
+	rt := helixon.NewRuntime(provider, cfg)
+	ctx := context.Background()
+	if err := rt.Init(ctx); err != nil {
+		return nil, fmt.Errorf("runtime init: %w", err)
+	}
+	if err := builtins.RegisterAll(rt.Registry(), builtins.Options{
+		Shell:     &builtins.ShellConfig{},
+		FileRead:  &builtins.FileReadConfig{},
+		FileWrite: &builtins.FileWriteConfig{},
+	}); err != nil {
+		return nil, fmt.Errorf("register builtins: %w", err)
+	}
+	if err := rt.Configure(ctx); err != nil {
+		return nil, fmt.Errorf("runtime configure: %w", err)
+	}
+	return rt, nil
+}
+
+// replPrompt renders the header line shown before the scanner loop. Centralised
+// so tests assert exact text and the orchestrator does not branch on it.
+func replPrompt(agentID string, toolCount int, echoMode bool) string {
+	if echoMode {
+		return fmt.Sprintf("helixon repl: agent_id=%q (no provider; echo mode) Ctrl-D to exit\n", agentID)
+	}
+	return fmt.Sprintf("helixon repl: agent_id=%q tools=%d (Ctrl-D to exit)\n", agentID, toolCount)
+}
+
+// runReplEchoMode is the no-provider branch: each line is echoed back verbatim.
+// Stops on :quit/:exit; blank lines are skipped.
+func runReplEchoMode(out io.Writer, in io.Reader) error {
+	scanner := bufio.NewScanner(in)
+	return runReplScannerLoop(out, scanner, func(line string) error {
+		fmt.Fprintf(out, "echo: %s\n", line)
+		return nil
+	})
+}
+
+// runReplDispatchMode is the with-provider branch: each line is dispatched
+// to the runtime via HandleMessage and the response is written to out.
+// Stops on :quit/:exit; per-line errors are reported but do not abort the loop.
+func runReplDispatchMode(out io.Writer, in io.Reader, ctx context.Context, rt *helixon.Runtime) error {
+	scanner := bufio.NewScanner(in)
+	return runReplScannerLoop(out, scanner, func(line string) error {
+		msg := helixon.IncomingMessage{Channel: "repl", Content: line}
+		resp, err := rt.HandleMessage(ctx, msg)
+		if err != nil {
+			fmt.Fprintf(out, "error: %v\n", err)
+			return nil
+		}
+		fmt.Fprintf(out, "%s\n", resp)
+		return nil
+	})
+}
+
+// runReplScannerLoop is the shared line-driven loop. It returns scanner.Err()
+// at the end. The handler is invoked once per non-blank, non-quit line.
+func runReplScannerLoop(out io.Writer, scanner *bufio.Scanner, handler func(line string) error) error {
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if line == ":quit" || line == ":exit" {
+			break
+		}
+		if err := handler(line); err != nil {
+			fmt.Fprintf(out, "error: %v\n", err)
+		}
+	}
+	return scanner.Err()
 }
 
 func newVersionCmd() *cobra.Command {
