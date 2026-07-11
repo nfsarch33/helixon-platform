@@ -98,52 +98,103 @@ func NewQueuedProvider(inner Provider, cfg QueueConfig) *QueuedProvider {
 }
 
 // Complete enqueues a request. Blocks if queue is full (respects context).
+//
+// The orchestrator is split into four focused helpers so each has low CC
+// and is independently testable (refactor v17804-4 from CC 15):
+//
+//	checkMemoryBudget - log + enforce soft memory ceiling with backpressure delay
+//	newPendingRequest - construct the queuedRequest envelope
+//	enqueueOrShutdown - put the request on the pending channel or fail fast
+//	waitForResponse   - drain the response/error channels or surface shutdown
 func (q *QueuedProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
-	select {
-	case <-q.done:
-		return nil, ErrQueueShutdown
-	default:
+	if err := q.checkMemoryBudget(ctx, req); err != nil {
+		return nil, err
 	}
+	qr := newPendingRequest(ctx, req)
+	if err := enqueueOrShutdown(ctx, q, qr); err != nil {
+		return nil, err
+	}
+	return waitForResponse(ctx, qr, q.doneRef())
+}
 
+// checkMemoryBudget logs a backpressure warning and, if the memory ceiling
+// is still exceeded after the configured delay, returns ErrQueueFull. Returns
+// nil when the request fits, or an error wrapping the context when ctx is
+// cancelled during the delay.
+func (q *QueuedProvider) checkMemoryBudget(ctx context.Context, req CompletionRequest) error {
 	memEst := q.estimateMemory(req)
 	maxMem := q.config.MaxMemoryMB * 1024 * 1024
-	if q.memoryBytes.Load()+memEst > maxMem {
-		log.Printf("[queue] backpressure: estimated memory %dMB would exceed %dMB limit",
-			(q.memoryBytes.Load()+memEst)/(1024*1024), q.config.MaxMemoryMB)
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("%w: backpressure delay", ctx.Err())
-		case <-time.After(q.config.BackpressureDelay):
-		}
-		if q.memoryBytes.Load()+memEst > maxMem {
-			return nil, fmt.Errorf("%w: memory budget exceeded (%dMB / %dMB)",
-				ErrQueueFull, q.memoryBytes.Load()/(1024*1024), q.config.MaxMemoryMB)
-		}
+	if q.memoryBytes.Load()+memEst <= maxMem {
+		return nil
 	}
+	log.Printf("[queue] backpressure: estimated memory %dMB would exceed %dMB limit",
+		(q.memoryBytes.Load()+memEst)/(1024*1024), q.config.MaxMemoryMB)
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("%w: backpressure delay", ctx.Err())
+	case <-time.After(q.config.BackpressureDelay):
+	}
+	if q.memoryBytes.Load()+memEst > maxMem {
+		return fmt.Errorf("%w: memory budget exceeded (%dMB / %dMB)",
+			ErrQueueFull, q.memoryBytes.Load()/(1024*1024), q.config.MaxMemoryMB)
+	}
+	return nil
+}
 
-	qr := &queuedRequest{
+// newPendingRequest builds a fresh queuedRequest envelope with buffered
+// response and error channels of capacity 1 (matches worker behaviour).
+// Extracted from Complete so tests can construct envelopes without spinning
+// a full QueuedProvider.
+func newPendingRequest(ctx context.Context, req CompletionRequest) *queuedRequest {
+	return &queuedRequest{
 		ctx:     ctx,
 		req:     req,
 		respCh:  make(chan *CompletionResponse, 1),
 		errCh:   make(chan error, 1),
 		created: time.Now(),
 	}
+}
 
+// enqueueOrShutdown pushes the request onto the pending channel and returns
+// the qr pointer (for the caller to wait on). Returns ErrQueueShutdown when
+// the provider is closed, or ctx.Err() if the caller cancels while waiting.
+func enqueueOrShutdown(ctx context.Context, q *QueuedProvider, qr *queuedRequest) error {
+	select {
+	case <-q.done:
+		return ErrQueueShutdown
+	default:
+	}
 	select {
 	case q.pending <- qr:
+		return nil
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err()
 	case <-q.done:
-		return nil, ErrQueueShutdown
+		return ErrQueueShutdown
 	}
+}
 
+// waitForResponse blocks until the worker delivers a response, an error, or
+// the done/ctx channel fires. On done it drains any in-flight value before
+// returning ErrQueueShutdown so callers do not lose work.
+func waitForResponse(ctx context.Context, qr *queuedRequest, done *chan struct{}) (*CompletionResponse, error) {
+	if done == nil {
+		select {
+		case resp := <-qr.respCh:
+			return resp, nil
+		case err := <-qr.errCh:
+			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	var doneCh <-chan struct{} = *done
 	select {
 	case resp := <-qr.respCh:
 		return resp, nil
 	case err := <-qr.errCh:
 		return nil, err
-	case <-q.done:
-		// Drain: the request may still be processed after done is signaled
+	case <-doneCh:
 		select {
 		case resp := <-qr.respCh:
 			return resp, nil
@@ -155,6 +206,13 @@ func (q *QueuedProvider) Complete(ctx context.Context, req CompletionRequest) (*
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+// doneRef returns a pointer to the receiver's done channel. Exists so the
+// test suite can exercise waitForResponse with a stand-alone struct without
+// reaching into unexported fields.
+func (q *QueuedProvider) doneRef() *chan struct{} {
+	return &q.done
 }
 
 func (q *QueuedProvider) worker() {

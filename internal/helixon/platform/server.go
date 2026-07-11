@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -313,11 +314,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
+	writeSSEHeaders(w)
 
 	ctx := r.Context()
 	heartbeatInterval := s.cfg.HeartbeatInterval
@@ -325,59 +322,11 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		heartbeatInterval = 15 * time.Second
 	}
 
-	heartbeatTicker := time.NewTicker(heartbeatInterval)
-	defer heartbeatTicker.Stop()
-
-	// writeMu serialises all writes to the ResponseWriter (heartbeat + emit).
 	var writeMu sync.Mutex
-
-	heartbeatDone := make(chan struct{})
-	var heartbeatWG sync.WaitGroup
-	heartbeatWG.Add(1)
-	stopHeartbeat := func() {
-		select {
-		case <-heartbeatDone:
-		default:
-			close(heartbeatDone)
-		}
-		heartbeatWG.Wait()
-	}
+	stopHeartbeat := newHeartbeatLoop(&writeMu, &sseBuf{w: w, flush: flusher}, heartbeatInterval, nil)
 	defer stopHeartbeat()
 
-	go func() {
-		defer heartbeatWG.Done()
-		for {
-			select {
-			case <-heartbeatDone:
-				return
-			case <-heartbeatTicker.C:
-				select {
-				case <-heartbeatDone:
-					return
-				default:
-				}
-				writeMu.Lock()
-				fmt.Fprint(w, ": heartbeat\n\n")
-				flusher.Flush()
-				writeMu.Unlock()
-			}
-		}
-	}()
-
-	emit := func(chunk string) error {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("client disconnected: %w", err)
-		}
-		safe := strings.ReplaceAll(chunk, "\n", "\\n")
-		writeMu.Lock()
-		_, writeErr := fmt.Fprintf(w, "data: %s\n\n", safe)
-		flusher.Flush()
-		writeMu.Unlock()
-		if writeErr != nil {
-			return fmt.Errorf("write chunk: %w", writeErr)
-		}
-		return nil
-	}
+	emit := newEmitFn(ctx, &writeMu, &sseBuf{w: w, flush: flusher})
 
 	msg := helixon.IncomingMessage{
 		SessionID: req.SessionID,
@@ -392,10 +341,109 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	writeMu.Lock()
 	defer writeMu.Unlock()
 
+	writeStreamTerminal(w, flusher, streamErr, ctx.Err(), req.SessionID, s.logger)
+}
+
+// writeSSEHeaders sets the SSE prelude headers and writes 200 OK.
+func writeSSEHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+}
+
+// safeOneLine escapes newlines so SSE event payloads stay on a single line.
+func safeOneLine(s string) string {
+	return strings.ReplaceAll(s, "\n", "\\n")
+}
+
+// sseBuf is a tiny io.Writer wrapper around the http.ResponseWriter +
+// Flusher pair used by the stream handlers. All writes go through
+// writeMu under the caller-supplied mutex; tests can pass any io.Writer.
+type sseBuf struct {
+	w     io.Writer
+	flush http.Flusher
+}
+
+func (b *sseBuf) Write(p []byte) (int, error) {
+	n, err := b.w.Write(p)
+	if b.flush != nil {
+		b.flush.Flush()
+	}
+	return n, err
+}
+
+// newHeartbeatLoop starts a goroutine that emits ": heartbeat\n\n" every
+// interval until stop() is invoked. The callback (if non-nil) is invoked
+// after each successful write — used by the helper tests to capture
+// writes without an http.ResponseWriter.
+//
+// Returns the stop func the caller MUST defer.
+func newHeartbeatLoop(mu *sync.Mutex, w io.Writer, interval time.Duration, onWrite func()) func() {
+	ticker := time.NewTicker(interval)
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				select {
+				case <-done:
+					return
+				default:
+				}
+				mu.Lock()
+				fmt.Fprint(w, ": heartbeat\n\n")
+				mu.Unlock()
+				if onWrite != nil {
+					onWrite()
+				}
+			}
+		}
+	}()
+	return func() {
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+		wg.Wait()
+	}
+}
+
+// newEmitFn returns a streaming emit closure that serialises writes through
+// mu and surfaces ctx.Done as a wrapped "client disconnected" error.
+func newEmitFn(ctx context.Context, mu *sync.Mutex, w io.Writer) func(string) error {
+	return func(chunk string) error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("client disconnected: %w", err)
+		}
+		safe := safeOneLine(chunk)
+		mu.Lock()
+		_, writeErr := fmt.Fprintf(w, "data: %s\n\n", safe)
+		mu.Unlock()
+		if writeErr != nil {
+			return fmt.Errorf("write chunk: %w", writeErr)
+		}
+		return nil
+	}
+}
+
+// writeStreamTerminal writes the SSE terminal event (event: error or
+// event: done) after the handler returns. Holds the writeMu through the
+// caller to keep ordering correct against a stopHeartbeat that may have
+// raced.
+func writeStreamTerminal(w http.ResponseWriter, flusher http.Flusher, streamErr error, ctxErr error, sessionID string, logger *slog.Logger) {
 	if streamErr != nil {
-		if ctx.Err() != nil {
-			s.logger.Debug("stream aborted: client disconnected",
-				slog.String("session", req.SessionID),
+		if ctxErr != nil {
+			logger.Debug("stream aborted: client disconnected",
+				slog.String("session", sessionID),
 			)
 			return
 		}
