@@ -319,3 +319,45 @@ func TestPlatform_ExposesHealthzAndReadyz_v14509(t *testing.T) {
 		t.Errorf("/readyz missing 'ready' field: %v", readyBody)
 	}
 }
+
+// TestMemoryBackend_InMemoryDefault: when HELIXON_ENGRAM_URL is unset
+// the runtime picks the InMemoryBackend path. v17802 default swap.
+func TestMemoryBackend_InMemoryDefault(t *testing.T) {
+	oldURL, hadURL := os.LookupEnv("HELIXON_ENGRAM_URL")
+	if hadURL {
+		_ = os.Unsetenv("HELIXON_ENGRAM_URL")
+		defer func() { _ = os.Setenv("HELIXON_ENGRAM_URL", oldURL) }()
+	}
+	out, _, err := runRoot(t, "memory", "backend")
+	if err != nil {
+		t.Fatalf("memory backend: %v", err)
+	}
+	if !strings.Contains(out, "backend: in-memory") {
+		t.Fatalf("expected in-memory backend, got: %q", out)
+	}
+}
+
+// TestMemoryBackend_EngramWithUnreachableURL: when HELIXON_ENGRAM_URL
+// is set to an unreachable address the runtime should still pick the
+// Engram+failsafe path. v17802 default swap.
+func TestMemoryBackend_EngramWithUnreachableURL(t *testing.T) {
+	oldURL, hadURL := os.LookupEnv("HELIXON_ENGRAM_URL")
+	if hadURL {
+		_ = os.Unsetenv("HELIXON_ENGRAM_URL")
+	}
+	_ = os.Setenv("HELIXON_ENGRAM_URL", "http://127.0.0.1:1")
+	defer func() {
+		if hadURL {
+			_ = os.Setenv("HELIXON_ENGRAM_URL", oldURL)
+		} else {
+			_ = os.Unsetenv("HELIXON_ENGRAM_URL")
+		}
+	}()
+	out, _, err := runRoot(t, "memory", "backend")
+	if err != nil {
+		t.Fatalf("memory backend: %v", err)
+	}
+	if !strings.Contains(out, "backend: engram+failsafe") {
+		t.Fatalf("expected engram+failsafe backend, got: %q", out)
+	}
+}

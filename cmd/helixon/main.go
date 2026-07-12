@@ -32,6 +32,7 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/helixon/builtins"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/dashboard"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/memory"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/platform"
 	"github.com/nfsarch33/helixon-platform/internal/llm"
 )
@@ -66,7 +67,7 @@ func newRootCmd() *cobra.Command {
 run the lifecycle (serve), and exercise tool dispatch interactively (repl).`,
 		SilenceUsage: true,
 	}
-	root.AddCommand(newServeCmd(), newDoctorCmd(), newReplCmd(), newVersionCmd(), newPlatformCmd(), newTaskCmd())
+	root.AddCommand(newServeCmd(), newDoctorCmd(), newReplCmd(), newVersionCmd(), newPlatformCmd(), newTaskCmd(), newMemoryCmd())
 	return root
 }
 
@@ -436,4 +437,54 @@ func loadConfig(path string) (helixon.RuntimeConfig, error) {
 	}
 	cfg.Logger = slog.Default()
 	return cfg, nil
+}
+
+// newMemoryCmd wires `helixon memory backend` (v17802 MVP-5 Engram wire).
+//
+// Default backend selection follows the v17802 design: when
+// $HELIXON_ENGRAM_URL is set (and reachable) the runtime uses
+// EngramBackend with an InMemoryBackend fail-open; otherwise it
+// uses InMemoryBackend directly. The choice is logged so operators
+// can verify which path is active at boot.
+func newMemoryCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "memory",
+		Short: "Memory backend diagnostics (v17802 MVP-5)",
+	}
+	cmd.AddCommand(newMemoryBackendCmd())
+	return cmd
+}
+
+func newMemoryBackendCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "backend",
+		Short: "Print the active memory backend type and stats",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			b := defaultMemoryBackend()
+			st := b.Stats()
+			fmt.Fprintf(cmd.OutOrStdout(), "backend: %s\n", st.Backend)
+			fmt.Fprintf(cmd.OutOrStdout(), "count:   %d\n", st.Count)
+			fmt.Fprintf(cmd.OutOrStdout(), "stores:  %d\n", st.StoreCount)
+			fmt.Fprintf(cmd.OutOrStdout(), "recalls: %d\n", st.RecallCount)
+			fmt.Fprintf(cmd.OutOrStdout(), "searches:%d\n", st.SearchCount)
+			fmt.Fprintf(cmd.OutOrStdout(), "fallback:%d\n", st.FallbackCount)
+			_ = b.Close()
+			return nil
+		},
+	}
+	return cmd
+}
+
+// defaultMemoryBackend is the v17802 wire-up point. The
+// InMemoryBackend is always the local fail-open; the EngramBackend
+// is added when HELIXON_ENGRAM_URL is set. Tests override via
+// SetDefaultMemoryBackend.
+var defaultMemoryBackendFn = defaultMemoryBackend
+
+func defaultMemoryBackend() memory.Backend {
+	fb := memory.NewInMemoryBackend()
+	if url := os.Getenv("HELIXON_ENGRAM_URL"); url != "" {
+		return memory.NewEngramBackend(memory.EngramConfig{BaseURL: url}, fb)
+	}
+	return fb
 }
