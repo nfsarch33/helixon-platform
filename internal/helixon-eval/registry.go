@@ -244,6 +244,8 @@ func sourceLabel(s TraceSource) string {
 		return "cache"
 	case SynthSource:
 		return "synth"
+	case LiveSource:
+		return "live"
 	case NullSource:
 		return "none"
 	default:
