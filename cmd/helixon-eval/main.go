@@ -94,29 +94,25 @@ func newRunCmd() *cobra.Command {
 		models    []string
 		asJSON    bool
 		threshold float64
-		source    string
 	)
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "execute the runner on one task or the entire golden set",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			src, err := buildSource(source, time.Now().UTC())
-			if err != nil {
-				return err
-			}
+			src := helixoneval.NewSynthSource(time.Now().UTC())
 			reg := helixoneval.NewRegistry()
 			runner := helixoneval.NewRunner(reg, src)
 			mdl := parseModels(models)
 			if runAll {
-				n, err := runner.RunAll(mdl, helixoneval.GoldenCatalog())
+				n, err := runner.RunAll(mdl, helixoneval.ExpandedCatalog())
 				if err != nil {
 					return err
 				}
 				if asJSON {
 					return writeCasesJSON(cmd.OutOrStdout(), reg)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "ran %d cases (%d tasks × %d models) [source=%s]\n",
-					n, len(helixoneval.GoldenTasks()), len(mdl), source)
+				fmt.Fprintf(cmd.OutOrStdout(), "ran %d cases (%d tasks × %d models)\n",
+					n, len(helixoneval.ExpandedTasks()), len(mdl))
 				return nil
 			}
 			if task == "" {
@@ -129,8 +125,8 @@ func newRunCmd() *cobra.Command {
 			if asJSON {
 				return writeCasesJSON(cmd.OutOrStdout(), reg)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "ran %s on %d models: %s [source=%s]\n",
-				task, len(ids), strings.Join(ids, ", "), source)
+			fmt.Fprintf(cmd.OutOrStdout(), "ran %s on %d models: %s\n",
+				task, len(ids), strings.Join(ids, ", "))
 			// Suppress unused warning; threshold is honoured by `report`.
 			_ = threshold
 			return nil
@@ -143,58 +139,48 @@ func newRunCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON to stdout instead of text")
 	cmd.Flags().Float64Var(&threshold, "threshold", 0.7,
 		"pass-threshold for the generated report (default 0.7)")
-	cmd.Flags().StringVar(&source, "source", "synth",
-		"trace source: synth (offline) or live (OpenAI-compatible upstreams)")
 	return cmd
-}
-
-// buildSource wires the TraceSource for the CLI's run/report commands.
-func buildSource(kind string, now time.Time) (helixoneval.TraceSource, error) {
-	switch kind {
-	case "synth", "":
-		return helixoneval.NewSynthSource(now), nil
-	case "live":
-		return helixoneval.NewLiveSourceFromEnv(helixoneval.DefaultLiveEndpoints(), now), nil
-	default:
-		return nil, fmt.Errorf("unknown --source=%q (want synth or live)", kind)
-	}
 }
 
 func newReportCmd() *cobra.Command {
 	var (
 		task      string
 		runAll    bool
+		expanded  bool
 		models    []string
 		outFile   string
 		threshold = 0.7
 		asJSON    bool
-		source    string
+		runTag    string
 	)
 	cmd := &cobra.Command{
 		Use:   "report",
-		Short: "run the golden set and emit the aggregate report (Markdown or JSON)",
+		Short: "run the golden or expanded set and emit the aggregate report (Markdown or JSON)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			src, err := buildSource(source, time.Now().UTC())
-			if err != nil {
-				return err
-			}
+			src := helixoneval.NewSynthSource(time.Now().UTC())
 			reg := helixoneval.NewRegistry()
 			runner := helixoneval.NewRunner(reg, src)
 			mdl := parseModels(models)
+			cat := helixoneval.GoldenCatalog()
+			defaultTask := helixoneval.GoldenTasks()[0]
+			if expanded {
+				cat = helixoneval.ExpandedCatalog()
+				defaultTask = helixoneval.ExpandedTasks()[0]
+			}
 			if runAll {
-				if _, err := runner.RunAll(mdl, helixoneval.GoldenCatalog()); err != nil {
+				if _, err := runner.RunAll(mdl, cat); err != nil {
 					return err
 				}
 			} else {
 				if task == "" {
-					task = helixoneval.GoldenTasks()[0]
+					task = defaultTask
 				}
 				if _, err := runner.Run(task, mdl); err != nil {
 					return err
 				}
 			}
 			rep := helixoneval.Report{}
-			rep.Aggregate(reg, "v18101", threshold)
+			rep.Aggregate(reg, runTag, threshold)
 			w := cmd.OutOrStdout()
 			if outFile != "" {
 				f, err := os.Create(outFile)
@@ -210,16 +196,16 @@ func newReportCmd() *cobra.Command {
 			return rep.WriteText(w)
 		},
 	}
-	cmd.Flags().StringVar(&task, "task", "", "task ID (default: first golden task)")
-	cmd.Flags().BoolVar(&runAll, "all", false, "run all golden tasks (default true in CI)")
+	cmd.Flags().StringVar(&task, "task", "", "task ID (default: first task in the active set)")
+	cmd.Flags().BoolVar(&runAll, "all", false, "run all tasks in the active set (default true in CI)")
+	cmd.Flags().BoolVar(&expanded, "expanded", false, "use the v18104 28-task matrix (84 cases) instead of the 5-task golden set")
 	cmd.Flags().StringSliceVar(&models, "models", defaultModels(),
 		"comma-separated list of model identifiers")
 	cmd.Flags().StringVar(&outFile, "out", "", "write report to file (default: stdout)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON instead of Markdown")
 	cmd.Flags().Float64Var(&threshold, "threshold", 0.7,
 		"pass-threshold for the report (default 0.7)")
-	cmd.Flags().StringVar(&source, "source", "synth",
-		"trace source: synth (offline) or live (OpenAI-compatible upstreams)")
+	cmd.Flags().StringVar(&runTag, "run-tag", "v18104", "sprint tag stamped into the report header")
 	return cmd
 }
 

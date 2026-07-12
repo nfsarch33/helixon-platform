@@ -59,13 +59,9 @@ type counterKey struct {
 	Status Status
 }
 
-func (k counterKey) toSendKey() SendKey { return SendKey(k) }
-
 type vendorKey struct {
 	Vendor Vendor
 }
-
-func (k vendorKey) toAttemptKey() AttemptKey { return AttemptKey(k) }
 
 // SendKey is the exported (vendor, status) tuple for counter lookups.
 type SendKey struct {
@@ -99,13 +95,13 @@ func NewRegistry(meter metric.Meter) *Registry {
 }
 
 // IncSend records one send outcome.
-func (r *Registry) IncSend(ctx context.Context, v Vendor, s Status) {
+func (r *Registry) IncSend(v Vendor, s Status) {
 	k := counterKey{Vendor: v, Status: s}
 	r.mu.Lock()
 	r.counter[k]++
 	r.mu.Unlock()
 	if r.intCnt != nil {
-		r.intCnt.Add(ctx, 1,
+		r.intCnt.Add(context.Background(), 1,
 			metric.WithAttributes(
 				attribute.String("vendor", string(v)),
 				attribute.String("status", string(s)),
@@ -115,13 +111,13 @@ func (r *Registry) IncSend(ctx context.Context, v Vendor, s Status) {
 }
 
 // ObserveSend records a send duration.
-func (r *Registry) ObserveSend(ctx context.Context, v Vendor, s Status, d time.Duration) {
+func (r *Registry) ObserveSend(v Vendor, s Status, d time.Duration) {
 	k := counterKey{Vendor: v, Status: s}
 	r.mu.Lock()
 	r.durSum[k] += d
 	r.mu.Unlock()
 	if r.durHst != nil {
-		r.durHst.Record(ctx, d.Seconds(),
+		r.durHst.Record(context.Background(), d.Seconds(),
 			metric.WithAttributes(
 				attribute.String("vendor", string(v)),
 				attribute.String("status", string(s)),
@@ -131,13 +127,13 @@ func (r *Registry) ObserveSend(ctx context.Context, v Vendor, s Status, d time.D
 }
 
 // IncAttempt records one HTTP attempt (including retries).
-func (r *Registry) IncAttempt(ctx context.Context, v Vendor) {
+func (r *Registry) IncAttempt(v Vendor) {
 	k := vendorKey{Vendor: v}
 	r.mu.Lock()
 	r.attempts[k]++
 	r.mu.Unlock()
 	if r.attCnt != nil {
-		r.attCnt.Add(ctx, 1,
+		r.attCnt.Add(context.Background(), 1,
 			metric.WithAttributes(attribute.String("vendor", string(v))),
 		)
 	}
@@ -157,15 +153,15 @@ func (r *Registry) Snapshot() Snapshot {
 	defer r.mu.RUnlock()
 	sc := make(map[SendKey]int64, len(r.counter))
 	for k, v := range r.counter {
-		sc[k.toSendKey()] = v
+		sc[SendKey(k)] = v
 	}
 	sd := make(map[SendKey]time.Duration, len(r.durSum))
 	for k, v := range r.durSum {
-		sd[k.toSendKey()] = v
+		sd[SendKey(k)] = v
 	}
 	at := make(map[AttemptKey]int64, len(r.attempts))
 	for k, v := range r.attempts {
-		at[k.toAttemptKey()] = v
+		at[AttemptKey(k)] = v
 	}
 	return Snapshot{SendCounts: sc, SendDur: sd, Attempts: at}
 }

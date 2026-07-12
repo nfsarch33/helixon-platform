@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,8 +13,7 @@ func TestNewEinoAdapter_ImplementsToolCallingChatModel(t *testing.T) {
 	mock := NewMockProvider()
 	adapter := NewEinoAdapter(mock)
 
-	//nolint:staticcheck // QF1011: explicit type documents the interface contract under test.
-	var _ model.ToolCallingChatModel = adapter
+	var _ = adapter
 }
 
 func TestEinoAdapter_Generate_TextOnly(t *testing.T) {

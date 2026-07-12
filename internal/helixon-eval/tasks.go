@@ -1,5 +1,6 @@
-// Package helixoneval hosts the Sprint 18 golden 5-task test set,
-// the synthetic offline trace generator, and the task catalogue.
+// tasks.go — Sprint 18 golden 5-task test set, the v18104 expanded
+// 28-task matrix (5 types × sub-variants), plus the synthetic
+// offline trace generator and the catalogues.
 //
 // The 5 tasks are:
 //  1. long-running context retention
@@ -141,6 +142,53 @@ func GoldenCatalog() StaticCatalog {
 	return StaticCatalog{TasksList: GoldenTasks()}
 }
 
+// ExpandedTasks returns the v18104 28-task matrix (5 types × sub-variants).
+// The first 5 entries are the canonical Sprint 18 golden set; the remaining
+// 23 are sub-task variants that exercise different facets of each type.
+// 28 tasks × 3 models = 84 cases total.
+func ExpandedTasks() []string {
+	return []string{
+		// Type 1: Long-running context retention (6 sub-tasks)
+		"long-running context retention",
+		"context retention — multi-turn dialogue",
+		"context retention — code-gen across files",
+		"context retention — error recovery",
+		"context retention — tool chain memory",
+		"context retention — persona persistence",
+		// Type 2: Self-improvement loop termination (6 sub-tasks)
+		"self-improvement loop termination",
+		"loop termination — budget exhaustion",
+		"loop termination — convergence detection",
+		"loop termination — operator interrupt",
+		"loop termination — timeout ceiling",
+		"loop termination — mutation cap",
+		// Type 3: Multi-step coding (6 sub-tasks)
+		"multi-step coding",
+		"multi-step — TDD cycle",
+		"multi-step — refactor without regression",
+		"multi-step — API integration",
+		"multi-step — database migration",
+		"multi-step — CLI scaffolding",
+		// Type 4: Eval rubric application (5 sub-tasks)
+		"eval rubric application",
+		"rubric application — boundary scoring",
+		"rubric application — missing rubric handling",
+		"rubric application — multi-trace aggregation",
+		"rubric application — threshold calibration",
+		// Type 5: PlanSync PR creation (5 sub-tasks)
+		"PlanSync PR creation",
+		"PlanSync PR — conflict resolution",
+		"PlanSync PR — multi-repo coordination",
+		"PlanSync PR — carry-forward injection",
+		"PlanSync PR — closeout evidence gate",
+	}
+}
+
+// ExpandedCatalog returns a StaticCatalog built from ExpandedTasks.
+func ExpandedCatalog() StaticCatalog {
+	return StaticCatalog{TasksList: ExpandedTasks()}
+}
+
 // AllModels returns the full set of model identifiers the runner
 // compares across. Sprint 18 only emits traces for the three live
 // models; offline-fixture is reserved for the CLI's --dry-run mode.
@@ -189,7 +237,7 @@ func slugify(s string) string {
 			out, prevDash, prevWasLower = emitLower(c, out, prevDash, prevWasLower)
 		case runeDigit:
 			out, prevDash, prevWasLower = emitDigit(c, out, prevDash, prevWasLower)
-		case runeOther:
+		default:
 			out, prevDash = emitSeparator(out, prevDash)
 			prevWasLower = false
 		}
@@ -234,13 +282,13 @@ func emitUpper(runes []byte, i int, out []byte, prevDash, prevWasLower bool) ([]
 }
 
 // emitLower handles a lowercase letter. CC=1.
-func emitLower(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) { //nolint:unparam // prevDash reserved for future boundary tracking
+func emitLower(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
 	out = append(out, c)
 	return out, false, true
 }
 
 // emitDigit handles a digit. CC=1.
-func emitDigit(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) { //nolint:unparam // prevDash reserved for future boundary tracking
+func emitDigit(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
 	out = append(out, c)
 	return out, false, false
 }
