@@ -94,12 +94,16 @@ func newRunCmd() *cobra.Command {
 		models    []string
 		asJSON    bool
 		threshold float64
+		source    string
 	)
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "execute the runner on one task or the entire golden set",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			src := helixoneval.NewSynthSource(time.Now().UTC())
+			src, err := buildSource(source, time.Now().UTC())
+			if err != nil {
+				return err
+			}
 			reg := helixoneval.NewRegistry()
 			runner := helixoneval.NewRunner(reg, src)
 			mdl := parseModels(models)
@@ -111,8 +115,8 @@ func newRunCmd() *cobra.Command {
 				if asJSON {
 					return writeCasesJSON(cmd.OutOrStdout(), reg)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "ran %d cases (%d tasks × %d models)\n",
-					n, len(helixoneval.GoldenTasks()), len(mdl))
+				fmt.Fprintf(cmd.OutOrStdout(), "ran %d cases (%d tasks × %d models) [source=%s]\n",
+					n, len(helixoneval.GoldenTasks()), len(mdl), source)
 				return nil
 			}
 			if task == "" {
@@ -125,8 +129,8 @@ func newRunCmd() *cobra.Command {
 			if asJSON {
 				return writeCasesJSON(cmd.OutOrStdout(), reg)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "ran %s on %d models: %s\n",
-				task, len(ids), strings.Join(ids, ", "))
+			fmt.Fprintf(cmd.OutOrStdout(), "ran %s on %d models: %s [source=%s]\n",
+				task, len(ids), strings.Join(ids, ", "), source)
 			// Suppress unused warning; threshold is honoured by `report`.
 			_ = threshold
 			return nil
@@ -139,7 +143,21 @@ func newRunCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON to stdout instead of text")
 	cmd.Flags().Float64Var(&threshold, "threshold", 0.7,
 		"pass-threshold for the generated report (default 0.7)")
+	cmd.Flags().StringVar(&source, "source", "synth",
+		"trace source: synth (offline) or live (OpenAI-compatible upstreams)")
 	return cmd
+}
+
+// buildSource wires the TraceSource for the CLI's run/report commands.
+func buildSource(kind string, now time.Time) (helixoneval.TraceSource, error) {
+	switch kind {
+	case "synth", "":
+		return helixoneval.NewSynthSource(now), nil
+	case "live":
+		return helixoneval.NewLiveSourceFromEnv(helixoneval.DefaultLiveEndpoints(), now), nil
+	default:
+		return nil, fmt.Errorf("unknown --source=%q (want synth or live)", kind)
+	}
 }
 
 func newReportCmd() *cobra.Command {
@@ -150,12 +168,16 @@ func newReportCmd() *cobra.Command {
 		outFile   string
 		threshold = 0.7
 		asJSON    bool
+		source    string
 	)
 	cmd := &cobra.Command{
 		Use:   "report",
 		Short: "run the golden set and emit the aggregate report (Markdown or JSON)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			src := helixoneval.NewSynthSource(time.Now().UTC())
+			src, err := buildSource(source, time.Now().UTC())
+			if err != nil {
+				return err
+			}
 			reg := helixoneval.NewRegistry()
 			runner := helixoneval.NewRunner(reg, src)
 			mdl := parseModels(models)
@@ -172,7 +194,7 @@ func newReportCmd() *cobra.Command {
 				}
 			}
 			rep := helixoneval.Report{}
-			rep.Aggregate(reg, "v16129", threshold)
+			rep.Aggregate(reg, "v18101", threshold)
 			w := cmd.OutOrStdout()
 			if outFile != "" {
 				f, err := os.Create(outFile)
@@ -196,6 +218,8 @@ func newReportCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit JSON instead of Markdown")
 	cmd.Flags().Float64Var(&threshold, "threshold", 0.7,
 		"pass-threshold for the report (default 0.7)")
+	cmd.Flags().StringVar(&source, "source", "synth",
+		"trace source: synth (offline) or live (OpenAI-compatible upstreams)")
 	return cmd
 }
 
