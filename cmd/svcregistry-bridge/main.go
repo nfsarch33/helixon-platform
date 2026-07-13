@@ -44,39 +44,15 @@ func main() {
 	)
 	flag.Parse()
 
-	ok, fail, skip := runAll(bridgeOptions{
-		RegistryPath: *registryPath,
-		APIURL:       *apiURL,
-		Owner:        *owner,
-		DryRun:       *dryRun,
-		Timeout:      *timeout,
-	})
-	fmt.Printf("bridge: registered=%d failed=%d skipped=%d\n", ok, fail, skip)
-	if fail > 0 {
-		os.Exit(1)
-	}
-}
-
-// bridgeOptions is the structured input to runAll.
-type bridgeOptions struct {
-	RegistryPath string
-	APIURL       string
-	Owner        string
-	DryRun       bool
-	Timeout      time.Duration
-}
-
-// runAll iterates the registry and dispatches each service. Returns
-// (ok, fail, skip) counts. Exposed for tests.
-func runAll(o bridgeOptions) (ok, fail, skip int) {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 
-	reg, err := registra.Load(o.RegistryPath)
+	reg, err := registra.Load(*registryPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load registry: %v\n", err)
-		return 0, 1, 0
+		os.Exit(1)
 	}
 
+	ok, fail, skip := 0, 0, 0
 	for _, s := range reg.Services {
 		if s.Port == 0 {
 			logger.Info("skip", "name", s.Name, "reason", "no port")
@@ -93,17 +69,17 @@ func runAll(o bridgeOptions) (ok, fail, skip int) {
 			"host":          s.Address,
 			"port":          s.Port,
 			"protocol":      "http",
-			"owner":         o.Owner,
+			"owner":         *owner,
 			"status":        "up",
 			"last_seen_iso": time.Now().UTC().Format(time.RFC3339),
 			"tailscale_ip":  tsIP,
 		}
-		if o.DryRun {
+		if *dryRun {
 			logger.Info("would-register", "name", s.Name, "port", s.Port, "ts_ip", tsIP)
 			ok++
 			continue
 		}
-		if err := postJSON(o.APIURL+"/api/v1/services", body, o.Timeout); err != nil {
+		if err := postJSON(*apiURL+"/api/v1/services", body, *timeout); err != nil {
 			logger.Error("register", "name", s.Name, "err", err)
 			fail++
 			continue
@@ -111,7 +87,10 @@ func runAll(o bridgeOptions) (ok, fail, skip int) {
 		logger.Info("registered", "name", s.Name, "port", s.Port)
 		ok++
 	}
-	return ok, fail, skip
+	fmt.Printf("bridge: registered=%d failed=%d skipped=%d\n", ok, fail, skip)
+	if fail > 0 {
+		os.Exit(1)
+	}
 }
 
 func postJSON(url string, body any, timeout time.Duration) error {

@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	shellCommandRe  = regexp.MustCompile(`(?m)^\s*[$#>]\s*(rm|del|kill|shutdown|reboot|sudo|chmod|chown|mkfs|dd\s|format)\s`)
+	shellCommandRe  = regexp.MustCompile("(?m)^\\s*[$#>]\\s*(rm|del|kill|shutdown|reboot|sudo|chmod|chown|mkfs|dd\\s|format)\\s")
 	envVarLeakRe    = regexp.MustCompile(`(?i)(OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET|GITHUB_TOKEN|DATABASE_URL|DB_PASSWORD)\s*[=:]\s*\S+`)
 	filePathLeakRe  = regexp.MustCompile(`(/etc/passwd|/etc/shadow|\.env|\.ssh/id_rsa|credentials\.json)`)
 	privateIPRe     = regexp.MustCompile(`\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b`)
