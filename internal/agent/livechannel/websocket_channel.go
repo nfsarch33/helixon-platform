@@ -141,7 +141,7 @@ func (c *Channel) Subscribe(conn *websocket.Conn) *Subscriber {
 
 // Unsubscribe removes a subscriber and closes its channel.
 func (c *Channel) Unsubscribe(sub *Subscriber) {
-	sub.close.Do(func() {
+	sub.closeOnce.Do(func() {
 		c.mu.Lock()
 		if _, ok := c.subs[sub]; ok {
 			delete(c.subs, sub)
@@ -178,7 +178,7 @@ func (c *Channel) Close() {
 	close(c.stopCh)
 	c.mu.Lock()
 	for sub := range c.subs {
-		sub.close.Do(func() {
+		sub.closeOnce.Do(func() {
 			_ = sub.conn.Close()
 			close(sub.done)
 		})

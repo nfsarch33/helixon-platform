@@ -43,18 +43,19 @@ subcommands:
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		usage(os.Stderr)
-		os.Exit(2)
-	}
+	os.Exit(runRegistra(os.Args[1:]))
+}
 
+// runRegistra executes the registra CLI with the given arguments and returns
+// the exit code. This allows tests to capture behavior without os.Exit.
+func runRegistra(args []string) int {
 	// Two-pass flag parsing: pull global --registry flag first regardless of position.
 	registryPath := defaultRegistryPath
-	args := make([]string, 0, len(os.Args)-1)
-	for i := 1; i < len(os.Args); i++ {
-		a := os.Args[i]
-		if a == "--registry" && i+1 < len(os.Args) {
-			registryPath = os.Args[i+1]
+	filtered := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--registry" && i+1 < len(args) {
+			registryPath = args[i+1]
 			i++
 			continue
 		}
@@ -62,26 +63,33 @@ func main() {
 			registryPath = strings.TrimPrefix(a, "--registry=")
 			continue
 		}
-		args = append(args, a)
+		filtered = append(filtered, a)
 	}
 
-	cmd := args[0]
-	cmdArgs := args[1:]
+	if len(filtered) < 1 {
+		usage(os.Stderr)
+		return 2
+	}
+
+	cmd := filtered[0]
+	cmdArgs := filtered[1:]
 
 	reg, err := registra.Load(registryPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "registra: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	switch cmd {
 	case "list":
 		node := ""
 		kind := ""
-		fs2 := flag.NewFlagSet("list", flag.ExitOnError)
+		fs2 := flag.NewFlagSet("list", flag.ContinueOnError)
 		fs2.StringVar(&node, "node", "", "filter by primary_node alias")
 		fs2.StringVar(&kind, "kind", "", "filter by service kind")
-		_ = fs2.Parse(cmdArgs)
+		if err := fs2.Parse(cmdArgs); err != nil {
+			return 2
+		}
 		svcs := reg.Services
 		if node != "" {
 			svcs = reg.ServicesForNode(node)
@@ -105,12 +113,12 @@ func main() {
 	case "show":
 		if len(cmdArgs) < 1 {
 			fmt.Fprintln(os.Stderr, "show: need NAME")
-			os.Exit(2)
+			return 2
 		}
 		s, ok := reg.FindService(cmdArgs[0])
 		if !ok {
 			fmt.Fprintf(os.Stderr, "show: no service %q\n", cmdArgs[0])
-			os.Exit(1)
+			return 1
 		}
 		b, _ := json.MarshalIndent(s, "", "  ")
 		fmt.Println(string(b))
@@ -133,19 +141,21 @@ func main() {
 	case "credential":
 		if len(cmdArgs) < 1 {
 			fmt.Fprintln(os.Stderr, "credential: need TITLE")
-			os.Exit(2)
+			return 2
 		}
 		c, ok := reg.FindCredentialByTitle(cmdArgs[0])
 		if !ok {
 			fmt.Fprintf(os.Stderr, "credential: no item %q\n", cmdArgs[0])
-			os.Exit(1)
+			return 1
 		}
 		fmt.Printf("id=%s\ntitle=%s\nvault=%s\ncategory=%s\nop_uri=%s\n",
 			c.ID, c.Title, c.Vault, c.Category, c.OPURI)
 	case "health":
-		fs2 := flag.NewFlagSet("health", flag.ExitOnError)
+		fs2 := flag.NewFlagSet("health", flag.ContinueOnError)
 		node := fs2.String("node", "", "limit to services on this node")
-		_ = fs2.Parse(cmdArgs)
+		if err := fs2.Parse(cmdArgs); err != nil {
+			return 2
+		}
 		svcs := reg.Services
 		if *node != "" {
 			svcs = reg.ServicesForNode(*node)
@@ -176,7 +186,7 @@ func main() {
 		}
 		fmt.Printf("\nhealth: pass=%d fail=%d total=%d\n", pass, fail, pass+fail)
 		if fail > 0 {
-			os.Exit(1)
+			return 1
 		}
 	case "summary":
 		fmt.Printf("helixon service registry\n")
@@ -193,6 +203,7 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "registra: unknown subcommand %q\n", cmd)
 		usage(os.Stderr)
-		os.Exit(2)
+		return 2
 	}
+	return 0
 }
