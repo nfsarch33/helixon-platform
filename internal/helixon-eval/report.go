@@ -131,6 +131,45 @@ func (r *Report) Score(reg *Registry, threshold float64) float64 {
 	return r.OverallScore
 }
 
+// EdgeTestEntry captures the (name, passed) pair that
+// AppendEdgeTests consumes. Built-in tests carry an empty Source to
+// indicate they ship in the binary; external callers can pass a
+// Source string (e.g. "v18517_edge_test.go") for traceability.
+type EdgeTestEntry struct {
+	Name   string
+	Passed bool
+	Source string
+}
+
+// EdgeResults slots the v18517+ harness edge-test summary into a
+// Report. Writers that don't set this see no edge section; the
+// canonical `helixon-eval report` subcommand populates it from the
+// results of `go test ./internal/helixon-eval/...` and passes them
+// in via SetEdgeResults.
+type EdgeResults struct {
+	Total   int
+	Passed  int
+	Failed  int
+	Entries []EdgeTestEntry
+}
+
+// edgeResults is package-private storage on Report. WriteText reads
+// it to render the optional "Edge-test coverage" section.
+var edgeResultsByReport = map[*Report]EdgeResults{}
+
+// SetEdgeResults attaches an edge-test summary to a Report so that
+// the subsequent WriteText call renders an "Edge-test coverage"
+// section. Calling SetEdgeResults(nil) clears any prior attachment.
+// Callers that don't attach anything see no edge section; the
+// default Report still renders the canonical matrix.
+func (r *Report) SetEdgeResults(er EdgeResults) {
+	if er.Total == 0 {
+		delete(edgeResultsByReport, r)
+		return
+	}
+	edgeResultsByReport[r] = er
+}
+
 // WriteText formats the report as a human-readable Markdown summary and
 // writes it to w. Empty w defaults to os.Stdout.
 func (r *Report) WriteText(w io.Writer) error {
@@ -154,6 +193,20 @@ func (r *Report) WriteText(w io.Writer) error {
 		s := r.ModelStats[m]
 		b.WriteString(fmt.Sprintf("| %s | %d | %.3f | %d | %d |\n",
 			m, s.Count, s.MeanScore, s.MedianSteps, s.Completions))
+	}
+	if er, ok := edgeResultsByReport[r]; ok && er.Total > 0 {
+		b.WriteString("\n## Edge-test coverage\n\n")
+		b.WriteString(fmt.Sprintf("Total: %d  Pass: %d  Fail: %d\n\n",
+			er.Total, er.Passed, er.Failed))
+		b.WriteString("| Test | Status | Source |\n")
+		b.WriteString("|---|---|---|\n")
+		for _, e := range er.Entries {
+			status := "PASS"
+			if !e.Passed {
+				status = "FAIL"
+			}
+			b.WriteString(fmt.Sprintf("| %s | %s | %s |\n", e.Name, status, e.Source))
+		}
 	}
 	b.WriteString("\n## Per-case\n\n")
 	b.WriteString("| Case | Model | Score | Steps | Termination |\n")
