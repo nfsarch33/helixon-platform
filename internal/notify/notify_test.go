@@ -443,6 +443,55 @@ func TestDispatcher_RoundRobin(t *testing.T) {
 	}
 }
 
+// xcut-10 (v18518): BrevoOnly mode must route ALL sends through Brevo
+// and never touch the Resend client.
+func TestDispatcher_BrevoOnly_RoutesOnlyToBrevo(t *testing.T) {
+	var rHits, bHits int32
+	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&rHits, 1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"r"}`))
+	}))
+	defer resend.Close()
+	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&bHits, 1)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"messageId":"b"}`))
+	}))
+	defer brevo.Close()
+
+	meter := noop.NewMeterProvider().Meter("test")
+	disp := notify.NewDispatcher(notify.DispatcherConfig{
+		ResendClient: notify.NewResendClient(notify.ResendConfig{
+			APIKey: "re_x", BaseURL: resend.URL, FromAddr: "ops@cylrl.com.au",
+			Timeout: 1 * time.Second, MaxRetry: 3, OtelMeter: meter,
+		}),
+		BrevoClient: notify.NewBrevoClient(notify.BrevoConfig{
+			APIKey: "xkeysib-x", BaseURL: brevo.URL,
+			Timeout: 1 * time.Second, MaxRetry: 3, OtelMeter: meter,
+		}),
+		BrevoOnly: true,
+	})
+
+	for i := 0; i < 4; i++ {
+		err := disp.Send(context.Background(), notify.Email{
+			To:             []string{"jaslian@gmail.com"},
+			Subject:        "bo",
+			HTMLBody:       "<p/>",
+			IdempotencyKey: "bo-" + string(rune('a'+i)),
+		})
+		if err != nil {
+			t.Fatalf("Send #%d: %v", i, err)
+		}
+	}
+	if got := atomic.LoadInt32(&rHits); got != 0 {
+		t.Errorf("BrevoOnly must not hit Resend; got %d Resend calls", got)
+	}
+	if got := atomic.LoadInt32(&bHits); got != 4 {
+		t.Errorf("BrevoOnly must hit Brevo for every send; got %d Brevo calls (want 4)", got)
+	}
+}
+
 func TestDispatcher_FallbackToBrevoOnResendExhaustion(t *testing.T) {
 	var rHits, bHits int32
 	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
