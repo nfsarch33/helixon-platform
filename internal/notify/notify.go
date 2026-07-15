@@ -550,6 +550,10 @@ type DispatcherConfig struct {
 	// round-robin path is skipped and every send goes through Primary;
 	// the legacy fallback path remains as a safety net. v17607-6.
 	Primary Client
+	// BrevoOnly (xcut-10, v18518) drops Resend from the round-robin
+	// pickOrder entirely. The Brevo client is the sole outbound vendor.
+	// Use when Resend's sender domain is unverified (CF-105).
+	BrevoOnly bool
 }
 
 // Dispatcher rotates between Resend and Brevo; falls back to the other
@@ -601,7 +605,10 @@ func (d *Dispatcher) Send(ctx context.Context, m Email) error {
 	}
 
 	// If a Primary is configured (RotatingSender), use it directly.
-	if d.cfg.Primary != nil {
+	// xcut-10 (v18518): when BrevoOnly is set, skip Primary entirely
+	// (the operator has decided Resend is unverified and Primary may
+	// pick a Resend key). Brevo-only path is the sole outbound.
+	if d.cfg.Primary != nil && !d.cfg.BrevoOnly {
 		if err := d.cfg.Primary.Send(ctx, m); err == nil {
 			return nil
 		} else if !errors.Is(err, ErrDeadLetter) {
@@ -630,6 +637,15 @@ func (d *Dispatcher) Send(ctx context.Context, m Email) error {
 }
 
 func (d *Dispatcher) pickOrder() []Client {
+	// xcut-10 (v18518): when BrevoOnly is set, Resend is excluded from
+	// the round-robin pool (sender domain unverified, CF-105). Falls back
+	// to Brevo alone with no fallback vendor.
+	if d.cfg.BrevoOnly {
+		if d.cfg.BrevoClient == nil {
+			return nil
+		}
+		return []Client{d.cfg.BrevoClient}
+	}
 	primary := d.cfg.ResendClient
 	secondary := d.cfg.BrevoClient
 	if d.rrCursor.Add(1)%2 == 0 {

@@ -42,17 +42,18 @@ func main() {
 // endEmailFlags holds parsed flags for the send-end-email command.
 // v17714-1: extracted from main() to keep the dispatcher ≤6.
 type endEmailFlags struct {
-	plan      string
-	subject   string
-	bodyFile  string
-	idemKey   string
-	jobID     string
-	resendKey string
-	brevoKey  string
-	dryRun    bool
-	fromAddr  string
-	noCC      bool
-	auditDB   string
+	plan       string
+	subject    string
+	bodyFile   string
+	idemKey    string
+	jobID      string
+	resendKey  string
+	brevoKey   string
+	dryRun     bool
+	fromAddr   string
+	noCC       bool
+	auditDB    string
+	brevoOnly  bool // xcut-10 (v18518): CF-105 Resend domain unverified → Brevo only.
 }
 
 // endEmailOptions groups inputs for runSendEndEmailCmd.
@@ -104,6 +105,10 @@ func parseEndEmailArgs(args []string) (endEmailOptions, int) {
 	fs.StringVar(&f.fromAddr, "from", "noreply@oztac.com.au", "From address")
 	fs.BoolVar(&f.noCC, "no-cc", false, "send only to Primary (jaslian@gmail.com) per v16301 unified-target directive")
 	fs.StringVar(&f.auditDB, "audit-db", "", "path to notifydb SQLite file (optional; default: ~/logs/runx/notifydb.sqlite3)")
+	// xcut-10 (v18518): when --brevo-only is set, Resend is excluded
+	// from the dispatch. Defaults from env NOTIFY_BREVO_ONLY=1 too.
+	brevoOnlyDefault := os.Getenv("NOTIFY_BREVO_ONLY") == "1"
+	fs.BoolVar(&f.brevoOnly, "brevo-only", brevoOnlyDefault, "skip Resend entirely (CF-105 Resend domain unverified; xcut-10)")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err)
 		return endEmailOptions{}, 2
@@ -259,6 +264,7 @@ func runLiveSend(ctx context.Context, audit map[string]any, opts endEmailOptions
 	disp := notify.NewDispatcher(notify.DispatcherConfig{
 		ResendClient: resendClient,
 		BrevoClient:  brevoClient,
+		BrevoOnly:    f.brevoOnly,
 	}).WithMetrics(metricsReg).WithAuditDB(db)
 
 	if err := disp.Send(ctx, m); err != nil {

@@ -40,6 +40,83 @@ func openTestDB(t *testing.T) *notifydb.DB {
 	return db
 }
 
+// xcut-10 (v18518): when Resend is unverified (CF-105), Brevo-only mode
+// must skip all Resend clients and pick among Brevo keys only. The mode
+// is set at construction time via NewRotatingSenderWithMode.
+func TestRotatingSender_BrevoOnly_SkipsResend(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	// Pre-record Resend keys to look older than Brevo — without the mode
+	// the LRU pick would otherwise select Resend.
+	now := time.Now().Unix()
+	if err := db.RecordKeyUse(ctx, notifydb.KeyUse{Vendor: "resend", KeyID: "r1", LastUsedUnix: now - 1000}); err != nil {
+		t.Fatalf("record r1: %v", err)
+	}
+	if err := db.RecordKeyUse(ctx, notifydb.KeyUse{Vendor: "resend", KeyID: "r2", LastUsedUnix: now - 999}); err != nil {
+		t.Fatalf("record r2: %v", err)
+	}
+	if err := db.RecordKeyUse(ctx, notifydb.KeyUse{Vendor: "brevo", KeyID: "b1", LastUsedUnix: now - 10}); err != nil {
+		t.Fatalf("record b1: %v", err)
+	}
+
+	var r1Calls, r2Calls, b1Calls atomic.Int32
+	rs, err := NewRotatingSenderWithMode(db,
+		[]Client{
+			newStubClient("resend", &r1Calls),
+			newStubClient("resend", &r2Calls),
+			newStubClient("brevo", &b1Calls),
+		},
+		[]string{"r1", "r2", "b1"},
+		RotatingSenderModeBrevoOnly)
+	if err != nil {
+		t.Fatalf("NewRotatingSenderWithMode: %v", err)
+	}
+
+	if err := rs.Send(ctx, Email{
+		To:             []string{"jaslian@gmail.com"},
+		IdempotencyKey: "brevo-only-1",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	if b1Calls.Load() != 1 {
+		t.Errorf("expected Brevo client to be called once; got b1=%d r1=%d r2=%d",
+			b1Calls.Load(), r1Calls.Load(), r2Calls.Load())
+	}
+	if r1Calls.Load() != 0 || r2Calls.Load() != 0 {
+		t.Errorf("expected NO Resend calls in BrevoOnly mode; got r1=%d r2=%d",
+			r1Calls.Load(), r2Calls.Load())
+	}
+}
+
+func TestRotatingSender_DefaultMode_AllowsAllVendors(t *testing.T) {
+	// Default behaviour (LRU across all) is preserved.
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	var rCalls, bCalls atomic.Int32
+	rs, err := NewRotatingSender(db,
+		[]Client{
+			newStubClient("resend", &rCalls),
+			newStubClient("brevo", &bCalls),
+		},
+		[]string{"r1", "b1"})
+	if err != nil {
+		t.Fatalf("NewRotatingSender: %v", err)
+	}
+	if err := rs.Send(ctx, Email{
+		To:             []string{"jaslian@gmail.com"},
+		IdempotencyKey: "default-mode-1",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if rCalls.Load()+bCalls.Load() != 1 {
+		t.Errorf("expected exactly one call across all clients, got r=%d b=%d",
+			rCalls.Load(), bCalls.Load())
+	}
+}
+
 func TestRotatingSender_PicksOldestKey(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
