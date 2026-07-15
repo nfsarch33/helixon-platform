@@ -1,0 +1,53 @@
+# Containerfile for svcregistryd (v14614 Pair 2 #1)
+# Source: github.com/nfsarch33/helixon-platform @ cmd/svcregistryd
+# Builder uses the official Go 1.25 toolchain (matches helixon-platform go.mod).
+# Runtime uses debian:bookworm-slim with tini PID 1 (v14856, switch tracked in evidence/v14856).
+
+# ---- builder ----
+FROM golang:1.26-bookworm AS builder
+
+WORKDIR /build
+
+# Layer-cache deps first.
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Now copy the rest of the source.
+COPY . .
+
+# Build only the svcregistryd binary. CGO_ENABLED=1 because the upstream
+# tree has CGO-using packages (e.g. modernc.org/sqlite transitively).
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /out/svcregistryd ./cmd/svcregistryd
+
+# ---- runtime ----
+# Switched runtime base to debian:bookworm-slim so the image has /bin/sh.
+# Reason: podman/quadlet wraps HealthCmd in 'sh -c' and a shell-less
+# base causes HealthCmd to always exit 1 (curl/wget not present either).
+# Cost: ~80 MB extra vs a shell-less base, ~5 MB vs buildpack-deps.
+FROM debian:bookworm-slim
+
+# Minimal runtime tooling: ca-certs for HTTPS probes, tini for proper
+# PID 1 signal forwarding so SIGTERM from systemctl triggers graceful
+# shutdown in svcregistryd's HTTP server.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/*
+
+# OCI labels (provenance + SBOM would land in v14629 / supply-chain sprint).
+LABEL org.opencontainers.image.title="svcregistryd" \
+      org.opencontainers.image.description="Helixon Service Registry daemon (HTTP API + JSON snapshot)" \
+      org.opencontainers.image.source="https://github.com/nfsarch33/helixon-platform" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      io.helixon.sprint="v14856" \
+      io.helixon.service="svcregistryd"
+
+COPY --from=builder /out/svcregistryd /svcregistryd
+
+# Keep the binary writable so a non-root user could update it in place
+# if needed, but make it owned by root for now (matches quadlet User=root).
+# Healthcheck (HealthCmd=/svcregistryd -healthcheck ...) is invoked under
+# whatever User the quadlet sets (root here).
+ENTRYPOINT ["/usr/bin/tini", "--", "/svcregistryd"]
+CMD ["-addr", "0.0.0.0:7777", "-path", "/var/lib/svcregistry/svc-registry.json", "-save-period", "30s"]
+
+EXPOSE 7777
