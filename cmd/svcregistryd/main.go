@@ -17,11 +17,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,12 +40,36 @@ func main() {
 		addr    = flag.String("addr", defaultAddr, "HTTP listen address")
 		path    = flag.String("path", defaultPath, "JSON snapshot path (~ expands to $HOME)")
 		period  = flag.Duration("save-period", 30*time.Second, "periodic Save interval")
-		showVer = flag.Bool("version", false, "print version and exit")
+		showVer     = flag.Bool("version", false, "print version and exit")
+		healthcheck = flag.Bool("healthcheck", false, "probe own /healthz endpoint (exit 0 ok, 1 bad); for distroless containers without curl")
 	)
 	flag.Parse()
 
 	if *showVer {
 		fmt.Println("svcregistryd dev (v16122 Sprint 17)")
+		return
+	}
+
+	if *healthcheck {
+		// Self-probe: hit the same /healthz endpoint we expose.
+		// Designed for distroless containers that have no curl/wget.
+		addr := *addr
+		// Translate 0.0.0.0 / [::] -> 127.0.0.1 for the probe target.
+		target := strings.NewReplacer("0.0.0.0", "127.0.0.1", "[::]", "[::1]").Replace(addr)
+		probe := "http://" + target + "/healthz"
+		client := &http.Client{Timeout: 3 * time.Second}
+		resp, err := client.Get(probe)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "healthcheck: GET %s: %v\n", probe, err)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			fmt.Fprintf(os.Stderr, "healthcheck: %s -> %d\n", probe, resp.StatusCode)
+			os.Exit(1)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		fmt.Printf("ok (probe=%s)\n", probe)
 		return
 	}
 
