@@ -1,0 +1,63 @@
+# Helixon fleet self-healing watchdog alerts (v14891)
+# Loaded by Alertmanager from
+# /home/jaslian/Code/helixon-platform/observability/alerts/
+
+groups:
+  - name: helixon-fleet-watchdog
+    interval: 30s
+    rules:
+      - alert: HelixonTailscaleWatchdog
+        expr: up{job="tailscale-watchdog"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: tailscale
+        annotations:
+          summary: "Helixon tailscale watchdog not firing on {{ $labels.host }}"
+          runbook: https://wiki.helixon.local/runbooks/tailscale-watchdog
+
+      - alert: HelixonK3sWatchdog
+        expr: up{job="k3s-watchdog"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: k3s
+        annotations:
+          summary: "Helixon k3s watchdog not firing on {{ $labels.host }}"
+
+      - alert: HelixonPodmanWatchdog
+        expr: up{job="podman-watchdog"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: podman
+        annotations:
+          summary: "Helixon podman watchdog not firing on {{ $labels.host }}"
+
+      - alert: HelixonTailscaleKeyExpiring
+        expr: tailscale_key_expiry_days < 7
+        for: 1h
+        labels:
+          severity: critical
+          service: tailscale
+        annotations:
+          summary: "tailscale key expires in {{ $value }} days on {{ $labels.host }}"
+          action: "Rotate tailscale auth key from 1Password"
+
+      - alert: HelixonK3sNodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: k3s
+        annotations:
+          summary: "k3s node {{ $labels.node }} not Ready for 10m"
+
+      - alert: HelixonQuadletRestarting
+        expr: increase(systemd_unit_restart_total[15m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+          service: podman
+        annotations:
+          summary: "Quadlet {{ $labels.name }} restarting >3 times / 15m"
