@@ -1,0 +1,111 @@
+# syntax=docker/dockerfile:1.7
+#
+# Containerfile for llama.cpp CUDA server (v14887)
+#
+# Builds the llama.cpp HTTP server with CUDA support, then
+# packages it into a debian-slim runtime with the pre-baked
+# Qwen 3.6 27B GGUF model.
+#
+# Target host: win4/wsl4 (RTX 3090, 24GB VRAM)
+# Endpoint: 0.0.0.0:11435 (llm-cluster-router peer pool port)
+# Model: /models/Qwen3.6-27B-Q4_K_M.gguf (read-only mount)
+#
+# CUDA 12.8 is pinned; matches the host nvidia driver >= 535
+# required for compute capability 8.6 (RTX 3090).
+#
+# Why not the upstream cuda.Dockerfile?
+#   - Upstream uses devel-ubuntu (1.2GB) and web UI tarball.
+#   - We only need `llama-server` binary + minimal runtime.
+#   - Migration target: debian-slim + tini (v14884 sweep).
+
+#####################
+# Stage 1: Build llama-server with CUDA
+#####################
+FROM docker.io/nvidia/cuda:12.8.1-devel-ubuntu24.04 AS builder
+
+ARG CUDA_DOCKER_ARCH=sm_86
+ARG LLAMA_CUDA_VERSION=12.8.1
+ENV LLAMA_CUDA_F16=1
+ENV LLAMA_CURL=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        git \
+        libssl-dev \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Use latest stable llama.cpp tag; will be pinned in CI
+ARG LLAMA_VERSION=b4340
+RUN git clone --depth 1 --branch ${LLAMA_VERSION} \
+        https://github.com/ggml-org/llama.cpp.git . \
+    || git clone --depth 1 https://github.com/ggml-org/llama.cpp.git .
+
+RUN cmake -B build \
+        -DGGML_CUDA=ON \
+        -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} \
+        -DLLAMA_CURL=ON \
+        -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --config Release \
+        --target llama-server -j$(nproc) \
+    && install -m 0755 build/bin/llama-server /usr/local/bin/llama-server
+
+#####################
+# Stage 2: Runtime (debian-slim + cuda runtime + tini)
+#####################
+FROM docker.io/nvidia/cuda:12.8.1-runtime-cudnn9-ubuntu24.04
+
+LABEL org.opencontainers.image.title="llama-cpp-cuda" \
+      org.opencontainers.image.description="llama.cpp CUDA HTTP server (Qwen 3.6 27B) for win4/wsl4" \
+      org.opencontainers.image.source="https://github.com/ggml-org/llama.cpp" \
+      org.opencontainers.image.vendor="helixon" \
+      org.opencontainers.image.licenses="MIT" \
+      helixon.security.distroless-free=true \
+      helixon.sprint="v14887" \
+      helixon.host="desktop-p5bul0f-wsl4" \
+      helixon.gpu="rtx-3090-24gb" \
+      helixon.model="Qwen3.6-27B-Q4_K_M.gguf"
+
+# Slim runtime requires runtime CUDA libs; use the
+# nvidia/cuda:12.8.1-runtime image (which provides
+# libcudart etc.) and install only the apt packages we
+# need for tini + ca-certificates + ssh client.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        tini \
+        openssh-client \
+        tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
+
+COPY --from=builder /usr/local/bin/llama-server /usr/local/bin/llama-server
+
+# Nonroot user. We must run as a user that can read the GGUF
+# mount (UID 1000 matches host user 'jason').
+RUN groupadd --system --gid 1000 helixon \
+    && useradd  --system --uid 1000 --gid helixon helixon \
+    && mkdir -p /models /var/log/llama-cpp \
+    && chown -R helixon:helixon /var/log/llama-cpp
+
+USER helixon:helixon
+
+# /models is a host bind-mount of /home/jason/models/qwen36-gguf/
+VOLUME ["/models"]
+EXPOSE 11435
+
+# Entrypoint: tini for proper PID 1 signal handling +
+# SIGTERM forward to llama-server on shutdown.
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/usr/local/bin/llama-server", \
+     "--host",  "0.0.0.0", \
+     "--port",  "11435", \
+     "--model", "/models/Qwen3.6-27B-Q4_K_M.gguf", \
+     "--ctx-size", "8192", \
+     "--n-gpu-layers", "999", \
+     "--parallel", "1", \
+     "--cont-batching"]

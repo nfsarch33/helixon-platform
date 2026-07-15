@@ -1,0 +1,162 @@
+---
+# v14887: Kubernetes manifest for llama.cpp CUDA server on win4/wsl4
+#
+# This is NOT a typical k8s deployment (it's an edge GPU node),
+# but the manifest structure gives us a portable spec that
+# could be applied via k3s (if wsl4 joins the fleet k3s) OR via
+# podman quadlet (if wsl4 stays as standalone host).
+#
+# Both consumers in the plan point to the same manifest:
+#   1. llm-cluster-router (v14888) discovers the peer at
+#      desktop-p5bul0f-wsl4.tail447712.ts.net:11435
+#   2. (Optional) k3s on wsl4 picks this up as a Deployment.
+#
+# NVIDIA GPU resource name 'nvidia.com/gpu: 1' requires
+# the NVIDIA device plugin to be installed on the cluster.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llm
+  labels:
+    app.kubernetes.io/part-of: helixon-fleet
+    helixon.sprint: v14887
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama-cpp-config
+  namespace: llm
+data:
+  host: "0.0.0.0"
+  port: "11435"
+  ctx_size: "8192"
+  n_gpu_layers: "999"
+  parallel: "1"
+  cont_batching: "true"
+  gguf_filename: "Qwen3.6-27B-Q4_K_M.gguf"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-cpp
+  namespace: llm
+  labels:
+    app: llama-cpp
+    app.kubernetes.io/part-of: helixon-fleet
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 11435
+    targetPort: 11435
+    protocol: TCP
+  selector:
+    app: llama-cpp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-cpp
+  namespace: llm
+  labels:
+    app: llama-cpp
+    app.kubernetes.io/part-of: helixon-fleet
+    helixon.sprint: v14887
+    helixon.host: desktop-p5bul0f-wsl4
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: llama-cpp
+  template:
+    metadata:
+      labels:
+        app: llama-cpp
+        app.kubernetes.io/part-of: helixon-fleet
+        helixon.host: desktop-p5bul0f-wsl4
+    spec:
+      # Run on the wsl4-labeled node only
+      nodeSelector:
+        helixon.io/host: wsl4
+      containers:
+      - name: llama-cpp
+        image: ghcr.io/nfsarch33/llama-cpp-cuda:dev
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 11435
+          name: http
+        env:
+        - name: LLAMA_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: llama-cpp-config
+              key: host
+        - name: LLAMA_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: llama-cpp-config
+              key: port
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "0"
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: "compute,utility"
+        args:
+          - --host=$(LLAMA_HOST)
+          - --port=$(LLAMA_PORT)
+          - --model=/models/$(GGUF_FILENAME)
+          - --ctx-size=8192
+          - --n-gpu-layers=999
+          - --parallel=1
+          - --cont-batching
+        env:
+        - name: LLAMA_HOST
+          value: "0.0.0.0"
+        - name: LLAMA_PORT
+          value: "11435"
+        - name: GGUF_FILENAME
+          valueFrom:
+            configMapKeyRef:
+              name: llama-cpp-config
+              key: gguf_filename
+        resources:
+          requests:
+            cpu: "2"
+            memory: "2Gi"
+            nvidia.com/gpu: 1
+          limits:
+            cpu: "16"
+            memory: "24Gi"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          tcpSocket:
+            port: 11435
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: 11435
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        volumeMounts:
+        - name: models
+          mountPath: /models
+          readOnly: true
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+      volumes:
+      - name: models
+        # Bind-mount /home/jason/models/qwen36-gguf from wsl4 host
+        hostPath:
+          path: /home/jason/models/qwen36-gguf
+          type: DirectoryOrCreate

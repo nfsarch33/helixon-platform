@@ -1,0 +1,65 @@
+# v14887: podman quadlet for llama.cpp CUDA server on win4/wsl4
+#
+# This is the *non-k8s* deployment path: standalone podman
+# container, managed by systemd. Used because wsl4 is
+# currently outside the k3s cluster (no kubelet installed).
+#
+# Run on wsl4 as `jason`:
+#   sudo cp llama-cpp-quadlet.container /etc/containers/systemd/llama-cpp.container
+#   sudo systemctl daemon-reload
+#   sudo systemctl start llama-cpp.service
+#   sudo systemctl enable llama-cpp.service
+
+[Unit]
+Description=llama.cpp CUDA server (Qwen 3.6 27B) for Helixon fleet
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Container]
+Image=ghcr.io/nfsarch33/llama-cpp-cuda:dev
+ContainerName=llama-cpp-wsl4
+PublishPort=0.0.0.0:11435:11435
+
+# Host bind-mount of the GGUF model dir
+Volume=/home/jason/models/qwen36-gguf:/models:ro
+
+# NVIDIA GPU passthrough (requires nvidia-container-toolkit on host)
+AddDevice=nvidia0
+AddDevice=nvidiactl
+AddDevice=nvidia-uvm
+AddDevice=nvidia-uvm-tools
+AddDevice=/dev/nvidia-modeset
+AddDevice=/dev/dri
+
+# Runtime config
+Environment=NVIDIA_VISIBLE_DEVICES=0
+Environment=NVIDIA_DRIVER_CAPABILITIES=compute,utility
+Environment=GGUF_FILENAME=Qwen3.6-27B-Q4_K_M.gguf
+
+# Healthcheck
+HealthCmd=curl -sf http://127.0.0.1:11435/health || exit 1
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=60s
+
+# Auto-restart on crash
+Restart=always
+RestartSec=10
+
+# Resource limits
+Memory=24G
+CPUs=16
+
+# Run as user 1000 (jason on host)
+User=1000:1000
+
+# Logging
+LogDriver=journald
+
+[Service]
+RestartSec=10
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target default.target
