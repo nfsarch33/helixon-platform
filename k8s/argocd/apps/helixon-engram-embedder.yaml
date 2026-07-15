@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: helixon-engram-embedder
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: helixon
+  source:
+    repoURL: https://github.com/nfsarch33/engram.git
+    targetRevision: master
+    path: k8s/embed
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: embed
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
