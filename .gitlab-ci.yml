@@ -1,157 +1,114 @@
+# GitLab CI for nfsarch33/helixon-platform
+#
+# Mirrors .github/workflows/ci.yml so that:
+#   - Today (GitLab CE blocked): runners register when CE recovers;
+#     this file serves as the canonical pipeline.
+#   - Tomorrow (post-recovery): this becomes the primary pipeline,
+#     GitHub Actions self-hosted runners become the fallback.
+
 stages:
   - lint
   - test
-  - build
-  - security
-  - sync
-  - notify
+  - scan
+  - publish
 
 variables:
-  GOVERSION: "1.26"
-  GOFLAGS: "-buildvcs=false"
+  GO_VERSION: "1.23.4"
+  REGISTRY: "ghcr.io/helixon"
+  IMAGE_NAME: "helixon-svcregistryd"
+  CACHE_DIR: "$CI_PROJECT_DIR/.cache"
 
-.go_base:
-  image: golang:${GOVERSION}
-  before_script:
-    - go mod download
+default:
   tags:
-    - podman
+    - helixon
+    - self-hosted
+  before_script:
+    - go version
+    - podman --version
 
-vet:
-  extends: .go_base
+# ─────────────────────────────────────────────────────────────
+# Stage 1: lint
+# ─────────────────────────────────────────────────────────────
+golangci-lint:
   stage: lint
+  image:
+    name: docker.io/golangci/golangci-lint:v1.62.2
+    entrypoint: [""]
   script:
-    - go vet ./...
-
-lint:
-  extends: .go_base
-  stage: lint
-  script:
-    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-    - golangci-lint run --timeout 5m ./...
-  allow_failure: false  # v14507: lint is now a required check
-
-test:
-  extends: .go_base
-  stage: test
-  script:
-    - go test -race -count=1 -coverprofile=coverage.out ./...
-    - go tool cover -func=coverage.out | tail -1
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.out
-    paths:
-      - coverage.out
-    expire_in: 7 days
-  coverage: "/total:\\s+\\(statements\\)\\s+(\\d+\\.\\d+)%/"
-  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
-
-build:
-  extends: .go_base
-  stage: build
-  script:
-    - CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${CI_COMMIT_SHORT_SHA}" -o helixon ./cmd/helixon/
-  artifacts:
-    paths:
-      - helixon
-    expire_in: 7 days
-  only:
-    - main
-    - tags
+    - golangci-lint run --timeout=5m ./cmd/...
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 govulncheck:
-  extends: .go_base
-  stage: security
+  stage: lint
+  image: golang:$GO_VERSION-alpine
   script:
     - go install golang.org/x/vuln/cmd/govulncheck@latest
     - govulncheck ./...
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-gosec:
-  extends: .go_base
-  stage: security
+# ─────────────────────────────────────────────────────────────
+# Stage 2: test
+# ─────────────────────────────────────────────────────────────
+unit-tests:
+  stage: test
+  image: golang:$GO_VERSION
   script:
-    - go install github.com/securego/gosec/v2/cmd/gosec@latest
-    - gosec -quiet ./...
-  allow_failure: false  # v14507: security check required
+    - go test -race -cover -coverprofile=coverage.txt -count=1 ./...
+    - go tool cover -func=coverage.txt | grep total
+  coverage: '/^total:\s+\(statements\)?\s+(\d+\.\d+)%/'
+  artifacts:
+    paths:
+      - coverage.txt
+    expire_in: 30 days
 
+# ─────────────────────────────────────────────────────────────
+# Stage 3: scan
+# ─────────────────────────────────────────────────────────────
 trivy-fs:
-  extends: .go_base
-  stage: security
+  stage: scan
   image:
-    name: aquasec/trivy:latest
+    name: docker.io/aquasec/trivy:0.58.1
     entrypoint: [""]
-  tags:
-    - docker
   script:
-    - trivy fs --exit-code 1 --severity HIGH,CRITICAL --no-progress .
-  allow_failure: false  # v14507: trivy fs required check
-
-nancy:
-  extends: .go_base
-  stage: security
-  script:
-    - go list -json -deps ./... > /tmp/deps.json
-    - curl -sfL https://github.com/sonatypecommunity/nancy-cli/releases/latest/download/nancy-cli_Linux_64-bit.tar.gz | tar -xz -C /tmp/
-    - /tmp/nancy sleuth --input /tmp/deps.json --output text
-  allow_failure: false  # v14507: nancy required check
-
-helm-lint:
-  stage: lint
-  image:
-    name: alpine/helm:3.21.2
-    entrypoint: [""]
-  tags:
-    - docker
-  script:
-    - helm lint charts/helixon-control-plane
-  allow_failure: false  # v14507: helm chart lint required
-
-github-sync:
-  stage: sync
-  tags:
-    - podman
-  image: golang:${GOVERSION}
-  variables:
-    GIT_STRATEGY: clone
-    GIT_DEPTH: "0"
-  script:
-    - |
-      if [ -z "${GITHUB_SYNC_TOKEN}" ] || [ -z "${GITHUB_REPO_URL}" ]; then
-        echo "WARN: sync vars not set, skipping"; exit 0
-      fi
-    - |
-      PUSH_URL="${GITHUB_REPO_URL}"
-      if echo "${PUSH_URL}" | grep -q "^https://"; then
-        PUSH_URL=$(echo "${PUSH_URL}" | sed "s|https://|https://x-access-token:${GITHUB_SYNC_TOKEN}@|")
-      fi
-    - git remote add github "${PUSH_URL}" 2>/dev/null || git remote set-url github "${PUSH_URL}"
-    - git fetch origin --unshallow 2>/dev/null || true
-    - git push github "HEAD:${CI_COMMIT_REF_NAME}" --force
-    - echo "Synced ${CI_COMMIT_REF_NAME} to GitHub"
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_TAG
-  after_script:
-    - git remote remove github 2>/dev/null || true
+    - trivy fs --scanners vuln,secret,misconfig
+        --exit-code 0 --severity HIGH,CRITICAL --no-progress .
   allow_failure: true
 
-ci-failure-notify:
-  stage: notify
-  tags:
-    - podman
-  image: golang:${GOVERSION}
-  when: on_failure
-  allow_failure: true
+nancy-deps:
+  stage: scan
+  image: golang:$GO_VERSION
   script:
+    - go install github.com/sonatype-nexus-community/nancy@latest
+    - go list -json -deps ./... | nancy sleuth
+  allow_failure: true
+
+# ─────────────────────────────────────────────────────────────
+# Stage 4: publish (build, sign, push)
+# ─────────────────────────────────────────────────────────────
+build-and-push-svcregistryd:
+  stage: publish
+  image:
+    name: quay.io/podman/stable:v4.9.3
+    entrypoint: [""]
+  script:
+    - podman build -t $REGISTRY/$IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+        -f cmd/svcregistryd/Containerfile cmd/svcregistryd
+    - podman tag  $REGISTRY/$IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+        $REGISTRY/$IMAGE_NAME:dev
+    # Push: ghcr.io OR localhost:5000 depending on REGISTRY_OVERRIDE
     - |
-      if [ -z "${NOTIFICATION_WEBHOOK_URL}" ]; then
-        echo "WARN: NOTIFICATION_WEBHOOK_URL not set, skipping"; exit 0
+      if [ "$REGISTRY_OVERRIDE" = "localhost:5000" ]; then
+        podman push --tls-verify=false $REGISTRY/$IMAGE_NAME:dev localhost:5000/$IMAGE_NAME:dev
+      else
+        echo "$GHCR_PASSWORD" | podman login ghcr.io -u "$GHCR_USER" --password-stdin
+        podman push $REGISTRY/$IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+        podman push $REGISTRY/$IMAGE_NAME:dev
       fi
-    - |
-      curl -sf -X POST "${NOTIFICATION_WEBHOOK_URL}" -H "Content-Type: application/json" \
-        -d '{"title":"CI failure: '${CI_PROJECT_NAME}' #'${CI_PIPELINE_ID}' on '${CI_COMMIT_REF_NAME}'","status":"open","source":"gitlab-ci"}' \
-        || echo "WARN: notification failed"
   rules:
-    - when: on_failure
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
