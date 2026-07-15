@@ -1,0 +1,177 @@
+---
+# v14888: k8s manifest for llm-cluster-router on win1/wsl1
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llm
+  labels:
+    app.kubernetes.io/part-of: helixon-fleet
+    helixon.sprint: v14888
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-cluster-router-config
+  namespace: llm
+  labels:
+    app: llm-cluster-router
+    app.kubernetes.io/part-of: helixon-fleet
+data:
+  router.yml: |
+    listen: ":8080"
+    metrics_addr: ":9091"
+    debug_addr: ":6060"
+    log_level: info
+    defaults:
+      max_queue_depth: 8
+      max_concurrency: 2
+      request_timeout: 180s
+      max_body_size: 4194304
+      circuit:
+        threshold: 5
+        cooldown: 30s
+    health_check:
+      interval: 15s
+      timeout: 5s
+      path: /health
+      unhealthy_threshold: 3
+      healthy_threshold: 1
+    fair_share:
+      enabled: false
+    nodes:
+      - name: wsl1-ollama-fast
+        url: http://127.0.0.1:11434
+        tier: fast
+        priority: 0
+        weight: 2
+        models: [qwen3.5-9b, qwen3.5-9b-instruct]
+      - name: wsl1-llama-coder-27b
+        url: http://127.0.0.1:11435
+        tier: reasoning
+        priority: 0
+        weight: 4
+        models: [qwen3.6-27b, Qwen3.6-27B-Q4_K_M]
+      - name: wsl4-llama-coder-27b
+        url: http://desktop-p5bul0f-wsl4.tail447712.ts.net:11435
+        tier: reasoning
+        priority: 5
+        weight: 4
+        models: [qwen3.6-27b, Qwen3.6-27B-Q4_K_M]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-cluster-router
+  namespace: llm
+  labels:
+    app: llm-cluster-router
+    app.kubernetes.io/part-of: helixon-fleet
+spec:
+  type: ClusterIP
+  ports:
+  - name: proxy
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  selector:
+    app: llm-cluster-router
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-cluster-router
+  namespace: llm
+  labels:
+    app: llm-cluster-router
+    app.kubernetes.io/part-of: helixon-fleet
+    helixon.sprint: v14888
+    helixon.host: desktop-12ro1af-wsl1
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: llm-cluster-router
+  template:
+    metadata:
+      labels:
+        app: llm-cluster-router
+        app.kubernetes.io/part-of: helixon-fleet
+    spec:
+      nodeSelector:
+        helixon.io/host: wsl1
+      containers:
+      - name: llm-cluster-router
+        image: ghcr.io/nfsarch33/llm-cluster-router:dev
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: proxy
+        - containerPort: 9091
+          name: metrics
+        - containerPort: 6060
+          name: debug
+        args:
+          - -config=/etc/llm-cluster-router/router.yml
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 15
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            memory: "256Mi"
+            cpu: "1000m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /etc/llm-cluster-router
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: llm-cluster-router-config
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llm-cluster-router
+  namespace: llm
+  labels:
+    app: llm-cluster-router
+spec:
+  rules:
+  - host: llm-router.helixon.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: llm-cluster-router
+            port:
+              number: 8080

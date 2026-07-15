@@ -1,0 +1,34 @@
+# v14888: podman quadlet for llm-cluster-router on win1/wsl1
+[Unit]
+Description=llm-cluster-router (Helixon fleet central LLM proxy)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Container]
+Image=ghcr.io/nfsarch33/llm-cluster-router:dev
+ContainerName=llm-cluster-router
+PublishPort=127.0.0.1:8080:8080
+PublishPort=0.0.0.0:9091:9091
+
+Volume=/home/jaslian/Code/llm-cluster-router/router.wsl1-wsl4.yml:/etc/llm-cluster-router/router.yml:ro
+
+User=1000:1000
+Memory=512M
+CPUs=2
+
+HealthCmd=curl -sf http://127.0.0.1:8080/health || exit 1
+HealthInterval=15s
+HealthTimeout=3s
+HealthRetries=3
+HealthStartPeriod=20s
+
+Restart=always
+RestartSec=5
+LogDriver=journald
+
+[Service]
+RestartSec=5
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target default.target
