@@ -90,6 +90,47 @@ func TestDB_Recent(t *testing.T) {
 	}
 }
 
+func TestDB_ListByPlan(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	// v18652 + v18654 dispatches; one v18653 transient that should NOT
+	// be included when we query for v18654.
+	rows := []Dispatch{
+		{ID: "v18652-end", Vendor: "resend", Status: "ok", CreatedUnix: 1700000010},
+		{ID: "v18653-end", Vendor: "resend", Status: "rendered", CreatedUnix: 1700000020},
+		{ID: "v18654-1-end", Vendor: "resend", Status: "ok", CreatedUnix: 1700000030},
+		{ID: "v18654-2-end", Vendor: "brevo", Status: "error", CreatedUnix: 1700000031},
+		{ID: "v18654-3-end", Vendor: "resend", Status: "ok", CreatedUnix: 1700000032},
+	}
+	for _, r := range rows {
+		if err := db.Insert(ctx, r); err != nil {
+			t.Fatalf("Insert %s: %v", r.ID, err)
+		}
+	}
+	got, err := db.ListByPlan(ctx, "v18654-")
+	if err != nil {
+		t.Fatalf("ListByPlan: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("ListByPlan v18654-: want 3, got %d (%v)", len(got), got)
+	}
+	// Newest-first: v18654-3-end (32), v18654-2-end (31), v18654-1-end (30).
+	if got[0].ID != "v18654-3-end" {
+		t.Fatalf("ListByPlan[0]: want v18654-3-end, got %s", got[0].ID)
+	}
+	if got[2].ID != "v18654-1-end" {
+		t.Fatalf("ListByPlan[2]: want v18654-1-end, got %s", got[2].ID)
+	}
+	// Empty prefix match (all) sanity check.
+	all, err := db.ListByPlan(ctx, "v1865")
+	if err != nil {
+		t.Fatalf("ListByPlan v1865: %v", err)
+	}
+	if len(all) != 5 {
+		t.Fatalf("ListByPlan v1865: want 5 (all v1865*), got %d", len(all))
+	}
+}
+
 func TestDB_CountByVendor(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()

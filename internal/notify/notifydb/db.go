@@ -216,6 +216,31 @@ FROM dispatches ORDER BY created_at_unix DESC LIMIT ?
 	return out, rows.Err()
 }
 
+// ListByPlan returns dispatches whose IdempotencyKey (id) starts with the
+// given plan prefix (e.g. "v18652-"). Used by session-end email audit.
+// Order is newest-first. v18654-2.
+func (d *DB) ListByPlan(ctx context.Context, planPrefix string) ([]Dispatch, error) {
+	const q = `
+SELECT id, vendor, recipient, subject, status, error, sent_at_unix, created_at_unix, attempt
+FROM dispatches WHERE id LIKE ? || '%' ORDER BY created_at_unix DESC
+`
+	rows, err := d.conn.QueryContext(ctx, q, planPrefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Dispatch
+	for rows.Next() {
+		var r Dispatch
+		if err := rows.Scan(&r.ID, &r.Vendor, &r.Recipient, &r.Subject, &r.Status, &r.Error,
+			&r.SentAtUnix, &r.CreatedUnix, &r.Attempt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // CountByVendor returns the count of dispatches for each vendor (for observability).
 func (d *DB) CountByVendor(ctx context.Context) (map[string]int, error) {
 	rows, err := d.conn.QueryContext(ctx, `SELECT vendor, COUNT(*) FROM dispatches GROUP BY vendor`)
