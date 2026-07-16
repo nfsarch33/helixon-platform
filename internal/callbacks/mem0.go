@@ -11,6 +11,11 @@ import (
 )
 
 // Mem0Config configures the Mem0Handler for scoped capsule writes.
+//
+// Deprecated: Mem0 retired per ADR-063; Engram is the PRIMARY memory engine.
+// The Mem0Callback is preserved for legacy LiteLLM installations but no
+// production path wires it after v18654. Removal targeted v18656+.
+// See CF-2026-07-16-122.
 type Mem0Config struct {
 	BaseURL   string // e.g. "http://127.0.0.1:18888" or cloud endpoint
 	APIKey    string
@@ -22,6 +27,8 @@ type Mem0Config struct {
 // Mem0Handler writes scoped capsule entries to Mem0 on OnEnd and OnError.
 // OnStart is a no-op (capsules are written at completion boundaries only).
 // Each memory entry includes the 4-part namespace key for Race Layer 3 isolation.
+//
+// Deprecated: see Mem0Config. CF-2026-07-16-122.
 type Mem0Handler struct {
 	cfg    Mem0Config
 	client *http.Client

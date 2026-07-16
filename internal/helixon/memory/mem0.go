@@ -13,6 +13,11 @@ import (
 // Mem0Result is the slim shape produced by any Mem0Client implementation.
 // It mirrors the subset of fields HybridSearcher needs for federated search
 // and rank-merging.
+//
+// Deprecated: Mem0 retired per ADR-063; Engram is the PRIMARY memory engine.
+// The federated-search interface is preserved for in-package symmetry; no
+// production caller wires Mem0Client after v18654. Removal targeted v18656+.
+// See CF-2026-07-16-122.
 type Mem0Result struct {
 	ID      string  `json:"id"`
 	Content string  `json:"content"`
@@ -21,6 +26,8 @@ type Mem0Result struct {
 
 // Mem0Client federates Mem0 alongside Engram + FTS5 inside HybridSearcher.
 // Implementations must be safe for concurrent use.
+//
+// Deprecated: see Mem0Result. CF-2026-07-16-122.
 type Mem0Client interface {
 	Search(ctx context.Context, query string, limit int) ([]Mem0Result, error)
 	Add(ctx context.Context, content string) error

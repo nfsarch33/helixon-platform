@@ -6,7 +6,7 @@
 // Usage:
 //
 //	export OP_SERVICE_ACCOUNT_TOKEN=$(cat ~/.config/op/service-account-token)
-//	./onepassword-bootstrap --vault Cursor_IronClaw
+//	./onepassword-bootstrap --vault HelixonSafe
 //
 // Items created (idempotent: skips if title already exists):
 //   - jason@win2   (Login: Win PC WSL Ubuntu Login GB password)
@@ -36,7 +36,7 @@ type itemSpec struct {
 }
 
 func main() {
-	vaultName := flag.String("vault", "Cursor_IronClaw", "1Password vault name (must be accessible by the service account)")
+	vaultName := flag.String("vault", "HelixonSafe", "1Password vault name (must be accessible by the service account)")
 	password := flag.String("password", os.Getenv("HELIXON_UNIVERSAL_PASSWORD"), "Universal Windows password to store in the Login items")
 	hfToken := flag.String("hf-token", os.Getenv("HF_TOKEN"), "HuggingFace token to store in the api_credential item")
 	timeout := flag.Duration("timeout", 30*time.Second, "SDK call timeout")
@@ -97,7 +97,7 @@ func main() {
 			Category: onepassword.ItemCategoryAPICredentials,
 			Fields: []onepassword.ItemField{
 				{ID: "credential", Title: "credential", Value: *hfToken, FieldType: onepassword.ItemFieldTypeConcealed},
-				{ID: "notes", Title: "notes", Value: "Auto-created by helixon-platform v14508.5 bootstrap. Injected via `op read op://Cursor_IronClaw/HF_TOKEN/credential` (CLI) or one.password-sdk-go Secrets().Resolve (programmatic).", FieldType: onepassword.ItemFieldTypeText},
+				{ID: "notes", Title: "notes", Value: "Auto-created by helixon-platform v14508.5 bootstrap. Injected via `op read op://HelixonSafe/HF_TOKEN/credential` (CLI) or one.password-sdk-go Secrets().Resolve (programmatic).", FieldType: onepassword.ItemFieldTypeText},
 			},
 		})
 	}

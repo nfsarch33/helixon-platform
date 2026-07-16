@@ -239,7 +239,7 @@ func TestRunRegistra_Credential(t *testing.T) {
 		CentralNode:     "wsl2",
 		CredentialsIndex: []registra.Credential{{
 			ID: "abc1234567890zyxwvu-tsrq", Title: "My Item",
-			Vault: "Cursor_IronClaw", Category: "API_KEY", OPURI: "op://Cursor_IronClaw/My Item/password",
+			Vault: "HelixonSafe", Category: "API_KEY", OPURI: "op://HelixonSafe/My Item/password",
 		}},
 	}
 	if err := writeRegistryYAML(filepath.Join(dir, "registry.yaml"), reg); err != nil {

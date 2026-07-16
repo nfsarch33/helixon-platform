@@ -9,12 +9,12 @@
 //
 //   - qwen3.7-plus / qwen3.7-max  -- Aliyun Beijing token-plan
 //     https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
-//     API key from 1Password Cursor_IronClaw vault, item
+//     API key from 1Password HelixonSafe vault, item
 //     "Aliyun Team Qwen Token Plan Key", field "password".
 //
 //   - MiniMax-M3 -- MiniMax China token-plan
 //     https://api.minimaxi.com/v1
-//     API key from 1Password Cursor_IronClaw vault, item "MiniMax M3
+//     API key from 1Password HelixonSafe vault, item "MiniMax M3
 //     Token Plan Key", field "password".
 //
 // The LiveSource emits a small canonical probe prompt per task and

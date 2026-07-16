@@ -32,20 +32,20 @@ type EnvEntry struct {
 
 var serviceMap = map[string][]EnvEntry{
 	"engramd": {
-		{EnvVar: "ENGRAM_EMBED_KEY", Vault: "Cursor_IronClaw", Item: "ripotpfq43jzlreor4zo2ay734", Field: "api-key"},
+		{EnvVar: "ENGRAM_EMBED_KEY", Vault: "HelixonSafe", Item: "ripotpfq43jzlreor4zo2ay734", Field: "api-key"},
 	},
 	"sprintboard-api": {
-		{EnvVar: "SPRINTBOARD_API_TOKEN", Vault: "Cursor_IronClaw", Item: "w7uspwgtg4y5gh6m4fdnxtu6lu", Field: "password"},
+		{EnvVar: "SPRINTBOARD_API_TOKEN", Vault: "HelixonSafe", Item: "w7uspwgtg4y5gh6m4fdnxtu6lu", Field: "password"},
 	},
 	"llm-router": {
-		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "Cursor_IronClaw", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
+		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
 	},
 	"svcregistryd": {
-		{EnvVar: "SVCREGISTRY_TOKEN", Vault: "Cursor_IronClaw", Item: "62ruxw2zud5fp7jpxgi2cgjb64", Field: "password"},
+		{EnvVar: "SVCREGISTRY_TOKEN", Vault: "HelixonSafe", Item: "62ruxw2zud5fp7jpxgi2cgjb64", Field: "password"},
 	},
 	"fleet-agent": {
-		{EnvVar: "OPENAI_BASE_URL", Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_BASE_URL=(.+)$`},
-		{EnvVar: "OPENAI_API_KEY", Vault: "Cursor_IronClaw", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_API_KEY=(.+)$`},
+		{EnvVar: "OPENAI_BASE_URL", Vault: "HelixonSafe", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_BASE_URL=(.+)$`},
+		{EnvVar: "OPENAI_API_KEY", Vault: "HelixonSafe", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_API_KEY=(.+)$`},
 	},
 }
 

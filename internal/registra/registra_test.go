@@ -66,8 +66,8 @@ llm_cells:
 credentials_index:
   - id: abc123
     title: github pat
-    vault: Cursor_IronClaw
-    op_uri: op://Cursor_IronClaw/github pat
+    vault: HelixonSafe
+    op_uri: op://HelixonSafe/github pat
 `
 
 func TestRegistryLoadAndList(t *testing.T) {
@@ -143,7 +143,7 @@ func TestRegistryFindCredentialByTitle(t *testing.T) {
 	if !ok {
 		t.Fatal("missing cred")
 	}
-	if c.OPURI != "op://Cursor_IronClaw/github pat" {
+	if c.OPURI != "op://HelixonSafe/github pat" {
 		t.Errorf("op_uri=%s", c.OPURI)
 	}
 }
