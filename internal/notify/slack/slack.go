@@ -31,11 +31,12 @@ import (
 
 // Client is a Slack webhook client.
 type Client struct {
-	webhook string
-	baseURL string // empty in production; populated only by tests
-	logger  *slog.Logger
-	httpc   *http.Client
-	metrics *metrics.Registry
+	webhook         string
+	baseURL         string // empty in production; populated only by tests
+	logger          *slog.Logger
+	httpc           *http.Client
+	metrics         *metrics.Registry
+	channelOverride string // set by NewFromOpWithResolver; "" uses webhook default
 }
 
 // Config is the Slack client config.
@@ -91,8 +92,12 @@ type Message struct {
 
 // Send posts a text message to the configured webhook.
 func (c *Client) Send(ctx context.Context, text string) error {
-	return c.send(ctx, Message{Text: text})
+	return c.send(ctx, Message{Text: text, Channel: c.channelOverride})
 }
+
+// Channel returns the override channel configured on this client ("" if
+// the webhook's default channel is in use). Used for diagnostics + tests.
+func (c *Client) Channel() string { return c.channelOverride }
 
 // send is the orchestrator. Mirrors telegram.SendMessageTo's helper split
 // (validate / build / execute / classify / record) for low-CC tests.
