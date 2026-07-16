@@ -38,6 +38,7 @@ const (
 	VendorResend   Vendor = "resend"
 	VendorBrevo    Vendor = "brevo"
 	VendorTelegram Vendor = "telegram"
+	VendorSlack    Vendor = "slack" // v18654-4
 )
 
 // Registry is the in-process counter store. It is safe for concurrent
