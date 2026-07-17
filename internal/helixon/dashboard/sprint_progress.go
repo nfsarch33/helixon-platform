@@ -13,6 +13,7 @@ import (
 type SprintProgressResponse struct {
 	SprintID     string  `json:"sprint_id"`
 	SprintName   string  `json:"sprint_name,omitempty"`
+	TenantID     string  `json:"tenant_id,omitempty"` // v18686-1: multi-tenancy
 	TotalTickets int     `json:"total_tickets"`
 	DoneTickets  int     `json:"done_tickets"`
 	InProgress   int     `json:"in_progress"`

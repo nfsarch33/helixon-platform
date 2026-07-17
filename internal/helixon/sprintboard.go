@@ -25,9 +25,10 @@ type SprintboardClient struct {
 
 // SprintboardConfig configures the sprintboard HTTP client.
 type SprintboardConfig struct {
-	BaseURL string
-	AgentID string
-	Timeout time.Duration
+	BaseURL  string
+	AgentID  string
+	TenantID string // v18686-1: multi-tenancy
+	Timeout  time.Duration
 }
 
 // NewSprintboardClient creates a client for the Sprintboard REST API.

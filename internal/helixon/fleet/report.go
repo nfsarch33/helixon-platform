@@ -10,6 +10,7 @@ import (
 // DailyReport summarises a day's task execution for fleet reporting.
 type DailyReport struct {
 	AgentID     string        `json:"agent_id"`
+	TenantID    string        `json:"tenant_id,omitempty"` // v18686-1: multi-tenancy
 	Date        string        `json:"date"`
 	Total       int           `json:"total"`
 	Completed   int           `json:"completed"`
