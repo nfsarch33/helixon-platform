@@ -175,7 +175,7 @@ func doEngramPersist(ctx context.Context, out io.Writer, engramURL, agentID, pro
 	summary := fmt.Sprintf("Agent %s executed task. Prompt: %s. Result: %s",
 		agentID, truncate(prompt, 200), truncate(result, 300))
 
-	mem, err := engram.Add(ctx, summary, "helixon", agentID)
+	mem, err := engram.Add(ctx, summary, "helixon", agentID, "")
 	if err != nil {
 		fmt.Fprintf(out, "warning: engram persistence failed: %v\n", err)
 		return

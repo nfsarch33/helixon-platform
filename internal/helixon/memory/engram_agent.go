@@ -12,6 +12,7 @@ import (
 type AgentMemoryConfig struct {
 	AppID      string
 	UserID     string
+	TenantID   string
 	MaxContext int
 	Logger     *slog.Logger
 }
@@ -53,7 +54,7 @@ func (am *AgentMemory) RetrieveContext(ctx context.Context, userPrompt string) s
 		return ""
 	}
 
-	results, err := am.searcher.Search(ctx, userPrompt, am.cfg.AppID, am.cfg.UserID)
+	results, err := am.searcher.Search(ctx, userPrompt, am.cfg.AppID, am.cfg.UserID, am.cfg.TenantID)
 	if err != nil {
 		am.logger.Warn("memory search failed (non-fatal)", slog.String("error", err.Error()))
 		return ""
@@ -94,7 +95,7 @@ func (am *AgentMemory) StoreConversationSummary(ctx context.Context, summary str
 		return nil
 	}
 
-	mem, err := am.searcher.Write(ctx, summary, am.cfg.AppID, am.cfg.UserID)
+	mem, err := am.searcher.Write(ctx, summary, am.cfg.AppID, am.cfg.UserID, am.cfg.TenantID)
 	if err != nil {
 		return fmt.Errorf("store summary: %w", err)
 	}

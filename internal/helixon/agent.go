@@ -28,6 +28,7 @@ const (
 // RuntimeConfig holds all configuration for a Helixon agent runtime.
 type RuntimeConfig struct {
 	AgentID                 string
+	TenantID                string
 	SystemPrompt            string
 	SessionDSN              string
 	MaxIterations           int

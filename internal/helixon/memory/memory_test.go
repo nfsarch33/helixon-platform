@@ -31,7 +31,7 @@ func TestEngramClientAdd(t *testing.T) {
 	defer func() { srv.Close() }()
 
 	client := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
-	mem, err := client.Add(context.Background(), "test memory", "helixon", "user-1")
+	mem, err := client.Add(context.Background(), "test memory", "helixon", "user-1", "")
 	require.NoError(t, err)
 	assert.Equal(t, "mem-001", mem.ID)
 	assert.Equal(t, "test memory", mem.Content)
@@ -53,7 +53,7 @@ func TestEngramClientSearch(t *testing.T) {
 	defer func() { srv.Close() }()
 
 	client := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
-	results, err := client.Search(context.Background(), "k8s", "app", "user", 10)
+	results, err := client.Search(context.Background(), "k8s", "app", "user", "", 10)
 	require.NoError(t, err)
 	assert.Len(t, results, 2)
 	assert.Equal(t, "kubernetes deployment", results[0].Content)
@@ -86,7 +86,7 @@ func TestEngramClientRetry(t *testing.T) {
 	defer func() { srv.Close() }()
 
 	client := NewEngramClient(EngramConfig{BaseURL: srv.URL, MaxRetries: 3}, nil)
-	mem, err := client.Add(context.Background(), "will retry", "app", "user")
+	mem, err := client.Add(context.Background(), "will retry", "app", "user", "")
 	require.NoError(t, err)
 	assert.Equal(t, "retry-ok", mem.ID)
 	assert.Equal(t, 3, attempts)
@@ -157,7 +157,7 @@ func TestHybridSearcherFTSOnly(t *testing.T) {
 	err = searcher.IndexLocal(context.Background(), "doc3", "kubernetes service mesh with istio")
 	require.NoError(t, err)
 
-	results, err := searcher.Search(context.Background(), "kubernetes", "", "")
+	results, err := searcher.Search(context.Background(), "kubernetes", "", "", "")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(results), 1)
 
@@ -184,7 +184,7 @@ func TestHybridSearcherVectorOnly(t *testing.T) {
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{}, nil)
 
-	results, err := searcher.Search(context.Background(), "test query", "app", "user")
+	results, err := searcher.Search(context.Background(), "test query", "app", "user", "")
 	require.NoError(t, err)
 	assert.Len(t, results, 2)
 	assert.Equal(t, "engram", results[0].Source)
@@ -222,7 +222,7 @@ func TestHybridSearcherMerge(t *testing.T) {
 	_ = searcher.IndexLocal(context.Background(), "l1", "shared content")
 	_ = searcher.IndexLocal(context.Background(), "l2", "local-only content")
 
-	results, err := searcher.Search(context.Background(), "shared content", "app", "user")
+	results, err := searcher.Search(context.Background(), "shared content", "app", "user", "")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(results), 1)
 
@@ -278,7 +278,7 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)
 	require.NoError(t, searcher.EnsureSchema(context.Background()))
 
-	mem, err := searcher.Write(context.Background(), "v8000-overnight memory", "claude-code", "user-1")
+	mem, err := searcher.Write(context.Background(), "v8000-overnight memory", "claude-code", "user-1", "")
 	require.NoError(t, err)
 	require.NotNil(t, mem)
 	assert.Equal(t, "mem-write-001", mem.ID)
@@ -289,7 +289,7 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 	assert.Equal(t, "claude-code", posted["app_id"])
 
 	// FTS mirror landed locally.
-	results, err := searcher.Search(context.Background(), "overnight", "claude-code", "user-1")
+	results, err := searcher.Search(context.Background(), "overnight", "claude-code", "user-1", "")
 	require.NoError(t, err)
 	found := false
 	for _, r := range results {
@@ -315,14 +315,14 @@ func TestHybridSearcherWrite_CanonicalFailureBlocks(t *testing.T) {
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)
 	require.NoError(t, searcher.EnsureSchema(context.Background()))
 
-	mem, err := searcher.Write(context.Background(), "should fail", "claude-code", "")
+	mem, err := searcher.Write(context.Background(), "should fail", "claude-code", "", "")
 	require.Error(t, err)
 	assert.Nil(t, mem)
 }
 
 func TestHybridSearcherWrite_MissingEngramFails(t *testing.T) {
 	searcher := NewHybridSearcher(nil, nil, HybridSearchConfig{}, nil)
-	_, err := searcher.Write(context.Background(), "x", "app", "user")
+	_, err := searcher.Write(context.Background(), "x", "app", "user", "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "engram client not configured")
 }

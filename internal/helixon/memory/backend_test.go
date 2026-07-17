@@ -35,7 +35,7 @@ func TestInMemoryBackend_Store_Recall(t *testing.T) {
 		t.Fatal("Store should set CreatedAt")
 	}
 
-	got, err := b.Recall(ctx, entry.ID)
+	got, err := b.Recall(ctx, entry.ID, "")
 	if err != nil {
 		t.Fatalf("Recall: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestInMemoryBackend_Search(t *testing.T) {
 	_ = b.Store(ctx, &Memory{Content: "buy eggs", AppID: "test", UserID: "u1"})
 	_ = b.Store(ctx, &Memory{Content: "sell house", AppID: "test", UserID: "u1"})
 
-	results, err := b.Search(ctx, "buy", "test", "u1", 10)
+	results, err := b.Search(ctx, "buy", "test", "u1", "", 10)
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestInMemoryBackend_ConcurrentSafe(t *testing.T) {
 			e := &Memory{Content: "c", AppID: "a", UserID: "u"}
 			_ = b.Store(ctx, e)
 			if e.ID != "" {
-				_, _ = b.Recall(ctx, e.ID)
+				_, _ = b.Recall(ctx, e.ID, "")
 			}
 		}(i)
 	}
@@ -131,7 +131,7 @@ func TestEngramBackend_FailOpen_OnUnreachable(t *testing.T) {
 		t.Fatal("EngramBackend.Store should assign ID even on fail-open")
 	}
 	// Recall should hit fallback since Engram is unreachable.
-	got, err := b.Recall(ctx, entry.ID)
+	got, err := b.Recall(ctx, entry.ID, "")
 	if err != nil {
 		t.Fatalf("EngramBackend.Recall (fallback path): %v", err)
 	}
@@ -167,7 +167,7 @@ func TestEngramBackend_Search_FailOpen(t *testing.T) {
 	_ = fb.Store(ctx, &Memory{Content: "alpha", AppID: "a", UserID: "u"})
 	_ = fb.Store(ctx, &Memory{Content: "alphabet", AppID: "a", UserID: "u"})
 
-	results, err := b.Search(ctx, "alph", "a", "u", 5)
+	results, err := b.Search(ctx, "alph", "a", "u", "", 5)
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

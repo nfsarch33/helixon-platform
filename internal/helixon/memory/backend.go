@@ -40,13 +40,20 @@ type Backend interface {
 	//   - be safe for concurrent callers
 	//   - return nil on success even if the write was deferred
 	Store(ctx context.Context, entry *Memory) error
-	// Recall fetches a memory entry by ID. Returns ErrMemoryNotFound
-	// when the ID is unknown.
-	Recall(ctx context.Context, id string) (*Memory, error)
+	// Recall fetches a memory entry by ID. tenantID enforces tenant
+	// isolation: an empty tenantID matches any entry (legacy behavior);
+	// a non-empty tenantID returns ErrMemoryNotFound for entries owned
+	// by a different tenant or by an empty-TenantID legacy entry.
+	// Per v18684-4 multi-tenancy hardening.
+	Recall(ctx context.Context, id, tenantID string) (*Memory, error)
 	// Search returns memories whose Content contains the query
 	// substring (case-insensitive). limit caps the result count; <=0
-	// means default of 10.
-	Search(ctx context.Context, query, appID, userID string, limit int) ([]SearchResult, error)
+	// means default of 10. tenantID filters by tenant — empty string
+	// matches all tenants (backward-compat for legacy entries); a
+	// non-empty tenantID restricts results to that tenant and legacy
+	// (empty-TenantID) entries, so caller sees its own data + the
+	// pre-migration global pool. Per v18684-4 multi-tenancy hardening.
+	Search(ctx context.Context, query, appID, userID, tenantID string, limit int) ([]SearchResult, error)
 	// Flush forces any buffered writes to durable storage. In-memory
 	// backends treat this as a no-op; HTTP-backed backends should
 	// flush any pending batch.
@@ -110,18 +117,23 @@ func (b *InMemoryBackend) Store(_ context.Context, entry *Memory) error {
 	return nil
 }
 
-func (b *InMemoryBackend) Recall(_ context.Context, id string) (*Memory, error) {
+func (b *InMemoryBackend) Recall(_ context.Context, id, tenantID string) (*Memory, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	e, ok := b.entries[id]
 	if !ok {
 		return nil, ErrMemoryNotFound
 	}
+	// Tenant isolation: if a tenantID is requested, the entry must either
+	// have no tenant (legacy) or match the requested tenant. Per v18684-4.
+	if tenantID != "" && e.TenantID != "" && e.TenantID != tenantID {
+		return nil, ErrMemoryNotFound
+	}
 	b.recallCount.Add(1)
 	return e, nil
 }
 
-func (b *InMemoryBackend) Search(_ context.Context, query, appID, userID string, limit int) ([]SearchResult, error) {
+func (b *InMemoryBackend) Search(_ context.Context, query, appID, userID, tenantID string, limit int) ([]SearchResult, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -134,6 +146,14 @@ func (b *InMemoryBackend) Search(_ context.Context, query, appID, userID string,
 			continue
 		}
 		if userID != "" && e.UserID != userID {
+			continue
+		}
+		// Tenant isolation: an entry is visible to tenantID if either
+		// the entry has no tenant (legacy / pre-migration) or its
+		// TenantID matches the caller. An empty tenantID matches
+		// everything (backward-compat for callers that have not been
+		// tenant-stamped yet).
+		if tenantID != "" && e.TenantID != "" && e.TenantID != tenantID {
 			continue
 		}
 		if q != "" && !strings.Contains(strings.ToLower(e.Content), q) {
