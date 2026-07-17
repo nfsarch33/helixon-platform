@@ -42,7 +42,7 @@ func TestNewFromOpWithResolver_ResolvesAndReturnsClient(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`"` + wantToken + `"`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, wantToken)
 	cl, err := NewFromOpWithResolver(context.Background(), resolver, onepassword.TelegramBot1UUID, "123456789")
@@ -73,7 +73,7 @@ func TestNewFromOpWithResolver_AllThreeBots(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`"` + wantToken + `"`))
 			}))
-			defer srv.Close()
+			defer func() { srv.Close() }()
 
 			resolver := newStubOpClient(t, srv.URL, wantToken)
 			cl, err := NewFromOpWithResolver(context.Background(), resolver, uuid, "999")
@@ -94,7 +94,7 @@ func TestNewFromOpWithResolver_RejectsEmptyUUID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`"anything"`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, "anything")
 	_, err := NewFromOpWithResolver(context.Background(), resolver, "", "999")
@@ -115,7 +115,7 @@ func TestNewFromOpWithResolver_VaultErrorIsTransient(t *testing.T) {
 		calls.Add(1)
 		http.Error(w, "vault unreachable", http.StatusInternalServerError)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, "")
 	_, err := NewFromOpWithResolver(context.Background(), resolver, onepassword.TelegramBot1UUID, "999")

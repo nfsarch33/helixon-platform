@@ -51,7 +51,7 @@ func TestAckAlert_DryRunAppendsNothing(t *testing.T) {
 		w.WriteHeader(200)
 		_ = json.NewEncoder(w).Encode(SilenceResponse{SilenceID: "x"})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	a := Alert{
 		Labels: map[string]string{"alertname": "Qwen36High5xx", "severity": "page"},
@@ -89,7 +89,7 @@ func TestAckAlert_WetRunPostsSilenceAndAppendsRow(t *testing.T) {
 		w.WriteHeader(200)
 		_ = json.NewEncoder(w).Encode(SilenceResponse{SilenceID: "sil-123"})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	a := Alert{
 		Labels: map[string]string{"alertname": "ControlPlaneDown", "severity": "page"},
@@ -167,7 +167,7 @@ func TestListAlerts_Reachable(t *testing.T) {
 			}{State: "active"}},
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	got, err := listAlerts(srv.URL)
 	if err != nil {
@@ -182,7 +182,7 @@ func TestListAlerts_BadStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	if _, err := listAlerts(srv.URL); err == nil {
 		t.Fatal("expected error for 500 status")
 	}

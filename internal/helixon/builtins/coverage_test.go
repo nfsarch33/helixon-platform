@@ -247,7 +247,7 @@ func TestSprintboardTool_DispatchViaHTTPServer(t *testing.T) {
 			_, _ = w.Write([]byte(`{"ok":true}`))
 		}
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	cfg := controlplane.SprintboardConfig{
 		BaseURL:   srv.URL,
@@ -355,7 +355,7 @@ func TestSprintboardClient_RegisterFailureSurfacesError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"boom"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	cfg := controlplane.SprintboardConfig{BaseURL: srv.URL, AgentName: "x"}
 	c := controlplane.NewSprintboardClient(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))

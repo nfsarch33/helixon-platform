@@ -139,7 +139,7 @@ func TestNDJSONHandler_WritesEvents(t *testing.T) {
 
 	h, err := callbacks.NewNDJSONHandler(path)
 	require.NoError(t, err)
-	defer h.Close()
+	defer func() { _ = h.Close() }()
 
 	info := &callbacks.RunInfo{ComponentName: "llm-call", RunID: "nd-1"}
 	ctx := context.Background()
@@ -147,7 +147,7 @@ func TestNDJSONHandler_WritesEvents(t *testing.T) {
 	h.OnStart(ctx, info, map[string]string{"prompt": "hello"})
 	h.OnEnd(ctx, info, map[string]string{"response": "world"})
 
-	h.Close()
+	_ = h.Close()
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -174,12 +174,12 @@ func TestNDJSONHandler_OnError_IncludesErrorMessage(t *testing.T) {
 
 	h, err := callbacks.NewNDJSONHandler(path)
 	require.NoError(t, err)
-	defer h.Close()
+	defer func() { _ = h.Close() }()
 
 	info := &callbacks.RunInfo{ComponentName: "parser", RunID: "nd-2"}
 	h.OnError(context.Background(), info, errors.New("parse failed: unexpected token"))
 
-	h.Close()
+	_ = h.Close()
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)

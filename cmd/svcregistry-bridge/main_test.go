@@ -54,7 +54,7 @@ nodes:
 		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	if err := bridge(yamlPath, srv.URL, "test-bridge"); err != nil {
 		t.Logf("bridge err: %v", err)

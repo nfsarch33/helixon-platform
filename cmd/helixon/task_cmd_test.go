@@ -67,7 +67,7 @@ func TestDoEngramPersist_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"id": "mem-001", "content": "test"})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	var buf bytes.Buffer
 	doEngramPersist(context.Background(), &buf, srv.URL, "test-agent", "prompt", "result")
@@ -81,7 +81,7 @@ func TestDoEngramPersist_FailureNonFatal(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	var buf bytes.Buffer
 	doEngramPersist(context.Background(), &buf, srv.URL, "test-agent", "prompt", "result")

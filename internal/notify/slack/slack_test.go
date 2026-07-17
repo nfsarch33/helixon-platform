@@ -48,7 +48,7 @@ func TestSlack_Metrics_SuccessOn200(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	reg := metrics.NewRegistry(nil)
 	c := &Client{webhook: validWebhook, httpc: &http.Client{}, metrics: reg,
 		baseURL: srv.URL, // injected for tests; see slack.go test hook
@@ -69,7 +69,7 @@ func TestSlack_Metrics_BadRequestOn4xx(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"channel_not_found"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	reg := metrics.NewRegistry(nil)
 	c := &Client{webhook: validWebhook, httpc: &http.Client{}, metrics: reg,
 		baseURL: srv.URL}
@@ -87,7 +87,7 @@ func TestSlack_Metrics_DeadLetterOn5xx(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("server error"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	reg := metrics.NewRegistry(nil)
 	c := &Client{webhook: validWebhook, httpc: &http.Client{}, metrics: reg,
 		baseURL: srv.URL}
@@ -104,7 +104,7 @@ func TestSlack_NilMetricsDoesNotPanic(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	c := &Client{webhook: validWebhook, httpc: &http.Client{}, baseURL: srv.URL}
 	if err := c.Send(context.Background(), "hi"); err != nil {
 		t.Fatalf("Send with nil metrics: %v", err)

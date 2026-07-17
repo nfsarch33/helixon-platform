@@ -22,7 +22,7 @@ func TestAgentWorkloadFetcher_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(agents)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewAgentWorkloadFetcher(srv.URL)
 	resp, err := fetcher.Fetch(context.Background())
@@ -48,7 +48,7 @@ func TestAgentWorkloadFetcher_WrappedResponse(t *testing.T) {
 			"agents": []AgentInfo{{AgentID: "a1", Status: "active"}},
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewAgentWorkloadFetcher(srv.URL)
 	resp, err := fetcher.Fetch(context.Background())
@@ -66,7 +66,7 @@ func TestAgentWorkloadFetcher_ServerError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("db error"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewAgentWorkloadFetcher(srv.URL)
 	_, err := fetcher.Fetch(context.Background())
@@ -80,7 +80,7 @@ func TestAgentWorkloadHandler_GET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]AgentInfo{{AgentID: "x", Status: "active"}})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	handler := AgentWorkloadHandler(NewAgentWorkloadFetcher(srv.URL))
 	rec := httptest.NewRecorder()

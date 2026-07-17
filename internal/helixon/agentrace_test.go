@@ -21,7 +21,7 @@ func TestTraceMiddleware_WritesNDJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTraceMiddleware: %v", err)
 	}
-	defer tm.Close()
+	defer func() { _ = tm.Close() }()
 
 	result, err := tm.Wrap("memory.search", func() (string, error) {
 		time.Sleep(5 * time.Millisecond)
@@ -34,7 +34,7 @@ func TestTraceMiddleware_WritesNDJSON(t *testing.T) {
 		t.Errorf("result = %q, want JSON array", result)
 	}
 
-	tm.Close()
+	_ = tm.Close()
 
 	data, err := os.ReadFile(logPath)
 	if err != nil {
@@ -78,7 +78,7 @@ func TestTraceMiddleware_RecordsErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTraceMiddleware: %v", err)
 	}
-	defer tm.Close()
+	defer func() { _ = tm.Close() }()
 
 	expectedErr := errors.New("connection refused")
 	_, callErr := tm.Wrap("sprintboard.claim", func() (string, error) {
@@ -88,7 +88,7 @@ func TestTraceMiddleware_RecordsErrors(t *testing.T) {
 		t.Fatalf("expected original error, got %v", callErr)
 	}
 
-	tm.Close()
+	_ = tm.Close()
 
 	data, err := os.ReadFile(logPath)
 	if err != nil {
@@ -127,7 +127,7 @@ func TestTraceMiddleware_MultipleWrites(t *testing.T) {
 			return "ok", nil
 		})
 	}
-	tm.Close()
+	_ = tm.Close()
 
 	data, err := os.ReadFile(logPath)
 	if err != nil {
@@ -168,7 +168,7 @@ func TestTraceMiddleware_EmitsCanonicalCorrelationFields(t *testing.T) {
 	if _, err := tm.Wrap("semble.search", func() (string, error) { return "ok", nil }); err != nil {
 		t.Fatalf("Wrap: %v", err)
 	}
-	tm.Close()
+	_ = tm.Close()
 
 	raw, err := os.ReadFile(logPath)
 	if err != nil {
@@ -206,7 +206,7 @@ func TestTraceMiddleware_MintsTraceWhenRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTraceMiddleware: %v", err)
 	}
-	defer tm.Close()
+	defer func() { _ = tm.Close() }()
 	if len(tm.traceID) != 26 {
 		t.Errorf("minted trace id = %q, want 26-char ULID", tm.traceID)
 	}

@@ -371,13 +371,13 @@ func TestHTTPServer_Healthz(t *testing.T) {
 	dir := t.TempDir()
 	reg := New(filepath.Join(dir, "r.json"))
 	srv := httptest.NewServer(NewHTTPServer(reg).Handler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Get(srv.URL + "/healthz")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
@@ -391,7 +391,7 @@ func TestHTTPServer_PostAndGet(t *testing.T) {
 	dir := t.TempDir()
 	reg := New(filepath.Join(dir, "r.json"))
 	srv := httptest.NewServer(NewHTTPServer(reg).Handler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	svc := makeService("helixon-platform", "wsl3", 8080, "http")
 	body, _ := json.Marshal(svc)
@@ -399,7 +399,7 @@ func TestHTTPServer_PostAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 201 {
 		t.Fatalf("POST status=%d", resp.StatusCode)
 	}
@@ -408,7 +408,7 @@ func TestHTTPServer_PostAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	var got []Service
 	if err := json.NewDecoder(resp2.Body).Decode(&got); err != nil {
 		t.Fatal(err)
@@ -421,7 +421,7 @@ func TestHTTPServer_PostAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	if resp3.StatusCode != 200 {
 		t.Fatalf("single GET status=%d", resp3.StatusCode)
 	}
@@ -431,12 +431,12 @@ func TestHTTPServer_PortConflictReturns409(t *testing.T) {
 	dir := t.TempDir()
 	reg := New(filepath.Join(dir, "r.json"))
 	srv := httptest.NewServer(NewHTTPServer(reg).Handler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	svc := makeService("a", "h1", 9100, "tcp")
 	body, _ := json.Marshal(svc)
 	resp, _ := http.Post(srv.URL+"/api/v1/services", "application/json", bytes.NewReader(body))
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	svc2 := makeService("b", "h1", 9100, "tcp")
 	body2, _ := json.Marshal(svc2)
@@ -444,7 +444,7 @@ func TestHTTPServer_PortConflictReturns409(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != 409 {
 		t.Fatalf("expected 409, got %d", resp2.StatusCode)
 	}
@@ -462,13 +462,13 @@ func TestHTTPServer_DeleteAndConflicts(t *testing.T) {
 	}
 
 	srv := httptest.NewServer(NewHTTPServer(reg).Handler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Get(srv.URL + "/api/v1/conflicts")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var c [][]Service
 	if err := json.NewDecoder(resp.Body).Decode(&c); err != nil {
 		t.Fatal(err)
@@ -482,7 +482,7 @@ func TestHTTPServer_DeleteAndConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 	if resp2.StatusCode != 204 {
 		t.Fatalf("DELETE status=%d", resp2.StatusCode)
 	}
@@ -494,13 +494,13 @@ func TestHTTPServer_MetricsEndpoint(t *testing.T) {
 	_ = reg.Register(makeService("a", "h1", 9100, "tcp"))
 
 	srv := httptest.NewServer(NewHTTPServer(reg).Handler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Get(srv.URL + "/metrics")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(body), "svcregistry_operations_total") {
 		t.Fatalf("metrics output missing counter: %s", body)

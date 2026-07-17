@@ -28,7 +28,7 @@ func TestEngramClientAdd(t *testing.T) {
 			AppID:   "helixon",
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	mem, err := client.Add(context.Background(), "test memory", "helixon", "user-1")
@@ -50,7 +50,7 @@ func TestEngramClientSearch(t *testing.T) {
 			},
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	results, err := client.Search(context.Background(), "k8s", "app", "user", 10)
@@ -65,7 +65,7 @@ func TestEngramClientHealth(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	err := client.Health(context.Background())
@@ -83,7 +83,7 @@ func TestEngramClientRetry(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(Memory{ID: "retry-ok"})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewEngramClient(EngramConfig{BaseURL: srv.URL, MaxRetries: 3}, nil)
 	mem, err := client.Add(context.Background(), "will retry", "app", "user")
@@ -142,7 +142,7 @@ func TestHybridSearcherFTSOnly(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "hybrid.db")
 	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	_, _ = db.Exec("PRAGMA journal_mode=WAL")
 
@@ -179,7 +179,7 @@ func TestHybridSearcherVectorOnly(t *testing.T) {
 			},
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{}, nil)
@@ -202,12 +202,12 @@ func TestHybridSearcherMerge(t *testing.T) {
 			},
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	dbPath := filepath.Join(t.TempDir(), "merge.db")
 	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	_, _ = db.Exec("PRAGMA journal_mode=WAL")
 
@@ -267,12 +267,12 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	dbPath := filepath.Join(t.TempDir(), "write.db")
 	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)
@@ -304,12 +304,12 @@ func TestHybridSearcherWrite_CanonicalFailureBlocks(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "engram down", http.StatusServiceUnavailable)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	dbPath := filepath.Join(t.TempDir(), "fail.db")
 	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL, MaxRetries: 1}, nil)
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)
@@ -333,7 +333,7 @@ func TestHybridSearcherRead_GreenPath(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(Memory{ID: "mem-read-001", Content: "fetched"})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{}, nil)

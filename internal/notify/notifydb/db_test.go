@@ -194,7 +194,7 @@ func TestDB_OpenWithDefaultPathFallsBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open default: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := db.Insert(context.Background(), Dispatch{
 		ID: "default-1", Vendor: "resend", Status: "ok",
 	}); err != nil {

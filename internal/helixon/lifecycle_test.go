@@ -188,7 +188,7 @@ func TestRegisterBuiltinTools_WithSprintboard(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	rt := NewRuntime(&stubProvider{}, RuntimeConfig{
 		AgentID:    "claude-code-sb-test",
@@ -328,9 +328,9 @@ func TestHTTPChannel_ChatAndHealth(t *testing.T) {
 	}
 
 	chatSrv := httptest.NewServer(ch.chatHandler(handler))
-	defer chatSrv.Close()
+	defer func() { chatSrv.Close() }()
 	healthSrv := httptest.NewServer(ch.healthHandler())
-	defer healthSrv.Close()
+	defer func() { healthSrv.Close() }()
 
 	// Happy path.
 	body, _ := json.Marshal(map[string]string{"message": "hello", "session_id": "s1"})
@@ -338,7 +338,7 @@ func TestHTTPChannel_ChatAndHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /chat: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
@@ -355,7 +355,7 @@ func TestHTTPChannel_ChatAndHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST bad: %v", err)
 	}
-	bad.Body.Close()
+	_ = bad.Body.Close()
 	if bad.StatusCode != http.StatusBadRequest {
 		t.Fatalf("bad json status = %d, want 400", bad.StatusCode)
 	}
@@ -366,7 +366,7 @@ func TestHTTPChannel_ChatAndHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST empty: %v", err)
 	}
-	em.Body.Close()
+	_ = em.Body.Close()
 	if em.StatusCode != http.StatusBadRequest {
 		t.Fatalf("empty message status = %d, want 400", em.StatusCode)
 	}
@@ -377,7 +377,7 @@ func TestHTTPChannel_ChatAndHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST explode: %v", err)
 	}
-	defer br.Body.Close()
+	defer func() { _ = br.Body.Close() }()
 	if br.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("handler-error status = %d, want 500", br.StatusCode)
 	}
@@ -392,7 +392,7 @@ func TestHTTPChannel_ChatAndHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /health: %v", err)
 	}
-	defer hr.Body.Close()
+	defer func() { _ = hr.Body.Close() }()
 	if hr.StatusCode != http.StatusOK {
 		t.Fatalf("health status = %d, want 200", hr.StatusCode)
 	}

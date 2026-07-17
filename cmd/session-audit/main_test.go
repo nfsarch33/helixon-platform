@@ -20,7 +20,7 @@ func setupTestDB(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx := context.Background()
 	for _, r := range []notifydb.Dispatch{
 		{ID: "v18652-end", Vendor: "resend", Recipient: "jaslian@gmail.com", Subject: "[END] v18652", Status: "ok", CreatedUnix: 1700000010},
@@ -41,7 +41,7 @@ func captureStdout(t *testing.T, fn func() int) (string, int) {
 	old := os.Stdout
 	os.Stdout = w
 	rc := fn()
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 	var buf strings.Builder
 	bs := make([]byte, 4096)
@@ -122,7 +122,7 @@ func TestRunSessionAudit_BadDBReturnsRc2(t *testing.T) {
 		os.Stdout = w
 		os.Stderr = w
 		rc = runSessionAudit("v18654-", "/nonexistent/path/db.sqlite3", false)
-		w.Close()
+		_ = w.Close()
 		os.Stdout = old
 		os.Stderr = oldErr
 		_ = r

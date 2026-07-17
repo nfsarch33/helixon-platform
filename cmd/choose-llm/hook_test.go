@@ -107,7 +107,7 @@ func TestHookSubcommand_DecideReadsStdin(t *testing.T) {
 	oldStdin := os.Stdin
 	os.Stdin = r
 	go func() {
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 		_, _ = io.Copy(w, stdin)
 	}()
 	defer func() { os.Stdin = oldStdin }()

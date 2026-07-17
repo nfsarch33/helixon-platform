@@ -78,7 +78,7 @@ func TestNDJSONAppend_ToFileIsAppendOnly(t *testing.T) {
 
 	w, err := OpenFile(p)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	require.NoError(t, w.Write(sampleEvent("qwen36-27b-q4", 0, 100, 50, "C1")))
 	require.NoError(t, w.Write(sampleEvent("qwen36-27b-q4", 1, 200, 100, "C2")))
@@ -87,7 +87,7 @@ func TestNDJSONAppend_ToFileIsAppendOnly(t *testing.T) {
 	// Re-open in append mode (the canonical Cursor flow).
 	w2, err := OpenFile(p)
 	require.NoError(t, err)
-	defer w2.Close()
+	defer func() { _ = w2.Close() }()
 	require.NoError(t, w2.Write(sampleEvent("qwen36-27b-q4", 2, 400, 200, "C1")))
 	require.NoError(t, w2.Close())
 
@@ -133,7 +133,7 @@ func TestNDJSONOpenFile_CreatesParentDirs(t *testing.T) {
 	p := filepath.Join(dir, "deeply", "nested", "cost.ndjson")
 	w, err := OpenFile(p)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 	require.NoError(t, w.Write(sampleEvent("qwen36-27b-q4", 0, 10, 10, "C1")))
 	_, err = os.Stat(p)
 	assert.NoError(t, err)

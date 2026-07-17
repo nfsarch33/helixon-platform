@@ -47,7 +47,7 @@ func TestWebFetchTool_GET_v8900(t *testing.T) {
 		w.WriteHeader(200)
 		_, _ = w.Write([]byte("ok-body"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	reg := tooldispatch.NewRegistry(nil)
 	if err := reg.Register(builtins.WebFetchTool(builtins.WebFetchConfig{
@@ -91,7 +91,7 @@ func TestSprintboardTool_RegisterClaim_v8900(t *testing.T) {
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := controlplane.NewSprintboardClient(controlplane.SprintboardConfig{
 		BaseURL:   srv.URL,

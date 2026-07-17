@@ -39,7 +39,7 @@ func TestMemorySearch_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(expected)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	mt := NewMemoryTool(MemoryToolConfig{
 		BaseURL: srv.URL,
@@ -69,7 +69,7 @@ func TestMemorySearch_Timeout(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	mt := NewMemoryTool(MemoryToolConfig{
 		BaseURL: srv.URL,
@@ -91,7 +91,7 @@ func TestMemorySearch_ServerError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"detail":"internal error"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	mt := NewMemoryTool(MemoryToolConfig{BaseURL: srv.URL})
 
@@ -121,7 +121,7 @@ func TestMemoryAdd_InferFalse(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(`{"id":"new-mem-1"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	mt := NewMemoryTool(MemoryToolConfig{
 		BaseURL: srv.URL,
@@ -154,7 +154,7 @@ func TestMemoryAdd_InferTrue(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"id":"inferred-1"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	mt := NewMemoryTool(MemoryToolConfig{
 		BaseURL: srv.URL,

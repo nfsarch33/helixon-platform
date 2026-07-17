@@ -65,11 +65,11 @@ func TestHealthzServer_RealListenAndServe(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
-	defer ts.Close()
+	defer func() { ts.Close() }()
 
 	resp, err := http.Get(ts.URL + "/healthz")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.True(t, strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json"))
 }

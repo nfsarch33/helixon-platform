@@ -19,7 +19,7 @@ func TestCICDStatusFetcher_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(pipelines)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewCICDStatusFetcher(CICDConfig{GitLabURL: srv.URL})
 	resp, err := fetcher.Fetch(context.Background())
@@ -41,7 +41,7 @@ func TestCICDStatusFetcher_Empty(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("[]"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewCICDStatusFetcher(CICDConfig{GitLabURL: srv.URL})
 	resp, err := fetcher.Fetch(context.Background())
@@ -63,7 +63,7 @@ func TestCICDStatusFetcher_WithToken(t *testing.T) {
 		gotToken = r.Header.Get("PRIVATE-TOKEN")
 		json.NewEncoder(w).Encode([]PipelineInfo{})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewCICDStatusFetcher(CICDConfig{
 		GitLabURL:    srv.URL,
@@ -83,7 +83,7 @@ func TestCICDStatusHandler_GET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]PipelineInfo{{ID: 1, Status: "success"}})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	handler := CICDStatusHandler(NewCICDStatusFetcher(CICDConfig{GitLabURL: srv.URL}))
 	rec := httptest.NewRecorder()

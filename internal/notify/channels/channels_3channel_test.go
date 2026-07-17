@@ -79,13 +79,13 @@ func TestDispatcher_SendAll_FiresAllThreeSurfaces(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":42}}`))
 	}))
-	defer tgServer.Close()
+	defer func() { tgServer.Close() }()
 
 	slServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slCalls.Add(1)
 		_, _ = w.Write([]byte("ok"))
 	}))
-	defer slServer.Close()
+	defer func() { slServer.Close() }()
 
 	tg := newStubTelegramClient(t, tgServer.URL, "123456789")
 	sl := newStubSlackClient(t, slServer.URL)
@@ -116,13 +116,13 @@ func TestDispatcher_SendAll_TelegramFailureDoesNotBlockSlack(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"ok":false,"description":"bad chat id"}`))
 	}))
-	defer tgServer.Close()
+	defer func() { tgServer.Close() }()
 
 	slServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slCalls.Add(1)
 		_, _ = w.Write([]byte("ok"))
 	}))
-	defer slServer.Close()
+	defer func() { slServer.Close() }()
 
 	tg := newStubTelegramClient(t, tgServer.URL, "999")
 	sl := newStubSlackClient(t, slServer.URL)
@@ -167,7 +167,7 @@ func TestDispatcher_SlackPayloadContainsText(t *testing.T) {
 		capturedPayload = string(body)
 		_, _ = w.Write([]byte("ok"))
 	}))
-	defer slServer.Close()
+	defer func() { slServer.Close() }()
 
 	sl := newStubSlackClient(t, slServer.URL)
 	d := newStubDispatcher(nil, sl)

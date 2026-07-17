@@ -282,13 +282,13 @@ func TestWebSocketChannel_Scaffold_Returns501(t *testing.T) {
 	ws := NewWebSocketChannel(WebSocketChannelConfig{})
 
 	srv := httptest.NewServer(ws.scaffoldHandler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Get(srv.URL)
 	if err != nil {
 		t.Fatalf("GET /ws scaffold: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotImplemented {
 		t.Fatalf("status = %d, want 501", resp.StatusCode)
