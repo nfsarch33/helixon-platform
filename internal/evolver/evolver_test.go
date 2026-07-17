@@ -22,7 +22,7 @@ type fakeSource struct {
 
 func (f *fakeSource) Name() string { return f.name }
 
-func (f *fakeSource) Observe(ctx context.Context) ([]evolver.Observation, error) {
+func (f *fakeSource) Observe(ctx context.Context) ([]evolver.Observation, error) { //nolint:revive // unused-parameter required by interface
 	n := atomic.AddInt32(&f.calls, 1)
 	if int(n) <= f.failFirst {
 		return nil, errors.New("simulated transient failure")
@@ -36,7 +36,7 @@ type fakeDistill struct {
 	err   error
 }
 
-func (d *fakeDistill) Reflect(ctx context.Context, in []evolver.Observation) ([]evolver.Candidate, error) {
+func (d *fakeDistill) Reflect(ctx context.Context, in []evolver.Observation) ([]evolver.Candidate, error) { //nolint:revive // unused-parameter required by interface
 	return d.cands, d.err
 }
 
@@ -48,7 +48,7 @@ type fakePromote struct {
 	calls     int32
 }
 
-func (p *fakePromote) Persist(ctx context.Context, c evolver.Candidate) error {
+func (p *fakePromote) Persist(ctx context.Context, c evolver.Candidate) error { //nolint:revive // unused-parameter required by interface
 	atomic.AddInt32(&p.calls, 1)
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -159,7 +159,7 @@ func Test5_PromoteFailure_ContinuesAndDedupes(t *testing.T) {
 // short-circuits the cycle without calling Distill or Promote.
 type countingDistill struct{ calls int32 }
 
-func (c *countingDistill) Reflect(ctx context.Context, in []evolver.Observation) ([]evolver.Candidate, error) {
+func (c *countingDistill) Reflect(_ context.Context, in []evolver.Observation) ([]evolver.Candidate, error) { //nolint:revive // unused-parameter required by interface
 	atomic.AddInt32(&c.calls, 1)
 	return nil, nil
 }

@@ -34,7 +34,7 @@ func NewMockProvider() *MockProvider {
 }
 
 // Complete records the request and returns a mock response.
-func (m *MockProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+func (m *MockProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) { //nolint:revive // unused-parameter required by interface
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

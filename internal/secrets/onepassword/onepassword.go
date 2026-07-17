@@ -157,7 +157,7 @@ func (c *Client) ResolveSecret(ctx context.Context, vault, itemUUID, fieldID str
 
 	resp, err := c.HTTPc.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrVaultUnreachable, err)
+		return "", fmt.Errorf("%w: %w", ErrVaultUnreachable, err)
 	}
 	defer resp.Body.Close()
 

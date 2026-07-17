@@ -165,7 +165,7 @@ func executeSendRequest(ctx context.Context, httpc *http.Client, url string, bod
 //	200 + OK=false                             -> StatusBadRequest
 //	malformed JSON / decode failure            -> StatusDeadLetter
 //	network error from executeSendRequest      -> StatusDeadLetter (caller path)
-func classifyResponse(ctx context.Context, resp *http.Response, reg *metrics.Registry) (metrics.Status, error) {
+func classifyResponse(ctx context.Context, resp *http.Response, reg *metrics.Registry) (metrics.Status, error) { //nolint:revive // unused-parameter required by interface
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return metrics.StatusBadRequest,

@@ -138,33 +138,33 @@ func checkContainsSubstringsAny(needles []string) func(lc, _ string) bool {
 	}
 }
 
-// checkMaxWords fails when the content has more than `max` words. CC=2.
-func checkMaxWords(max int) func(_, content string) bool {
+// checkMaxWords fails when the content has more than `maxWords` words. CC=2.
+func checkMaxWords(maxWords int) func(_, content string) bool {
 	return func(_, content string) bool {
-		return wordCount(content) <= max
+		return wordCount(content) <= maxWords
 	}
 }
 
-// checkMinWords fails when the content has fewer than `min` words. CC=2.
-func checkMinWords(min int) func(_, content string) bool {
+// checkMinWords fails when the content has fewer than `minWords` words. CC=2.
+func checkMinWords(minWords int) func(_, content string) bool {
 	return func(_, content string) bool {
-		return wordCount(content) >= min
+		return wordCount(content) >= minWords
 	}
 }
 
-// checkMinNewlines fails when the content has fewer than `min`
+// checkMinNewlines fails when the content has fewer than `minNewlines`
 // newline characters. CC=2.
-func checkMinNewlines(min int) func(_, content string) bool {
+func checkMinNewlines(minNewlines int) func(_, content string) bool {
 	return func(_, content string) bool {
-		return strings.Count(content, "\n") >= min
+		return strings.Count(content, "\n") >= minNewlines
 	}
 }
 
 // checkMaxCompletionTokens fails when the content has more than
-// `max` words (proxy for completion tokens). CC=2.
-func checkMaxCompletionTokens(max int) func(_, content string) bool {
+// `maxTokens` words (proxy for completion tokens). CC=2.
+func checkMaxCompletionTokens(maxTokens int) func(_, content string) bool {
 	return func(_, content string) bool {
-		return wordCount(content) <= max
+		return wordCount(content) <= maxTokens
 	}
 }
 
@@ -180,14 +180,14 @@ func checkRegex(pattern string) func(_, content string) bool {
 }
 
 // checkJSONArrayMinLen fails when the content is not a JSON array of
-// at least `min` elements. CC=3.
-func checkJSONArrayMinLen(min int) func(_, content string) bool {
+// at least `minLen` elements. CC=3.
+func checkJSONArrayMinLen(minLen int) func(_, content string) bool {
 	return func(_, content string) bool {
 		var arr []any
 		if err := json.Unmarshal([]byte(content), &arr); err != nil {
 			return false
 		}
-		return len(arr) >= min
+		return len(arr) >= minLen
 	}
 }
 

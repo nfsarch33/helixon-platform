@@ -9,7 +9,7 @@ import (
 )
 
 // Test 1: Backend interface satisfies Store/Recall/Search/Flush/Close/Stats contract.
-func TestBackend_InterfaceContract(t *testing.T) {
+func TestBackend_InterfaceContract(t *testing.T) { //nolint:revive // unused-parameter required by interface
 	_ = Backend(nil) // type assertion compile check
 }
 
@@ -101,7 +101,7 @@ func TestInMemoryBackend_ConcurrentSafe(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
-		go func(i int) {
+		go func(i int) { //nolint:revive // unused-parameter required by interface
 			defer wg.Done()
 			e := &Memory{Content: "c", AppID: "a", UserID: "u"}
 			_ = b.Store(ctx, e)

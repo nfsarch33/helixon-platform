@@ -74,7 +74,7 @@ func TestBedrockClient_Complete_Success(t *testing.T) {
 }
 
 func TestBedrockClient_Complete_MapsUsage(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeBedrockResponse("tracked", 42, 18))
 	}))

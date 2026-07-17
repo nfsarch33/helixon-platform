@@ -17,7 +17,7 @@ type costTrackingProvider struct {
 	failNext bool
 }
 
-func (p *costTrackingProvider) Complete(_ context.Context, req CompletionRequest) (*CompletionResponse, error) {
+func (p *costTrackingProvider) Complete(_ context.Context, _ CompletionRequest) (*CompletionResponse, error) {
 	if p.failNext {
 		return nil, fmt.Errorf("provider %s unavailable", p.name)
 	}

@@ -48,7 +48,7 @@ func TestNew_CustomBaseURL(t *testing.T) {
 }
 
 func TestTelegram_Metrics_SuccessOn200(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":1}}`))
 	}))
@@ -67,7 +67,7 @@ func TestTelegram_Metrics_SuccessOn200(t *testing.T) {
 }
 
 func TestTelegram_Metrics_BadRequestOn4xx(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"ok":false,"description":"bad chat id"}`))
 	}))

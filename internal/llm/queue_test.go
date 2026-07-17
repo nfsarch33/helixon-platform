@@ -57,7 +57,7 @@ func TestQueuedProvider_ConcurrencyLimit(t *testing.T) {
 	var maxInflight atomic.Int64
 
 	slow := &testProvider{
-		fn: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+		fn: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) { //nolint:revive // unused-parameter required by interface
 			cur := inflight.Add(1)
 			defer inflight.Add(-1)
 			for {
@@ -100,7 +100,7 @@ func TestQueuedProvider_ConcurrencyLimit(t *testing.T) {
 
 func TestQueuedProvider_ContextCancelled(t *testing.T) {
 	slow := &testProvider{
-		fn: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+		fn: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) { //nolint:revive // unused-parameter required by interface
 			time.Sleep(5 * time.Second)
 			return &CompletionResponse{}, nil
 		},
@@ -176,7 +176,7 @@ func TestQueuedProvider_MemoryBackpressure(t *testing.T) {
 
 func TestQueuedProvider_Stats(t *testing.T) {
 	mock := &testProvider{
-		fn: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+		fn: func(_ context.Context, req CompletionRequest) (*CompletionResponse, error) { //nolint:revive // unused-parameter required by interface
 			time.Sleep(100 * time.Millisecond)
 			return &CompletionResponse{
 				Choices: []Choice{{Message: Message{Content: "ok"}}},
@@ -210,7 +210,7 @@ func TestQueuedProvider_DefaultConfig(t *testing.T) {
 func TestQueuedProvider_GracefulShutdownDrains(t *testing.T) {
 	var completed atomic.Int64
 	slow := &testProvider{
-		fn: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+		fn: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) { //nolint:revive // unused-parameter required by interface
 			time.Sleep(50 * time.Millisecond)
 			completed.Add(1)
 			return &CompletionResponse{

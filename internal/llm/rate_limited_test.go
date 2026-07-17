@@ -125,17 +125,17 @@ func TestRateLimited_Stats(t *testing.T) {
 		BurstSize:         5,
 	})
 
-	active, max := rl.Stats()
+	active, maxTokens := rl.Stats()
 	assert.Equal(t, 0, active)
-	assert.Equal(t, 15, max)
+	assert.Equal(t, 15, maxTokens)
 
 	_, _ = rl.Complete(context.Background(), CompletionRequest{
 		Messages: []Message{{Role: "user", Content: "hi"}},
 	})
 
-	active, max = rl.Stats()
+	active, maxTokens = rl.Stats()
 	assert.Equal(t, 1, active)
-	assert.Equal(t, 15, max)
+	assert.Equal(t, 15, maxTokens)
 }
 
 func TestRateLimited_ConcurrentRequests(t *testing.T) {

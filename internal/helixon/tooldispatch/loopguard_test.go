@@ -18,7 +18,7 @@ type fakeInner struct {
 	err   error
 }
 
-func (f *fakeInner) Execute(ctx context.Context, name string, argsJSON string) (string, error) {
+func (f *fakeInner) Execute(ctx context.Context, name string, argsJSON string) (string, error) { //nolint:revive // unused-parameter required by interface
 	f.calls++
 	return f.reply, f.err
 }

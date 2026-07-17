@@ -131,7 +131,7 @@ func TestAnthropicDirectClient_Complete_HealthFail(t *testing.T) {
 	}
 }
 
-func TestAnthropicDirectClient_ProviderInterface(t *testing.T) {
+func TestAnthropicDirectClient_ProviderInterface(t *testing.T) { //nolint:revive // unused-parameter required by interface
 	var _ Provider = (*AnthropicDirectClient)(nil)
 	var _ HealthChecker = (*AnthropicDirectClient)(nil)
 }

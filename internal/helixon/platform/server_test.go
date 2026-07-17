@@ -99,7 +99,7 @@ func TestPlatformServer_BadRequest_v8900(t *testing.T) {
 // streams `data:` lines for each chunk emitted by the StreamHandler and
 // terminates with `event: done`.
 func TestPlatformServer_SSE_v8900(t *testing.T) {
-	stream := func(ctx context.Context, _ helixon.IncomingMessage, emit func(chunk string) error) error {
+	stream := func(ctx context.Context, _ helixon.IncomingMessage, emit func(chunk string) error) error { //nolint:revive // unused-parameter required by interface
 		for _, c := range []string{"hello", " ", "world"} {
 			if err := emit(c); err != nil {
 				return err
@@ -286,7 +286,7 @@ func TestPlatformServer_StreamNoConfigured_v12022(t *testing.T) {
 // TestPlatformServer_StreamHeartbeat_v12022 verifies the SSE heartbeat comment
 // is emitted during long-running streams.
 func TestPlatformServer_StreamHeartbeat_v12022(t *testing.T) {
-	stream := func(ctx context.Context, _ helixon.IncomingMessage, emit func(string) error) error {
+	stream := func(ctx context.Context, _ helixon.IncomingMessage, emit func(string) error) error { //nolint:revive // unused-parameter required by interface
 		time.Sleep(80 * time.Millisecond)
 		return emit("final")
 	}

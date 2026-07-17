@@ -241,7 +241,7 @@ func emitAudit(audit map[string]any, f notifyFlags) int {
 
 // isDryRun reports whether the dispatch should skip the live send.
 // v17714-1: extracted from emitAudit.
-func isDryRun(audit map[string]any, f notifyFlags) bool {
+func isDryRun(audit map[string]any, f notifyFlags) bool { //nolint:revive // unused-parameter required by interface
 	if f.dryRun {
 		return true
 	}
@@ -252,10 +252,10 @@ func isDryRun(audit map[string]any, f notifyFlags) bool {
 
 // telegramWithStrikes sends via Telegram with exponential backoff. Returns
 // (attempts used, result label, error).
-func telegramWithStrikes(tg *telegram.Client, subject, body string, max int) (int, string, error) {
+func telegramWithStrikes(tg *telegram.Client, subject, body string, maxAttempts int) (int, string, error) {
 	text := "[" + subject + "]\n\n" + truncate(body, 3500) // Telegram 4096-char limit
 	var lastErr error
-	for attempt := 1; attempt <= max; attempt++ {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		err := tg.SendMessage(ctx, text)
 		cancel()
@@ -263,11 +263,11 @@ func telegramWithStrikes(tg *telegram.Client, subject, body string, max int) (in
 			return attempt, "sent", nil
 		}
 		lastErr = err
-		if attempt < max {
+		if attempt < maxAttempts {
 			time.Sleep(time.Duration(1<<attempt) * 100 * time.Millisecond) // 200ms, 400ms
 		}
 	}
-	return max, "fallback-to-email", lastErr
+	return maxAttempts, "fallback-to-email", lastErr
 }
 
 func truncate(s string, n int) string {

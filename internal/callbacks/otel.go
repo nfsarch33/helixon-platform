@@ -32,7 +32,7 @@ func NewOTELHandlerWithTracer(tracer trace.Tracer) *OTELHandler {
 	return &OTELHandler{tracer: tracer}
 }
 
-func (h *OTELHandler) OnStart(ctx context.Context, info *RunInfo, input any) context.Context {
+func (h *OTELHandler) OnStart(ctx context.Context, info *RunInfo, input any) context.Context { //nolint:revive // unused-parameter required by interface
 	attrs := []attribute.KeyValue{
 		attribute.String("component.name", info.ComponentName),
 		attribute.String("run.id", info.RunID),
@@ -55,7 +55,7 @@ func (h *OTELHandler) OnStart(ctx context.Context, info *RunInfo, input any) con
 	return context.WithValue(ctx, spanKey{}, span)
 }
 
-func (h *OTELHandler) OnEnd(ctx context.Context, info *RunInfo, _ any) context.Context {
+func (h *OTELHandler) OnEnd(ctx context.Context, info *RunInfo, _ any) context.Context { //nolint:revive // unused-parameter required by interface
 	if span, ok := ctx.Value(spanKey{}).(trace.Span); ok && span.IsRecording() {
 		span.SetStatus(codes.Ok, "")
 		span.End()

@@ -283,13 +283,13 @@ func emitUpper(runes []byte, i int, out []byte, prevDash, prevWasLower bool) ([]
 }
 
 // emitLower handles a lowercase letter. CC=1.
-func emitLower(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
+func emitLower(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) { //nolint:revive // unused-parameter required by interface
 	out = append(out, c)
 	return out, false, true
 }
 
 // emitDigit handles a digit. CC=1.
-func emitDigit(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) {
+func emitDigit(c byte, out []byte, prevDash, prevWasLower bool) ([]byte, bool, bool) { //nolint:revive // unused-parameter required by interface
 	out = append(out, c)
 	return out, false, false
 }

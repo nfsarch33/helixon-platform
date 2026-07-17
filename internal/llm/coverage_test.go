@@ -139,7 +139,7 @@ func TestOllamaClient_Complete_TemperatureAndMaxTokens(t *testing.T) {
 }
 
 func TestOllamaClient_Complete_ServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal error"))
 	}))
@@ -158,7 +158,7 @@ func TestOllamaClient_Complete_ServerError(t *testing.T) {
 }
 
 func TestOllamaClient_Complete_InvalidJSON(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Write([]byte("not json"))
 	}))
 	defer func() { srv.Close() }()
@@ -174,7 +174,7 @@ func TestOllamaClient_Complete_InvalidJSON(t *testing.T) {
 }
 
 func TestOllamaClient_Complete_ContextCancelled(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		time.Sleep(5 * time.Second)
 	}))
 	defer func() { srv.Close() }()
@@ -192,7 +192,7 @@ func TestOllamaClient_Complete_ContextCancelled(t *testing.T) {
 }
 
 func TestOllamaClient_Complete_WithReasoning(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		resp := ollamaChatResponse{
 			Message: Message{Role: "assistant", Content: "answer", Reasoning: "thinking..."},
 			Done:    true,
@@ -243,7 +243,7 @@ func TestClient_DisableThinking(t *testing.T) {
 }
 
 func TestClient_ResponseOversized(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		big := bytes.Repeat([]byte("x"), maxResponseSize+100)
 		w.Write(big)
 	}))

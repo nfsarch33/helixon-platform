@@ -63,7 +63,7 @@ func TestTruncate(t *testing.T) {
 
 func TestDoEngramPersist_Success(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"id": "mem-001", "content": "test"})
 	}))
@@ -78,7 +78,7 @@ func TestDoEngramPersist_Success(t *testing.T) {
 
 func TestDoEngramPersist_FailureNonFatal(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer func() { srv.Close() }()

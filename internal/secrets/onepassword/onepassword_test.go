@@ -48,10 +48,10 @@ type fakeOpServer struct {
 
 // newFakeServer returns an httptest.Server that emulates the SDK's Resolve
 // HTTP boundary. The resolver under test should hit it once per Resolve call.
-func newFakeServer(t *testing.T, expectedVault, expectedItem, expectedField, secret string, forceErr error) (*httptest.Server, *fakeOpServer) {
+func newFakeServer(t *testing.T, expectedVault, expectedItem, expectedField, secret string, forceErr error) (*httptest.Server, *fakeOpServer) { //nolint:revive // unused-parameter required by interface
 	t.Helper()
 	fs := &fakeOpServer{forceError: forceErr}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		fs.mu.Add(1)
 		if forceErr != nil {
 			http.Error(w, forceErr.Error(), http.StatusInternalServerError)

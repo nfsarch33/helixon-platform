@@ -38,7 +38,7 @@ func TestDefaultHTTPStatusRetryable(t *testing.T) {
 func TestDo_SuccessFirstAttempt(t *testing.T) {
 	p := Policy{}
 	calls := 0
-	result, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) {
+	result, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) { //nolint:revive // unused-parameter required by interface
 		calls++
 		return "ok", nil
 	})
@@ -50,7 +50,7 @@ func TestDo_SuccessFirstAttempt(t *testing.T) {
 func TestDo_4xxFailFast(t *testing.T) {
 	p := Policy{MaxAttempts: 3, InitialBackoff: 10 * time.Millisecond}
 	calls := 0
-	_, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) {
+	_, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) { //nolint:revive // unused-parameter required by interface
 		calls++
 		return "", &HTTPError{StatusCode: 404, Status: "Not Found"}
 	})
@@ -64,7 +64,7 @@ func TestDo_4xxFailFast(t *testing.T) {
 func TestDo_429RetriesThenExhausts(t *testing.T) {
 	p := Policy{MaxAttempts: 3, InitialBackoff: 5 * time.Millisecond, MaxBackoff: 20 * time.Millisecond}
 	calls := 0
-	_, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) {
+	_, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) { //nolint:revive // unused-parameter required by interface
 		calls++
 		return "", &HTTPError{StatusCode: http.StatusTooManyRequests, Status: "Too Many Requests"}
 	})
@@ -76,7 +76,7 @@ func TestDo_429RetriesThenExhausts(t *testing.T) {
 func TestDo_5xxRetriesThenSucceeds(t *testing.T) {
 	p := Policy{MaxAttempts: 3, InitialBackoff: 5 * time.Millisecond}
 	calls := 0
-	result, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) {
+	result, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) { //nolint:revive // unused-parameter required by interface
 		calls++
 		if calls < 2 {
 			return "", &HTTPError{StatusCode: 503, Status: "Service Unavailable"}
@@ -91,7 +91,7 @@ func TestDo_5xxRetriesThenSucceeds(t *testing.T) {
 func TestDo_NetworkErrorRetries(t *testing.T) {
 	p := Policy{MaxAttempts: 3, InitialBackoff: 5 * time.Millisecond}
 	calls := 0
-	_, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) {
+	_, err := Do(context.Background(), p, func(ctx context.Context, attempt int) (string, error) { //nolint:revive // unused-parameter required by interface
 		calls++
 		return "", errors.New("connection reset by peer")
 	})
@@ -107,7 +107,7 @@ func TestDo_ContextCancelled(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		cancel()
 	}()
-	_, err := Do(ctx, p, func(ctx context.Context, attempt int) (string, error) {
+	_, err := Do(ctx, p, func(ctx context.Context, attempt int) (string, error) { //nolint:revive // unused-parameter required by interface
 		calls++
 		return "", errors.New("transient")
 	})

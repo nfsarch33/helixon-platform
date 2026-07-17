@@ -42,7 +42,7 @@ func TestSprintboardClient_Register_Success(t *testing.T) {
 func TestSprintboardClient_Register_ServerError(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte(`{"error":"maintenance"}`))
 	}))
@@ -84,7 +84,7 @@ func TestSprintboardClient_Heartbeat_Success(t *testing.T) {
 func TestSprintboardClient_Heartbeat_Timeout(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -131,7 +131,7 @@ func TestSprintboardClient_ClaimTicket_Success(t *testing.T) {
 func TestSprintboardClient_ClaimTicket_AlreadyClaimed(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusConflict)
 		w.Write([]byte(`{"error":"ticket already claimed by agent-delta"}`))
 	}))

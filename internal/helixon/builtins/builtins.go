@@ -415,7 +415,7 @@ func FileReadTool(cfg FileReadConfig) tooldispatch.ToolDef {
 			}
 		}`),
 		Timeout: cfg.Timeout,
-		Handler: func(ctx context.Context, args map[string]any) (string, error) {
+		Handler: func(ctx context.Context, args map[string]any) (string, error) { //nolint:revive // unused-parameter required by interface
 			path, _ := args["path"].(string)
 			if path == "" {
 				return "", errors.New("path is required")
@@ -467,7 +467,7 @@ func FileWriteTool(cfg FileWriteConfig) tooldispatch.ToolDef {
 			}
 		}`),
 		Timeout: cfg.Timeout,
-		Handler: func(ctx context.Context, args map[string]any) (string, error) {
+		Handler: func(ctx context.Context, args map[string]any) (string, error) { //nolint:revive // unused-parameter required by interface
 			path, _ := args["path"].(string)
 			content, _ := args["content"].(string)
 			if path == "" {
@@ -548,11 +548,11 @@ func (o Options) Defs() []tooldispatch.ToolDef {
 	return defs
 }
 
-func truncateBytes(s string, max int) string {
-	if max <= 0 || len(s) <= max {
+func truncateBytes(s string, maxBytes int) string {
+	if maxBytes <= 0 || len(s) <= maxBytes {
 		return s
 	}
-	return s[:max] + "\n... [truncated]"
+	return s[:maxBytes] + "\n... [truncated]"
 }
 
 func schemeOf(rawURL string) string {

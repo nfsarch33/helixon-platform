@@ -19,7 +19,7 @@ func TestAgentMemory_RetrieveContext_NoSearcher(t *testing.T) {
 }
 
 func TestAgentMemory_RetrieveContext_WithResults(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		resp := map[string]any{
 			"results": []map[string]any{
 				{"id": "m1", "content": "Go uses goroutines for concurrency", "score": 0.9},

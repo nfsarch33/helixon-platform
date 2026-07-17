@@ -74,7 +74,7 @@ func TestDecide_RedirectNone_WhenDisabled(t *testing.T) {
 
 func TestDecide_RouterErrorFallsBackToLocalhost(t *testing.T) {
 	in := newInput("hello world")
-	dec := DecideWith(in, func(t Tier) (Decision, error) {
+	dec := DecideWith(in, func(t Tier) (Decision, error) { //nolint:revive // unused-parameter required by interface
 		return Decision{}, errFake("no cells")
 	})
 	out, err := dec()

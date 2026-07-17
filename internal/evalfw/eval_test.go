@@ -43,7 +43,7 @@ func TestRunner_RunSuite_SinglePassCase(t *testing.T) {
 		Cases: []Case{
 			{
 				Name: "always-pass",
-				Fn: func(ctx context.Context) CaseResult {
+				Fn: func(ctx context.Context) CaseResult { //nolint:revive // unused-parameter required by interface
 					return CaseResult{Verdict: VerdictPass, Metrics: map[string]float64{"latency_ms": 1.5}}
 				},
 			},
@@ -71,13 +71,13 @@ func TestRunner_RunSuite_FailCase(t *testing.T) {
 		Cases: []Case{
 			{
 				Name: "pass-case",
-				Fn: func(ctx context.Context) CaseResult {
+				Fn: func(ctx context.Context) CaseResult { //nolint:revive // unused-parameter required by interface
 					return CaseResult{Verdict: VerdictPass}
 				},
 			},
 			{
 				Name: "fail-case",
-				Fn: func(ctx context.Context) CaseResult {
+				Fn: func(ctx context.Context) CaseResult { //nolint:revive // unused-parameter required by interface
 					return CaseResult{Verdict: VerdictFail, Error: "expected X got Y"}
 				},
 			},
@@ -105,7 +105,7 @@ func TestRunner_RunSuite_WarnCase(t *testing.T) {
 		Cases: []Case{
 			{
 				Name: "warn-case",
-				Fn: func(ctx context.Context) CaseResult {
+				Fn: func(ctx context.Context) CaseResult { //nolint:revive // unused-parameter required by interface
 					return CaseResult{Verdict: VerdictWarn, Error: "latency above threshold"}
 				},
 			},

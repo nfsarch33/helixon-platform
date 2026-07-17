@@ -266,11 +266,11 @@ func finalizeStreamResp(acc *streamAccumulator) *CompletionResponse {
 // Returns -1 when the map is empty so the +1 in finalizeStreamResp
 // yields a zero-length iteration.
 func maxToolIndex(m map[int]*ToolCall) int {
-	max := -1
+	best := -1
 	for k := range m {
-		if k > max {
-			max = k
+		if k > best {
+			best = k
 		}
 	}
-	return max
+	return best
 }

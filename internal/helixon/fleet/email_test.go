@@ -79,7 +79,7 @@ func TestEmailReporterSendReport(t *testing.T) {
 		msg  []byte
 	}
 
-	mockSend := func(addr string, a smtp.Auth, from string, to []string, msg []byte) error {
+	mockSend := func(addr string, a smtp.Auth, from string, to []string, msg []byte) error { //nolint:revive // unused-parameter required by interface
 		captured.addr = addr
 		captured.from = from
 		captured.to = to

@@ -20,7 +20,7 @@ func FuzzClassifyTask(f *testing.F) {
 	for _, s := range seeds {
 		f.Add(s)
 	}
-	f.Fuzz(func(t *testing.T, systemPrompt string) {
+	f.Fuzz(func(t *testing.T, systemPrompt string) { //nolint:revive // unused-parameter required by interface
 		req := CompletionRequest{
 			Messages: []Message{
 				{Role: "system", Content: systemPrompt},
@@ -35,7 +35,7 @@ func FuzzCompletionResponseUnmarshal(f *testing.F) {
 	f.Add([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"hi"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 	f.Add([]byte(`{}`))
 	f.Add([]byte(`{"choices":[]}`))
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(t *testing.T, data []byte) { //nolint:revive // unused-parameter required by interface
 		var r CompletionResponse
 		_ = json.Unmarshal(data, &r)
 	})
@@ -45,7 +45,7 @@ func FuzzMessageMarshal(f *testing.F) {
 	f.Add("user", "hello")
 	f.Add("system", "You are a helpful assistant.")
 	f.Add("", "")
-	f.Fuzz(func(t *testing.T, role, content string) {
+	f.Fuzz(func(t *testing.T, role, content string) { //nolint:revive // unused-parameter required by interface
 		m := Message{Role: role, Content: content}
 		_, _ = json.Marshal(m)
 	})
@@ -57,7 +57,7 @@ func FuzzTierRoutingKeyLookup(f *testing.F) {
 	f.Add("visual")
 	f.Add("unknown")
 	f.Add("")
-	f.Fuzz(func(t *testing.T, taskTypeStr string) {
+	f.Fuzz(func(t *testing.T, taskTypeStr string) { //nolint:revive // unused-parameter required by interface
 		cfg := DefaultSemanticRouterConfig()
 		tt := TaskType(taskTypeStr)
 		_ = cfg.TaskTierMap[tt]
@@ -68,7 +68,7 @@ func FuzzExtractSystemContent(f *testing.F) {
 	f.Add(`[{"role":"system","content":"sys"}]`)
 	f.Add(`[{"role":"user","content":"hi"}]`)
 	f.Add(`[]`)
-	f.Fuzz(func(t *testing.T, messagesJSON string) {
+	f.Fuzz(func(t *testing.T, messagesJSON string) { //nolint:revive // unused-parameter required by interface
 		var msgs []Message
 		if json.Unmarshal([]byte(messagesJSON), &msgs) != nil {
 			return
@@ -82,7 +82,7 @@ func FuzzPromptBuilding(f *testing.F) {
 	f.Add("short")
 	f.Add(string(make([]byte, 10000)))
 	f.Add("")
-	f.Fuzz(func(t *testing.T, content string) {
+	f.Fuzz(func(t *testing.T, content string) { //nolint:revive // unused-parameter required by interface
 		req := CompletionRequest{
 			Messages: []Message{
 				{Role: "system", Content: content},
@@ -96,7 +96,7 @@ func FuzzPromptBuilding(f *testing.F) {
 func FuzzOllamaResponseUnmarshal(f *testing.F) {
 	f.Add([]byte(`{"model":"llama","message":{"role":"assistant","content":"hi"},"done":true}`))
 	f.Add([]byte(`{}`))
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		var r struct {
 			Message Message `json:"message"`
 		}
@@ -152,7 +152,7 @@ func FuzzSemanticRouterConfig(f *testing.F) {
 	for _, s := range seeds {
 		f.Add(s)
 	}
-	f.Fuzz(func(t *testing.T, taskTypeStr string) {
+	f.Fuzz(func(t *testing.T, taskTypeStr string) { //nolint:revive // unused-parameter required by interface
 		tt := TaskType(taskTypeStr)
 		_ = cfg.TaskTierMap[tt]
 	})
@@ -162,7 +162,7 @@ func FuzzBuildPrompt(f *testing.F) {
 	f.Add("user", "hello", "")
 	f.Add("system", "be helpful", "user")
 	f.Add("", "", "")
-	f.Fuzz(func(t *testing.T, role1, content1, role2 string) {
+	f.Fuzz(func(t *testing.T, role1, content1, role2 string) { //nolint:revive // unused-parameter required by interface
 		msgs := []Message{{Role: role1, Content: content1}}
 		if role2 != "" {
 			msgs = append(msgs, Message{Role: role2, Content: "test"})
@@ -177,7 +177,7 @@ func FuzzParseClaudeCLIOutput(f *testing.F) {
 	f.Add([]byte(`just plain text`))
 	f.Add([]byte(``))
 	f.Add([]byte(`{}`))
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(t *testing.T, data []byte) { //nolint:revive // unused-parameter required by interface
 		_, _ = parseClaudeCLIOutput(data)
 	})
 }
@@ -187,7 +187,7 @@ func FuzzContainsAny(f *testing.F) {
 	f.Add("screenshot of the UI", "visual")
 	f.Add("", "")
 	f.Add("nothing relevant here", "xyz")
-	f.Fuzz(func(t *testing.T, s, substr string) {
+	f.Fuzz(func(t *testing.T, s, substr string) { //nolint:revive // unused-parameter required by interface
 		_ = containsAny(s, substr)
 	})
 }
@@ -196,7 +196,7 @@ func FuzzQueueConfigDefaults(f *testing.F) {
 	f.Add(0, 0, int64(0), int64(0), int64(0))
 	f.Add(100, 4, int64(512), int64(300000000000), int64(2000000000))
 	f.Add(-1, -1, int64(-1), int64(-1), int64(-1))
-	f.Fuzz(func(t *testing.T, maxPending, maxConcurrent int, maxMemMB, timeoutNs, backpressureNs int64) {
+	f.Fuzz(func(t *testing.T, maxPending, maxConcurrent int, maxMemMB, timeoutNs, backpressureNs int64) { //nolint:revive // unused-parameter required by interface
 		cfg := QueueConfig{
 			MaxPending:        maxPending,
 			MaxConcurrent:     maxConcurrent,
@@ -212,7 +212,7 @@ func FuzzRateLimitConfigDefaults(f *testing.F) {
 	f.Add(10, int64(60000000000), 2)
 	f.Add(0, int64(0), 0)
 	f.Add(-1, int64(-1), -1)
-	f.Fuzz(func(t *testing.T, rpm int, windowNs int64, burst int) {
+	f.Fuzz(func(t *testing.T, rpm int, windowNs int64, burst int) { //nolint:revive // unused-parameter required by interface
 		cfg := RateLimitConfig{
 			RequestsPerMinute: rpm,
 			Window:            time.Duration(windowNs),
@@ -226,7 +226,7 @@ func FuzzUsageJSON(f *testing.F) {
 	f.Add([]byte(`{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30}`))
 	f.Add([]byte(`{}`))
 	f.Add([]byte(`{"prompt_tokens":-1}`))
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(t *testing.T, data []byte) { //nolint:revive // unused-parameter required by interface
 		var u Usage
 		_ = json.Unmarshal(data, &u)
 	})
@@ -237,7 +237,7 @@ func FuzzAPIErrorFormat(f *testing.F) {
 	f.Add(429, "rate limited")
 	f.Add(500, "")
 	f.Add(0, "")
-	f.Fuzz(func(t *testing.T, status int, body string) {
+	f.Fuzz(func(t *testing.T, status int, body string) { //nolint:revive // unused-parameter required by interface
 		e := &APIError{StatusCode: status, Body: body}
 		_ = e.Error()
 	})
