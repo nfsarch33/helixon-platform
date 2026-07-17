@@ -15,6 +15,7 @@ type EmailConfig struct {
 	To       []string
 	Username string
 	Password string
+	TenantID string // v18686-1: multi-tenancy
 }
 
 // Validate returns an error if required fields are missing.

@@ -24,6 +24,7 @@ type PipelineInfo struct {
 // CICDStatusResponse is the JSON payload for /api/v1/cicd.
 type CICDStatusResponse struct {
 	Pipelines   []PipelineInfo `json:"pipelines"`
+	TenantID    string         `json:"tenant_id,omitempty"` // v18686-1: multi-tenancy
 	TotalCount  int            `json:"total_count"`
 	SuccessRate float64        `json:"success_rate"`
 	GeneratedAt string         `json:"generated_at"`

@@ -57,6 +57,7 @@ var (
 // the v14511 hook can pipe through `jq` without renaming.
 type pickOutput struct {
 	SprintID         string `json:"sprint_id"`
+	TenantID         string `json:"tenant_id,omitempty"` // v18686-1: multi-tenancy
 	Tier             int    `json:"tier"`
 	TierLabel        string `json:"tier_label"`
 	CellID           string `json:"cell_id"`

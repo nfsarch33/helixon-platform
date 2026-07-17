@@ -14,6 +14,7 @@ type InjectionPattern struct {
 // ValidationResult captures the outcome of input validation.
 type ValidationResult struct {
 	Safe            bool     `json:"safe"`
+	TenantID        string   `json:"tenant_id,omitempty"` // v18686-1: multi-tenancy
 	MatchedPatterns []string `json:"matched_patterns,omitempty"`
 	Categories      []string `json:"categories,omitempty"`
 }

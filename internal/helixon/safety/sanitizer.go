@@ -16,6 +16,7 @@ var (
 // SanitizeResult describes what was cleaned from the output.
 type SanitizeResult struct {
 	Output         string   `json:"output"`
+	TenantID       string   `json:"tenant_id,omitempty"` // v18686-1: multi-tenancy
 	RedactedCount  int      `json:"redacted_count"`
 	RedactedTypes  []string `json:"redacted_types,omitempty"`
 	ShellLeakFound bool     `json:"shell_leak_found"`

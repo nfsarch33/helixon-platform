@@ -46,6 +46,7 @@ type StreamHandler func(ctx context.Context, msg helixon.IncomingMessage, emit f
 // Config configures Server.
 type Config struct {
 	Addr                 string
+	TenantID             string // v18686-1: multi-tenancy
 	ReadTimeout          time.Duration
 	WriteTimeout         time.Duration
 	IdleTimeout          time.Duration
