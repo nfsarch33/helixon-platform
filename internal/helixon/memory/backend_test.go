@@ -16,7 +16,7 @@ func TestBackend_InterfaceContract(t *testing.T) {
 // Test 2: InMemoryBackend stores and recalls entries.
 func TestInMemoryBackend_Store_Recall(t *testing.T) {
 	b := NewInMemoryBackend()
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 
 	ctx := context.Background()
 	entry := &Memory{
@@ -47,7 +47,7 @@ func TestInMemoryBackend_Store_Recall(t *testing.T) {
 // Test 3: InMemoryBackend Search returns content matches.
 func TestInMemoryBackend_Search(t *testing.T) {
 	b := NewInMemoryBackend()
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	ctx := context.Background()
 
 	_ = b.Store(ctx, &Memory{Content: "buy milk", AppID: "test", UserID: "u1"})
@@ -66,7 +66,7 @@ func TestInMemoryBackend_Search(t *testing.T) {
 // Test 4: InMemoryBackend Flush is a no-op (in-memory always flushed).
 func TestInMemoryBackend_Flush(t *testing.T) {
 	b := NewInMemoryBackend()
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	ctx := context.Background()
 	if err := b.Store(ctx, &Memory{Content: "x", AppID: "a", UserID: "u"}); err != nil {
 		t.Fatalf("Store: %v", err)
@@ -79,7 +79,7 @@ func TestInMemoryBackend_Flush(t *testing.T) {
 // Test 5: InMemoryBackend Stats reports counts.
 func TestInMemoryBackend_Stats(t *testing.T) {
 	b := NewInMemoryBackend()
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	ctx := context.Background()
 	for i := 0; i < 3; i++ {
 		_ = b.Store(ctx, &Memory{Content: "x", AppID: "a", UserID: "u"})
@@ -96,7 +96,7 @@ func TestInMemoryBackend_Stats(t *testing.T) {
 // Test 6: InMemoryBackend concurrent Store/Recall is race-clean.
 func TestInMemoryBackend_ConcurrentSafe(t *testing.T) {
 	b := NewInMemoryBackend()
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
@@ -120,7 +120,7 @@ func TestInMemoryBackend_ConcurrentSafe(t *testing.T) {
 func TestEngramBackend_FailOpen_OnUnreachable(t *testing.T) {
 	cfg := EngramConfig{BaseURL: "http://127.0.0.1:1", Timeout: 200 * time.Millisecond, MaxRetries: 0}
 	b := NewEngramBackend(cfg, NewInMemoryBackend())
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 
 	ctx := context.Background()
 	entry := &Memory{Content: "test fail-open", AppID: "a", UserID: "u"}
@@ -145,7 +145,7 @@ func TestEngramBackend_Stats_IncludesFallback(t *testing.T) {
 	cfg := EngramConfig{BaseURL: "http://127.0.0.1:1", Timeout: 200 * time.Millisecond, MaxRetries: 0}
 	fb := NewInMemoryBackend()
 	b := NewEngramBackend(cfg, fb)
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	ctx := context.Background()
 	_ = b.Store(ctx, &Memory{Content: "x", AppID: "a", UserID: "u"})
 	st := b.Stats()
@@ -162,7 +162,7 @@ func TestEngramBackend_Search_FailOpen(t *testing.T) {
 	cfg := EngramConfig{BaseURL: "http://127.0.0.1:1", Timeout: 200 * time.Millisecond, MaxRetries: 0}
 	fb := NewInMemoryBackend()
 	b := NewEngramBackend(cfg, fb)
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	ctx := context.Background()
 	_ = fb.Store(ctx, &Memory{Content: "alpha", AppID: "a", UserID: "u"})
 	_ = fb.Store(ctx, &Memory{Content: "alphabet", AppID: "a", UserID: "u"})

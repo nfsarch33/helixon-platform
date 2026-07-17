@@ -67,7 +67,7 @@ func TestDispatcherSend_RejectsNonCanonical(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"email_1"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	d := NewDispatcher(DispatcherConfig{
 		ResendClient: NewResendClient(ResendConfig{APIKey: "k", BaseURL: srv.URL}),
@@ -94,7 +94,7 @@ func TestDispatcherSend_AcceptsCanonical(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"email_1"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	d := NewDispatcher(DispatcherConfig{
 		ResendClient: NewResendClient(ResendConfig{APIKey: "k", BaseURL: srv.URL}),

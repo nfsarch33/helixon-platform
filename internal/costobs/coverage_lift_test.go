@@ -118,7 +118,7 @@ func TestOpenFile_MkdirParentOnDeepPath(t *testing.T) {
 	deep := filepath.Join(dir, "a", "b", "c", "sink.ndjson")
 	w, err := OpenFile(deep)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 	require.NoError(t, w.Write(Event{SchemaVersion: SchemaVersion, SprintID: "v17702", CellID: "C1", Model: "qwen36-27b-q4", Outcome: "ok"}))
 	st, err := os.Stat(deep)
 	require.NoError(t, err)

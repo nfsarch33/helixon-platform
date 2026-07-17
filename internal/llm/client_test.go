@@ -46,7 +46,7 @@ func TestComplete_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("Hello world", 10, 5))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{
 		BaseURL: srv.URL + "/v1",
@@ -75,7 +75,7 @@ func TestComplete_SystemAndUserMessages(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 5, 2))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "m"}, srv.Client())
 	_, err := client.Complete(context.Background(), CompletionRequest{
@@ -98,7 +98,7 @@ func TestComplete_BearerAuth(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{
 		BaseURL: srv.URL + "/v1",
@@ -119,7 +119,7 @@ func TestComplete_NoAuthWhenKeyEmpty(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "m"}, srv.Client())
 	_, err := client.Complete(context.Background(), CompletionRequest{
@@ -136,7 +136,7 @@ func TestComplete_TemperatureAndMaxTokens(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	temp := 0.7
 	maxTok := 256
@@ -165,7 +165,7 @@ func TestComplete_RateLimitRetry(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("finally", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "m"}, srv.Client())
 	// Override backoff for fast tests
@@ -184,7 +184,7 @@ func TestComplete_ServerError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error":"internal server error"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "m"}, srv.Client())
 	_, err := client.Complete(context.Background(), CompletionRequest{
@@ -202,7 +202,7 @@ func TestComplete_ContextCancellation(t *testing.T) {
 		time.Sleep(5 * time.Second)
 		w.Write(fakeCompletionResponse("late", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "m"}, srv.Client())
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -229,7 +229,7 @@ func TestComplete_InvalidJSON(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{invalid json`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "m"}, srv.Client())
 	_, err := client.Complete(context.Background(), CompletionRequest{
@@ -244,7 +244,7 @@ func TestComplete_UsageTracking(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("tracked", 42, 18))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "m"}, srv.Client())
 	resp, err := client.Complete(context.Background(), CompletionRequest{
@@ -263,7 +263,7 @@ func TestComplete_ModelFromConfig(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{
 		BaseURL: srv.URL + "/v1",
@@ -283,7 +283,7 @@ func TestComplete_ModelOverrideInRequest(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "default-model"}, srv.Client())
 	_, err := client.Complete(context.Background(), CompletionRequest{
@@ -301,7 +301,7 @@ func TestComplete_QwenModel_SendsThink(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "qwen3.5-27b"}, srv.Client())
 	_, err := client.Complete(context.Background(), CompletionRequest{
@@ -321,7 +321,7 @@ func TestComplete_OpenAIModel_OmitsThink(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "gpt-4.1-mini"}, srv.Client())
 	_, err := client.Complete(context.Background(), CompletionRequest{
@@ -340,7 +340,7 @@ func TestComplete_GPT5Model_UsesMaxCompletionTokens(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("ok", 1, 1))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	maxTok := 512
 	client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: "gpt-5.4"}, srv.Client())
@@ -379,7 +379,7 @@ func TestComplete_GPT5Model_ScalesTokenBudget(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write(fakeCompletionResponse("ok", 1, 1))
 			}))
-			defer srv.Close()
+			defer func() { srv.Close() }()
 
 			maxTok := tt.input
 			client := NewClientWithHTTP(Config{BaseURL: srv.URL + "/v1", Model: tt.model}, srv.Client())

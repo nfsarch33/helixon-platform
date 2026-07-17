@@ -52,7 +52,7 @@ func TestTelegram_Metrics_SuccessOn200(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":1}}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	reg := metrics.NewRegistry(nil)
 	c := New(Config{BotToken: "tok", BaseURL: srv.URL + "/bot"}).WithMetrics(reg)
 	if err := c.SendMessageTo(context.Background(), "123", "hi"); err != nil {
@@ -71,7 +71,7 @@ func TestTelegram_Metrics_BadRequestOn4xx(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"ok":false,"description":"bad chat id"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	reg := metrics.NewRegistry(nil)
 	c := New(Config{BotToken: "tok", BaseURL: srv.URL + "/bot"}).WithMetrics(reg)
 	err := c.SendMessageTo(context.Background(), "123", "hi")

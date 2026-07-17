@@ -29,7 +29,7 @@ func TestAgentMemory_RetrieveContext_WithResults(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{MaxResults: 5}, nil)
@@ -56,7 +56,7 @@ func TestAgentMemory_StoreConversationSummary(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"id": "new-1", "content": stored})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{}, nil)

@@ -21,7 +21,7 @@ func TestAgentraceEmit_AppendsLoopTripEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAgentraceEmitter: %v", err)
 	}
-	defer emit.Close()
+	defer func() { _ = emit.Close() }()
 
 	if err := emit.Emit(LoopTripEvent{
 		Tool:    "read_file",
@@ -62,7 +62,7 @@ func TestAgentraceEmit_ConcurrentSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAgentraceEmitter: %v", err)
 	}
-	defer emit.Close()
+	defer func() { _ = emit.Close() }()
 
 	var wg sync.WaitGroup
 	const N = 50

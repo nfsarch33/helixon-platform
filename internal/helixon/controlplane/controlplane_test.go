@@ -21,7 +21,7 @@ func TestA2AClientRegister(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&received)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewA2AClient(A2AConfig{
 		GatewayURL: srv.URL,
@@ -46,7 +46,7 @@ func TestA2AClientCompleteTask(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&received)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewA2AClient(A2AConfig{GatewayURL: srv.URL}, nil)
 	err := client.CompleteTask(context.Background(), TaskResult{
@@ -64,7 +64,7 @@ func TestA2AClientDeregister(t *testing.T) {
 		assert.Equal(t, "/api/v1/agents/deregister", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewA2AClient(A2AConfig{GatewayURL: srv.URL}, nil)
 	err := client.Deregister(context.Background(), "agent-001")
@@ -178,7 +178,7 @@ func TestSprintboardClientRegister(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&received)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{
 		BaseURL:      srv.URL,
@@ -205,7 +205,7 @@ func TestSprintboardClaimAndComplete(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{
 		BaseURL:   srv.URL,
@@ -229,7 +229,7 @@ func TestSprintboardSprintStatus(t *testing.T) {
 			"in_progress": 3,
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{BaseURL: srv.URL}, nil)
 	status, err := client.SprintStatus(context.Background(), "v7400")

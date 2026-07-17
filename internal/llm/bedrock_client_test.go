@@ -41,7 +41,7 @@ func TestBedrockClient_Complete_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeBedrockResponse("Hello from Claude!", 15, 8))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewBedrockClientWithHTTP(BedrockConfig{
 		BaseURL: srv.URL + "/bedrock",
@@ -78,7 +78,7 @@ func TestBedrockClient_Complete_MapsUsage(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeBedrockResponse("tracked", 42, 18))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewBedrockClientWithHTTP(BedrockConfig{
 		BaseURL: srv.URL + "/bedrock",

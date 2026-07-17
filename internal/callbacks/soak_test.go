@@ -28,7 +28,7 @@ func TestSoak_MultiHandler_24hCompressed(t *testing.T) {
 
 	ndjsonH, err := callbacks.NewNDJSONHandler(ndjsonPath)
 	require.NoError(t, err)
-	defer ndjsonH.Close()
+	defer func() { _ = ndjsonH.Close() }()
 
 	reg := prometheus.NewRegistry()
 	promH := callbacks.NewPrometheusHandler(reg)
@@ -54,7 +54,7 @@ func TestSoak_MultiHandler_24hCompressed(t *testing.T) {
 		}
 	}
 
-	ndjsonH.Close()
+	_ = ndjsonH.Close()
 
 	stat, err := os.Stat(ndjsonPath)
 	require.NoError(t, err)

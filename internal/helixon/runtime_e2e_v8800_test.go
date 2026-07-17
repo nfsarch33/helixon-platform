@@ -79,7 +79,7 @@ func TestRuntime_MCPStdio_E2E(t *testing.T) {
 	callLine, _ := json.Marshal(channel.MCPRequest{JSONRPC: "2.0", Method: "tools/call", ID: 2, Params: callParams})
 
 	go func() {
-		defer pw.Close()
+		defer func() { _ = pw.Close() }()
 		_, _ = pw.Write(append(listLine, '\n'))
 		_, _ = pw.Write(append(callLine, '\n'))
 	}()

@@ -180,7 +180,7 @@ func TestAgentMaxIterations(t *testing.T) {
 	dsn := filepath.Join(t.TempDir(), "test.db")
 	store, err := NewSessionStore(context.Background(), dsn)
 	require.NoError(t, err)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	agent := New(provider, tools, store, Config{
 		MaxIterations: 3,
@@ -218,7 +218,7 @@ func TestAgentBudgetExhaust(t *testing.T) {
 	dsn := filepath.Join(t.TempDir(), "test.db")
 	store, err := NewSessionStore(context.Background(), dsn)
 	require.NoError(t, err)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	agent := New(provider, tools, store, Config{
 		MaxIterations: 20,

@@ -19,7 +19,7 @@ func TestVLLMProviderE2E(t *testing.T) {
 	if err != nil || resp.StatusCode != 200 {
 		t.Skipf("vLLM not available at %s (err=%v)", baseURL, err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	cfg := helixon.ProviderConfig{
 		Kind:    "openai-compat",

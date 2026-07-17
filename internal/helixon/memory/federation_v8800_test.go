@@ -92,12 +92,12 @@ func newEngramServerEcho(t *testing.T) (*httptest.Server, *EngramClient) {
 
 func TestHybridSearcher_FederatedSearch_MergesAllThreeSources(t *testing.T) {
 	srv, engram := newEngramServerEcho(t)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	dbPath := filepath.Join(t.TempDir(), "fed.db")
 	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mem0 := &stubMem0{
 		results: []Mem0Result{
@@ -134,7 +134,7 @@ func TestHybridSearcher_FederatedSearch_MergesAllThreeSources(t *testing.T) {
 
 func TestHybridSearcher_FederatedSearch_Mem0FailureNonFatal(t *testing.T) {
 	srv, engram := newEngramServerEcho(t)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	mem0 := &stubMem0{searchErr: errors.New("mem0 down")}
 
@@ -148,12 +148,12 @@ func TestHybridSearcher_FederatedSearch_Mem0FailureNonFatal(t *testing.T) {
 
 func TestHybridSearcher_FederatedWrite_Mem0Mirror(t *testing.T) {
 	srv, engram := newEngramServerEcho(t)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	dbPath := filepath.Join(t.TempDir(), "fed-write.db")
 	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mem0 := &stubMem0{}
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)
@@ -171,7 +171,7 @@ func TestHybridSearcher_FederatedWrite_Mem0Mirror(t *testing.T) {
 
 func TestHybridSearcher_FederatedWrite_Mem0FailureNonFatal(t *testing.T) {
 	srv, engram := newEngramServerEcho(t)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	mem0 := &stubMem0{addErr: errors.New("mem0 add boom")}
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{}, nil)
@@ -207,7 +207,7 @@ func TestMem0HTTPClient_Adapter(t *testing.T) {
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewMem0HTTPClient(Mem0HTTPConfig{
 		BaseURL: srv.URL,
@@ -226,7 +226,7 @@ func TestMem0HTTPClient_Adapter(t *testing.T) {
 
 // readAllBody is a tiny helper to keep the test file standalone.
 func readAllBody(r *http.Request) ([]byte, error) {
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	buf := new(bytes.Buffer)
 	_, err := buf.ReadFrom(r.Body)
 	return buf.Bytes(), err

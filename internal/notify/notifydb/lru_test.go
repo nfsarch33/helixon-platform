@@ -21,7 +21,7 @@ func TestKeyUsage_RecordAndList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 	now := time.Now().Unix()
@@ -56,7 +56,7 @@ func TestKeyUsage_Upsert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 	now := time.Now().Unix()
@@ -111,7 +111,7 @@ func TestKeyUsage_ListKeyUses_EmptyVendor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	got, err := db.ListKeyUses(context.Background(), "neverused")
 	if err != nil {

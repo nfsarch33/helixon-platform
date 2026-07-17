@@ -34,7 +34,7 @@ func TestStreamComplete_ContentChunks(t *testing.T) {
 		fmt.Fprint(w, "data: [DONE]\n\n")
 		flusher.Flush()
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClient(Config{BaseURL: srv.URL, Model: "test-model"})
 
@@ -74,7 +74,7 @@ func TestStreamComplete_ToolCalls(t *testing.T) {
 		fmt.Fprint(w, "data: [DONE]\n\n")
 		flusher.Flush()
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClient(Config{BaseURL: srv.URL, Model: "test-model"})
 
@@ -96,7 +96,7 @@ func TestStreamComplete_ErrorResponse(t *testing.T) {
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = w.Write([]byte(`{"error":"rate limited"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewClient(Config{BaseURL: srv.URL, Model: "test-model"})
 

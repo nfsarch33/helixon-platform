@@ -275,7 +275,7 @@ func TestRotatingSender_EndToEnd_WithHTTPServer(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"x"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	db := openTestDB(t)
 	c1 := NewResendClient(ResendConfig{APIKey: "k", BaseURL: srv.URL})

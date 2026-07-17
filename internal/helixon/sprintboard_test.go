@@ -23,7 +23,7 @@ func TestSprintboardClient_Register_Success(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&received)
 		w.WriteHeader(http.StatusCreated)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{
 		BaseURL: srv.URL,
@@ -46,7 +46,7 @@ func TestSprintboardClient_Register_ServerError(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte(`{"error":"maintenance"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{BaseURL: srv.URL})
 	err := client.Register(context.Background(), "test")
@@ -66,7 +66,7 @@ func TestSprintboardClient_Heartbeat_Success(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&received)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{BaseURL: srv.URL})
 	err := client.Heartbeat(context.Background(), "agent-beta")
@@ -88,7 +88,7 @@ func TestSprintboardClient_Heartbeat_Timeout(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{
 		BaseURL: srv.URL,
@@ -113,7 +113,7 @@ func TestSprintboardClient_ClaimTicket_Success(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"claimed":true}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{BaseURL: srv.URL})
 	err := client.ClaimTicket(context.Background(), "T-8001", "agent-gamma")
@@ -135,7 +135,7 @@ func TestSprintboardClient_ClaimTicket_AlreadyClaimed(t *testing.T) {
 		w.WriteHeader(http.StatusConflict)
 		w.Write([]byte(`{"error":"ticket already claimed by agent-delta"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client := NewSprintboardClient(SprintboardConfig{BaseURL: srv.URL})
 	err := client.ClaimTicket(context.Background(), "T-8001", "agent-gamma")

@@ -142,7 +142,7 @@ func TestHybridSearcher_EndToEndWriteSearch(t *testing.T) {
 
 	stub := newEngramStub()
 	srv := httptest.NewServer(stub.handler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	db := openTempSQLite(t)
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
@@ -195,7 +195,7 @@ func TestHybridSearcher_CanonicalAsymmetry(t *testing.T) {
 
 	stub := newEngramStub()
 	srv := httptest.NewServer(stub.handler())
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	db := openTempSQLite(t)
 	// Configure retries=0 so a single 500 fails the canonical write.

@@ -32,7 +32,7 @@ func TestMem0Handler_OnEnd_WritesCapsule(t *testing.T) {
 		w.WriteHeader(200)
 		w.Write([]byte(`{"results": [{"id": "test"}]}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	h := callbacks.NewMem0Handler(callbacks.Mem0Config{
 		BaseURL:   srv.URL,
@@ -82,7 +82,7 @@ func TestMem0Handler_OnError_WritesCapsule(t *testing.T) {
 		mu.Unlock()
 		w.WriteHeader(200)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	h := callbacks.NewMem0Handler(callbacks.Mem0Config{
 		BaseURL:   srv.URL,
@@ -113,7 +113,7 @@ func TestMem0Handler_OnStart_NoOp(t *testing.T) {
 		requestCount++
 		w.WriteHeader(200)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	h := callbacks.NewMem0Handler(callbacks.Mem0Config{BaseURL: srv.URL})
 	info := &callbacks.RunInfo{ComponentName: "test", RunID: "noop"}
@@ -136,7 +136,7 @@ func TestMem0Handler_NamespaceKey_Format(t *testing.T) {
 		mu.Unlock()
 		w.WriteHeader(200)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	h := callbacks.NewMem0Handler(callbacks.Mem0Config{
 		BaseURL:   srv.URL,
@@ -175,7 +175,7 @@ func TestMem0Handler_DefaultNamespace(t *testing.T) {
 		mu.Unlock()
 		w.WriteHeader(200)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	h := callbacks.NewMem0Handler(callbacks.Mem0Config{
 		BaseURL: srv.URL,

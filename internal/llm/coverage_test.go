@@ -41,7 +41,7 @@ func TestOllamaClient_Complete_Success(t *testing.T) {
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -74,7 +74,7 @@ func TestOllamaClient_Complete_ModelOverride(t *testing.T) {
 		resp := ollamaChatResponse{Message: Message{Role: "assistant", Content: "ok"}, Done: true}
 		json.NewEncoder(w).Encode(resp)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -97,7 +97,7 @@ func TestOllamaClient_Complete_DisableThinking(t *testing.T) {
 		resp := ollamaChatResponse{Message: Message{Role: "assistant", Content: "ok"}, Done: true}
 		json.NewEncoder(w).Encode(resp)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -125,7 +125,7 @@ func TestOllamaClient_Complete_TemperatureAndMaxTokens(t *testing.T) {
 		resp := ollamaChatResponse{Message: Message{Role: "assistant", Content: "ok"}, Done: true}
 		json.NewEncoder(w).Encode(resp)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -143,7 +143,7 @@ func TestOllamaClient_Complete_ServerError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal error"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -161,7 +161,7 @@ func TestOllamaClient_Complete_InvalidJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("not json"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -177,7 +177,7 @@ func TestOllamaClient_Complete_ContextCancelled(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(5 * time.Second)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -199,7 +199,7 @@ func TestOllamaClient_Complete_WithReasoning(t *testing.T) {
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewOllamaClient(Config{BaseURL: srv.URL, Model: "qwen3"})
 	c.httpClient = srv.Client()
@@ -230,7 +230,7 @@ func TestClient_DisableThinking(t *testing.T) {
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewClient(Config{BaseURL: srv.URL, Model: "qwen3.5-test"})
 	c.httpClient = srv.Client()
@@ -247,7 +247,7 @@ func TestClient_ResponseOversized(t *testing.T) {
 		big := bytes.Repeat([]byte("x"), maxResponseSize+100)
 		w.Write(big)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := NewClient(Config{BaseURL: srv.URL, Model: "test"})
 	c.httpClient = srv.Client()

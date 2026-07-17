@@ -352,12 +352,12 @@ func TestHandlerHTTPSubmit(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	body := `{"agent_name":"http-agent","prompt":"do it"}`
 	resp, err := http.Post(srv.URL+"/api/v1/fleet/tasks", "application/json", strings.NewReader(body))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
 
 	var result map[string]string
@@ -383,11 +383,11 @@ func TestHandlerHTTPGetTask(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Get(srv.URL + "/api/v1/fleet/tasks/" + taskID)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var rec TaskRecord
@@ -401,11 +401,11 @@ func TestHandlerHTTPGetTaskNotFound(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Get(srv.URL + "/api/v1/fleet/tasks/nonexistent")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
@@ -430,11 +430,11 @@ func TestHandlerHTTPListTasks(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Get(srv.URL + "/api/v1/fleet/tasks")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var tasks []TaskRecord
@@ -447,11 +447,11 @@ func TestHandlerHTTPSubmitBadBody(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Post(srv.URL+"/api/v1/fleet/tasks", "application/json", strings.NewReader("{invalid"))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
@@ -460,12 +460,12 @@ func TestHandlerHTTPSubmitNoPrompt(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resp, err := http.Post(srv.URL+"/api/v1/fleet/tasks", "application/json",
 		strings.NewReader(`{"agent_name":"a"}`))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 

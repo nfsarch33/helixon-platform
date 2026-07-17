@@ -42,7 +42,7 @@ func TestNewFromOpWithResolver_ResolvesAndReturnsClient(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`"` + wantURL + `"`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, wantURL)
 	cl, err := NewFromOpWithResolver(context.Background(), resolver, "")
@@ -68,7 +68,7 @@ func TestNewFromOpWithResolver_ChannelOverride(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`"` + wantURL + `"`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, wantURL)
 	cl, err := NewFromOpWithResolver(context.Background(), resolver, "#fleet-critical")
@@ -89,7 +89,7 @@ func TestNewFromOpWithResolver_RejectsBadURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`"` + bad + `"`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, bad)
 	_, err := NewFromOpWithResolver(context.Background(), resolver, "")
@@ -110,7 +110,7 @@ func TestNewFromOpWithResolver_VaultErrorIsTransient(t *testing.T) {
 		calls.Add(1)
 		http.Error(w, "vault unreachable", http.StatusInternalServerError)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, "")
 	_, err := NewFromOpWithResolver(context.Background(), resolver, "")

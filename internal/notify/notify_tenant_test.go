@@ -53,7 +53,7 @@ func TestDispatcher_TenantIDFromContext(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"test"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	d := newTestDispatcher(srv.URL)
 
@@ -93,7 +93,7 @@ func TestDispatcher_TenantIDFieldFallback(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"test"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	d := newTestDispatcher(srv.URL)
 
@@ -130,7 +130,7 @@ func TestDispatcher_TenantIDDefaultWhenUnset(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"test"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	d := newTestDispatcher(srv.URL)
 
@@ -165,7 +165,7 @@ func TestDispatcher_TenantIDFromEnvVar(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"test"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	d := newTestDispatcher(srv.URL)
 

@@ -38,13 +38,13 @@ func newProbeServer(gate ReadinessGate) *httptest.Server {
 func TestHealthzEndpoint(t *testing.T) {
 	t.Parallel()
 	ts := newProbeServer(nil)
-	defer ts.Close()
+	defer func() { ts.Close() }()
 
 	resp, err := http.Get(ts.URL + "/healthz")
 	if err != nil {
 		t.Fatalf("GET /healthz: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status: want 200, got %d", resp.StatusCode)
 	}
@@ -54,13 +54,13 @@ func TestReadyzEndpointReady(t *testing.T) {
 	t.Parallel()
 	gate := stubReadinessGate{ready: true, why: "all dependencies healthy"}
 	ts := newProbeServer(gate)
-	defer ts.Close()
+	defer func() { ts.Close() }()
 
 	resp, err := http.Get(ts.URL + "/readyz")
 	if err != nil {
 		t.Fatalf("GET /readyz: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("ready gate should be 200, got %d", resp.StatusCode)
 	}
@@ -70,13 +70,13 @@ func TestReadyzEndpointNotReady(t *testing.T) {
 	t.Parallel()
 	gate := stubReadinessGate{ready: false, why: "sprintboard URL not reachable"}
 	ts := newProbeServer(gate)
-	defer ts.Close()
+	defer func() { ts.Close() }()
 
 	resp, err := http.Get(ts.URL + "/readyz")
 	if err != nil {
 		t.Fatalf("GET /readyz: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("not-ready gate should be 503, got %d", resp.StatusCode)
 	}
@@ -85,13 +85,13 @@ func TestReadyzEndpointNotReady(t *testing.T) {
 func TestMetricsEndpoint(t *testing.T) {
 	t.Parallel()
 	ts := newProbeServer(nil)
-	defer ts.Close()
+	defer func() { ts.Close() }()
 
 	resp, err := http.Get(ts.URL + "/metrics")
 	if err != nil {
 		t.Fatalf("GET /metrics: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status: want 200, got %d", resp.StatusCode)
 	}
@@ -107,19 +107,19 @@ func TestMetricsEndpointRegistersPromHandler(t *testing.T) {
 	srv := NewServer(cfg, echoMsgHandler)
 	mux := srv.Routes()
 	muxServer := httptest.NewServer(mux)
-	defer muxServer.Close()
+	defer func() { muxServer.Close() }()
 
 	resp, err := http.Get(muxServer.URL + "/healthz")
 	if err != nil {
 		t.Fatalf("GET /healthz: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	metricsResp, err := http.Get(muxServer.URL + "/metrics")
 	if err != nil {
 		t.Fatalf("GET /metrics: %v", err)
 	}
-	defer metricsResp.Body.Close()
+	defer func() { _ = metricsResp.Body.Close() }()
 	if metricsResp.StatusCode != http.StatusOK {
 		t.Errorf("metrics status: want 200, got %d", metricsResp.StatusCode)
 	}

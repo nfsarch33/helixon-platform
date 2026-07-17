@@ -97,7 +97,7 @@ func TestSendSlack_LiveServer(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 	d := New(Config{}) // starts empty
 	// Inject a Slack client pointed at the test server. baseURL is the test
 	// hook documented in internal/notify/slack/slack.go.
@@ -114,7 +114,7 @@ func TestSendAll_BothConfigured(t *testing.T) {
 	slackSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer slackSrv.Close()
+	defer func() { slackSrv.Close() }()
 	d := New(Config{}) // starts empty
 	d.slack = slack.New(slack.Config{
 		WebhookURL: "https://hooks.slack.com/services/T/B/X",

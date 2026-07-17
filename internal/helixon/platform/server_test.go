@@ -162,7 +162,7 @@ func TestPlatformServer_Listen_v8900(t *testing.T) {
 	if err != nil {
 		t.Fatalf("healthz GET: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		t.Fatalf("healthz: %d", resp.StatusCode)
 	}
@@ -227,7 +227,7 @@ func TestPlatformServer_StreamContextCancellation_v12022(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err == nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	time.Sleep(50 * time.Millisecond)

@@ -24,7 +24,7 @@ func TestSprintProgressFetcher_WithTickets(t *testing.T) {
 			},
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewSprintProgressFetcher(srv.URL)
 	resp, err := fetcher.Fetch(context.Background())
@@ -61,7 +61,7 @@ func TestSprintProgressFetcher_WithCounts(t *testing.T) {
 			"done":  7,
 		})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewSprintProgressFetcher(srv.URL)
 	resp, err := fetcher.Fetch(context.Background())
@@ -85,7 +85,7 @@ func TestSprintProgressFetcher_ServerError(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("no active sprint"))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	fetcher := NewSprintProgressFetcher(srv.URL)
 	_, err := fetcher.Fetch(context.Background())
@@ -99,7 +99,7 @@ func TestSprintProgressHandler_GET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"id": "s1", "total": 5, "done": 3})
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	handler := SprintProgressHandler(NewSprintProgressFetcher(srv.URL))
 	rec := httptest.NewRecorder()

@@ -61,7 +61,7 @@ func TestResend_SuccessFirstAttempt(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"abc-123"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey:    "re_test_xyz",
@@ -101,7 +101,7 @@ func TestResend_ResendFreeTierCollapsesCCIntoTo(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"x"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey:    "re_x",
@@ -145,7 +145,7 @@ func TestResend_4xxFailsFastNoRetry(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"error":"bad api key"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey:    "re_invalid",
@@ -185,7 +185,7 @@ func TestResend_5xxRetriesExponentialBackoffMax3(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"recovered"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey:    "re_test",
@@ -223,7 +223,7 @@ func TestResend_5xxExhaustedMaxAttemptsReturnsTransientError(t *testing.T) {
 		atomic.AddInt32(&hit, 1)
 		w.WriteHeader(http.StatusBadGateway)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey:    "re_test",
@@ -258,7 +258,7 @@ func TestResend_IdempotencyDedup(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"x"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey:    "re_test",
@@ -299,7 +299,7 @@ func TestResend_NeverLogsAPIKey(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = io.WriteString(w, "Forbidden: re_secret_DO_NOT_LOG")
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey:    "re_secret_DO_NOT_LOG",
@@ -334,7 +334,7 @@ func TestBrevo_SuccessFirstAttempt(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"messageId":"<abc@gmail.com>"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewBrevoClient(notify.BrevoConfig{
 		APIKey:    "xkeysib-test",
@@ -366,7 +366,7 @@ func TestBrevo_4xxFailFast(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"code":"invalid_parameter","message":"bad"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewBrevoClient(notify.BrevoConfig{
 		APIKey:    "xkeysib-bad",
@@ -402,13 +402,13 @@ func TestDispatcher_RoundRobin(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"r"}`))
 	}))
-	defer resend.Close()
+	defer func() { resend.Close() }()
 	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&bHits, 1)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"messageId":"b"}`))
 	}))
-	defer brevo.Close()
+	defer func() { brevo.Close() }()
 
 	meter := noop.NewMeterProvider().Meter("test")
 	disp := notify.NewDispatcher(notify.DispatcherConfig{
@@ -452,13 +452,13 @@ func TestDispatcher_BrevoOnly_RoutesOnlyToBrevo(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"r"}`))
 	}))
-	defer resend.Close()
+	defer func() { resend.Close() }()
 	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&bHits, 1)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"messageId":"b"}`))
 	}))
-	defer brevo.Close()
+	defer func() { brevo.Close() }()
 
 	meter := noop.NewMeterProvider().Meter("test")
 	disp := notify.NewDispatcher(notify.DispatcherConfig{
@@ -498,13 +498,13 @@ func TestDispatcher_FallbackToBrevoOnResendExhaustion(t *testing.T) {
 		atomic.AddInt32(&rHits, 1)
 		w.WriteHeader(http.StatusBadGateway)
 	}))
-	defer resend.Close()
+	defer func() { resend.Close() }()
 	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&bHits, 1)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"messageId":"fb"}`))
 	}))
-	defer brevo.Close()
+	defer func() { brevo.Close() }()
 
 	meter := noop.NewMeterProvider().Meter("test")
 	disp := notify.NewDispatcher(notify.DispatcherConfig{
@@ -561,13 +561,13 @@ func TestResend_AuditDB_RecordsSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"ok-1"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey: "re_test", BaseURL: srv.URL, FromAddr: "ops@cylrl.com.au",
@@ -602,13 +602,13 @@ func TestResend_AuditDB_RecordsError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"bad input"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey: "re_test", BaseURL: srv.URL, FromAddr: "ops@cylrl.com.au",
@@ -639,13 +639,13 @@ func TestResend_AuditDB_RecordsError(t *testing.T) {
 func TestBrevo_AuditDB_RecordsSuccess(t *testing.T) {
 	dir := t.TempDir()
 	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"messageId":"brevo-1"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewBrevoClient(notify.BrevoConfig{
 		APIKey: "xkeysib-test", BaseURL: srv.URL,
@@ -670,13 +670,13 @@ func TestBrevo_AuditDB_RecordsSuccess(t *testing.T) {
 func TestResend_AuditDB_RecordsDeadLetter(t *testing.T) {
 	dir := t.TempDir()
 	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"oops"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c := notify.NewResendClient(notify.ResendConfig{
 		APIKey: "re_test", BaseURL: srv.URL, FromAddr: "ops@cylrl.com.au",
@@ -706,7 +706,7 @@ func TestResend_AuditDB_InsertIsIdempotent(t *testing.T) {
 	// duplicate idempotency keys before they ever reach the audit path.
 	dir := t.TempDir()
 	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	row := notifydb.Dispatch{
 		ID: "shared-key", Vendor: "resend", Status: "ok", CreatedUnix: 1,

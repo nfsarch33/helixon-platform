@@ -35,7 +35,7 @@ func TestMountAll_RegistersAllRoutes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: GET error %v", path, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		// We accept 200 OR an upstream-network error JSON; the goal
 		// of this test is route registration, not endpoint success.
 		// A 404 here would mean the route is missing — that's a fail.
@@ -63,7 +63,7 @@ func TestMountAll_NilMuxIgnoresRuntimeAndConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("dashboard status=%d want 200", resp.StatusCode)
 	}

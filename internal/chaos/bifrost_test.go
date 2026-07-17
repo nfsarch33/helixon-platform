@@ -104,7 +104,7 @@ func RunRandomVendorFailure(ctx context.Context, t *testing.T) error {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"msg-ok"}`))
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	// Hit the server up to 5 times; should recover within 5 calls.
 	for i := 0; i < 5; i++ {
@@ -112,7 +112,7 @@ func RunRandomVendorFailure(ctx context.Context, t *testing.T) error {
 		if err != nil {
 			return fmt.Errorf("chaos: get failed: %w", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode == 200 {
 			return nil
 		}
@@ -132,7 +132,7 @@ func RunSlowVendor(ctx context.Context, t *testing.T) error {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	// Hit with a 1s context; expect failure (slow vendor).
 	shortCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -140,7 +140,7 @@ func RunSlowVendor(ctx context.Context, t *testing.T) error {
 	req, _ := http.NewRequestWithContext(shortCtx, "GET", srv.URL, nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err == nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return fmt.Errorf("chaos: expected slow vendor to time out; got %d", resp.StatusCode)
 	}
 	return nil // timeout error is the expected outcome
@@ -158,14 +158,14 @@ func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	// First call: 200 OK
 	resp, err := http.Get(srv.URL)
 	if err != nil {
 		return fmt.Errorf("chaos: get failed: %w", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("chaos: expected 200 on 1st call; got %d", resp.StatusCode)
 	}
@@ -175,7 +175,7 @@ func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
 	if err != nil {
 		return fmt.Errorf("chaos: get failed: %w", err)
 	}
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != 400 {
 		return fmt.Errorf("chaos: expected 400 (intermittent 4xx on 2nd call); got %d", resp2.StatusCode)
 	}
@@ -192,14 +192,14 @@ func RunFullOutage(ctx context.Context, t *testing.T) error {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	for i := 0; i < 3; i++ {
 		resp, err := http.Get(srv.URL)
 		if err != nil {
 			return fmt.Errorf("chaos: get failed: %w", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode < 500 {
 			return fmt.Errorf("chaos: expected 5xx; got %d", resp.StatusCode)
 		}

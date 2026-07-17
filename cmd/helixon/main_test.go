@@ -290,7 +290,7 @@ func TestPlatform_ExposesHealthzAndReadyz_v14509(t *testing.T) {
 	if healthErr != nil {
 		t.Fatalf("GET /healthz never succeeded within 3 s: %v", healthErr)
 	}
-	defer healthResp.Body.Close()
+	defer func() { _ = healthResp.Body.Close() }()
 	if healthResp.StatusCode != http.StatusOK {
 		t.Fatalf("/healthz status=%d want 200", healthResp.StatusCode)
 	}
@@ -306,7 +306,7 @@ func TestPlatform_ExposesHealthzAndReadyz_v14509(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /readyz: %v", err)
 	}
-	defer readyResp.Body.Close()
+	defer func() { _ = readyResp.Body.Close() }()
 	if readyResp.StatusCode != http.StatusOK {
 		t.Fatalf("/readyz status=%d want 200", readyResp.StatusCode)
 	}

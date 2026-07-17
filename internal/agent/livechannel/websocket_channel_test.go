@@ -38,13 +38,13 @@ func dial(t *testing.T, url string) (*websocket.Conn, *http.Response) {
 
 func TestChannel_PublishAndReceive(t *testing.T) {
 	ch := NewChannel(ChannelConfig{ChannelBuffer: 16})
-	defer ch.Close()
+	defer func() { ch.Close() }()
 
 	srv, wsURL := newTestServer(t, ch)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	client, _ := dial(t, wsURL)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Publish an event from the server side.
 	ch.Publish(Event{
@@ -74,14 +74,14 @@ func TestChannel_PublishAndReceive(t *testing.T) {
 
 func TestChannel_MultipleSubscribers(t *testing.T) {
 	ch := NewChannel(ChannelConfig{ChannelBuffer: 8})
-	defer ch.Close()
+	defer func() { ch.Close() }()
 	srv, wsURL := newTestServer(t, ch)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c1, _ := dial(t, wsURL)
-	defer c1.Close()
+	defer func() { _ = c1.Close() }()
 	c2, _ := dial(t, wsURL)
-	defer c2.Close()
+	defer func() { _ = c2.Close() }()
 
 	// Wait for both clients to register as subscribers.
 	ch.WaitForSubscribers(2, 2*time.Second)
@@ -106,7 +106,7 @@ func TestChannel_MultipleSubscribers(t *testing.T) {
 
 func TestChannel_PublishNoSubscribers(t *testing.T) {
 	ch := NewChannel(ChannelConfig{ChannelBuffer: 4})
-	defer ch.Close()
+	defer func() { ch.Close() }()
 
 	// Publish with no subscribers; should not block or panic.
 	done := make(chan struct{})
@@ -126,7 +126,7 @@ func TestChannel_CloseUnsubscribes(t *testing.T) {
 	srv, wsURL := newTestServer(t, ch)
 
 	c, _ := dial(t, wsURL)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	ch.WaitForSubscribers(1, 2*time.Second)
 	ch.Close()
@@ -156,9 +156,9 @@ func TestChannel_AuthToken(t *testing.T) {
 		ChannelBuffer: 4,
 		AuthToken:     "secret-token",
 	})
-	defer ch.Close()
+	defer func() { ch.Close() }()
 	srv, _ := newTestServer(t, ch)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	d := websocket.Dialer{HandshakeTimeout: 2 * time.Second}
 	// Without token: should fail handshake.
@@ -190,7 +190,7 @@ func wsURLHelper(srv *httptest.Server) string {
 
 func TestChannel_AuthNoTokenRequired(t *testing.T) {
 	ch := NewChannel(ChannelConfig{ChannelBuffer: 4})
-	defer ch.Close()
+	defer func() { ch.Close() }()
 	// Without AuthToken set, any token passes (or empty).
 	if !ch.ValidateToken("") {
 		t.Errorf("expected empty token to pass when AuthToken is unset")
@@ -217,12 +217,12 @@ func TestEvent_Types(t *testing.T) {
 
 func TestChannel_ConcurrentPublishers(t *testing.T) {
 	ch := NewChannel(ChannelConfig{ChannelBuffer: 256})
-	defer ch.Close()
+	defer func() { ch.Close() }()
 	srv, wsURL := newTestServer(t, ch)
-	defer srv.Close()
+	defer func() { srv.Close() }()
 
 	c, _ := dial(t, wsURL)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ch.WaitForSubscribers(1, 2*time.Second)
 
 	const goroutines = 8

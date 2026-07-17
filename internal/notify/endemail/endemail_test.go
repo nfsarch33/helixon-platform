@@ -64,7 +64,7 @@ func TestRenderAndAudit_WritesRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	tmpl := endemail.Template{
 		Plan:         "v17401-v17500",
@@ -103,7 +103,7 @@ func TestRenderAndAudit_NilDBSkipsAudit(t *testing.T) {
 func TestRenderAndAudit_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	tmpl := endemail.Template{IdempKey: "dup-1", Subject: "s", BodyMarkdown: "y"}
 	for i := 0; i < 3; i++ {
