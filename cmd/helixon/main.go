@@ -479,8 +479,6 @@ func newMemoryBackendCmd() *cobra.Command {
 // InMemoryBackend is always the local fail-open; the EngramBackend
 // is added when HELIXON_ENGRAM_URL is set. Tests override via
 // SetDefaultMemoryBackend.
-var defaultMemoryBackendFn = defaultMemoryBackend
-
 func defaultMemoryBackend() memory.Backend {
 	fb := memory.NewInMemoryBackend()
 	if url := os.Getenv("HELIXON_ENGRAM_URL"); url != "" {

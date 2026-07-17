@@ -16,7 +16,7 @@ import (
 func TestReport_SetEdgeResults_RendersSection(t *testing.T) {
 	reg := NewRegistry()
 	mustAdd(t, reg, Case{
-		ID: "multi-step coding::qwen3.7-plus",
+		ID:   "multi-step coding::qwen3.7-plus",
 		Task: "multi-step coding", Model: ModelQwen37Plus,
 		Score: 0.85,
 		RubricScores: map[string]float64{

@@ -29,7 +29,7 @@ func (f *fakeBrevoClient) Vendor() string { return "brevo" }
 type fakeResendClient struct{}
 
 func (f *fakeResendClient) Send(ctx context.Context, m Email) error { return nil }
-func (f *fakeResendClient) Vendor() string                         { return "resend" }
+func (f *fakeResendClient) Vendor() string                          { return "resend" }
 
 // newTestDB returns a fresh temp-file notifydb for tracker tests.
 // Temp file because notifydb.Open requires a path (no in-memory variant).

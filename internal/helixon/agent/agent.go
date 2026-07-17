@@ -251,7 +251,7 @@ func (a *Agent) recordAssistantTurn(ctx context.Context, sessionID string, choic
 //
 //	len(choice.Message.ToolCalls) == 0 -> final=true,  set FinalContent
 //	otherwise                            -> final=false, continue loop
-func finalizeRun(r *RunResult, content string, toolCallCount int) (bool, error) {
+func finalizeRun(r *RunResult, content string, toolCallCount int) (bool, error) { //nolint:unparam // error return reserved for tool-call dispatch failures
 	if toolCallCount == 0 {
 		r.FinalContent = content
 		return true, nil

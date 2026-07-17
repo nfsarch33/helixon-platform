@@ -295,6 +295,7 @@ func processSSEPayload(payload string, buf *strings.Builder, cb StreamCallback) 
 	var chunk StreamChunk
 	if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
 		// skip malformed chunk; do not abort the stream
+		//nolint:nilerr // intentional: malformed SSE is recoverable
 		return nil
 	}
 	for _, delta := range chunk.Choices {

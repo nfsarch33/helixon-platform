@@ -13,11 +13,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// upgrader is used to upgrade test HTTP requests to WebSocket.
-var testUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
-
 // newTestServer starts an HTTP test server with the channel handler mounted at
 // /agent/live. Returns the server URL (e.g. "ws://127.0.0.1:54321/agent/live").
 func newTestServer(t *testing.T, ch *Channel) (*httptest.Server, string) {
@@ -37,6 +32,7 @@ func dial(t *testing.T, url string) (*websocket.Conn, *http.Response) {
 	if err != nil {
 		t.Fatalf("dial %s: %v", url, err)
 	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
 	return conn, resp
 }
 

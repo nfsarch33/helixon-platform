@@ -295,7 +295,7 @@ var v18517EdgeTests = []string{
 // into a single FAIL row in the report (the contract documented on
 // EdgeTestEntry.Source). Currently the manifest lookup always
 // succeeds so the error is nil in practice.
-func runEdgeSuite(cmd *cobra.Command) (helixoneval.EdgeResults, error) {
+func runEdgeSuite(cmd *cobra.Command) (helixoneval.EdgeResults, error) { //nolint:unparam // error return reserved for future suite-level failures
 	out := cmd.OutOrStdout()
 	er := helixoneval.EdgeResults{
 		Total:   len(v18517EdgeTests),

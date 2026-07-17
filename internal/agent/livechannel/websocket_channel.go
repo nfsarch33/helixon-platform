@@ -71,7 +71,6 @@ type Subscriber struct {
 	id        int64
 	conn      *websocket.Conn
 	ch        chan Event
-	next      atomic.Int64
 	done      chan struct{}
 	closeOnce sync.Once
 }

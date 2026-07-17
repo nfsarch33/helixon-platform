@@ -42,18 +42,18 @@ func main() {
 // endEmailFlags holds parsed flags for the send-end-email command.
 // v17714-1: extracted from main() to keep the dispatcher ≤6.
 type endEmailFlags struct {
-	plan       string
-	subject    string
-	bodyFile   string
-	idemKey    string
-	jobID      string
-	resendKey  string
-	brevoKey   string
-	dryRun     bool
-	fromAddr   string
-	noCC       bool
-	auditDB    string
-	brevoOnly  bool // xcut-10 (v18518): CF-105 Resend domain unverified → Brevo only.
+	plan      string
+	subject   string
+	bodyFile  string
+	idemKey   string
+	jobID     string
+	resendKey string
+	brevoKey  string
+	dryRun    bool
+	fromAddr  string
+	noCC      bool
+	auditDB   string
+	brevoOnly bool // xcut-10 (v18518): CF-105 Resend domain unverified → Brevo only.
 }
 
 // endEmailOptions groups inputs for runSendEndEmailCmd.

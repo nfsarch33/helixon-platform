@@ -24,6 +24,7 @@ func (s *staticOpenAIDirectDoer) Do(req *http.Request) (*http.Response, error) {
 	s.lastReq = req
 	if req.Body != nil {
 		body, _ := io.ReadAll(req.Body)
+		_ = req.Body.Close()
 		s.lastBody = body
 	}
 	if s.err != nil {

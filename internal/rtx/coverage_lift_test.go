@@ -121,8 +121,7 @@ func TestLoadFromFile_InvalidJSONLineSkipped(t *testing.T) {
 	good := Record{Key: Key("p", "s"), Prompt: "p", StateHash: "s", Tier: Tier1, CellID: "c", Response: "r", CreatedAt: time.Now()}
 	gb, _ := json.Marshal(good)
 	contents := append(gb, '\n')
-	contents = append(contents, []byte("not-valid-json")...)
-	contents = append(contents, '\n')
+	contents = append(contents, []byte("not-valid-json\n")...)
 	if err := os.WriteFile(p, contents, 0o644); err != nil {
 		t.Fatal(err)
 	}

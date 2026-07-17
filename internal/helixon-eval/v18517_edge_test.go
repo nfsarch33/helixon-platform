@@ -6,14 +6,14 @@
 // report's robustness to malformed traces.
 //
 // The eight cases are:
-//   1. Conflict resolution: same ID, two different scores (Upsert wins)
-//   2. All rubrics missing on one model (skews model mean)
-//   3. Unknown model name not in canonical four (Skip silently)
-//   4. Empty taskID rejected by Run
-//   5. Empty models slice rejected by Run
-//   6. Concurrent Run (10 goroutines) — no panic, no duplicate IDs
-//   7. Very long TaskID (1024 char) accepted as-is, no truncation
-//   8. Negative-step / Inf-duration case passes through without panic
+//  1. Conflict resolution: same ID, two different scores (Upsert wins)
+//  2. All rubrics missing on one model (skews model mean)
+//  3. Unknown model name not in canonical four (Skip silently)
+//  4. Empty taskID rejected by Run
+//  5. Empty models slice rejected by Run
+//  6. Concurrent Run (10 goroutines) — no panic, no duplicate IDs
+//  7. Very long TaskID (1024 char) accepted as-is, no truncation
+//  8. Negative-step / Inf-duration case passes through without panic
 //
 // These tests follow the same TDD pattern as registry_test.go and
 // registry_edge_test.go.
@@ -80,7 +80,7 @@ func TestReport_Aggregate_ModelWithEmptyRubricPullsItsMeanToZero(t *testing.T) {
 	reg := NewRegistry()
 	// A canonical good case (score ~0.85)
 	mustAdd(t, reg, Case{
-		ID: "long-running context retention::qwen3.7-plus",
+		ID:   "long-running context retention::qwen3.7-plus",
 		Task: "long-running context retention", Model: ModelQwen37Plus,
 		Score: 0.85, Steps: 10, TerminationReason: "completed",
 		RubricScores: map[string]float64{
@@ -89,7 +89,7 @@ func TestReport_Aggregate_ModelWithEmptyRubricPullsItsMeanToZero(t *testing.T) {
 	})
 	// A broken case with empty rubric (score 0)
 	mustAdd(t, reg, Case{
-		ID: "loop termination — budget exhaustion::qwen3.7-max",
+		ID:   "loop termination — budget exhaustion::qwen3.7-max",
 		Task: "loop termination — budget exhaustion", Model: ModelQwen37Max,
 		Score: 0, Steps: 5, TerminationReason: "max_steps",
 		RubricScores: map[string]float64{},
@@ -163,10 +163,7 @@ func TestRun_UnknownModel_AcceptedBySynthSource_PinsBehaviour(t *testing.T) {
 	stored, ok := reg.Get(wantID)
 	if !ok {
 		// Diagnostic: dump what is actually in the registry
-		var seen []string
-		for _, id := range reg.IDs() {
-			seen = append(seen, id)
-		}
+		seen := reg.IDs()
 		t.Fatalf("want case retrievable under ID %q; registry has %v", wantID, seen)
 	}
 	if stored.Model != unknown {
@@ -289,7 +286,7 @@ func TestRun_VeryLongTaskID_AcceptedAsIs(t *testing.T) {
 func TestReport_DefensiveOnNegativeStepsAndInfDuration(t *testing.T) {
 	reg := NewRegistry()
 	mustAdd(t, reg, Case{
-		ID: "multi-step coding::qwen3.7-plus",
+		ID:   "multi-step coding::qwen3.7-plus",
 		Task: "multi-step coding", Model: ModelQwen37Plus,
 		Score: 0.7,
 		RubricScores: map[string]float64{

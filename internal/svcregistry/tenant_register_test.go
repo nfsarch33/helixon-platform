@@ -15,7 +15,7 @@ func newTestRegistry(t *testing.T) *svcregistry.Registry {
 	return svcregistry.New(filepath.Join(dir, "registry.json"))
 }
 
-func mkSvc(name string, port int, tenant string) svcregistry.Service {
+func mkSvc(name string, port int, tenant string) svcregistry.Service { //nolint:unparam // name kept for future per-test variants
 	return svcregistry.Service{
 		Name:     name,
 		Host:     "127.0.0.1",

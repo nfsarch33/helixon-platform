@@ -15,11 +15,11 @@ const retryBackoff = 100 * time.Millisecond
 
 // Evolver orchestrates one cycle: Source → Distill → Promote.
 type Evolver struct {
-	source    Source
-	distill   Distill
-	promote   Promote
-	maxRetry  int
-	dedupe    map[string]bool
+	source   Source
+	distill  Distill
+	promote  Promote
+	maxRetry int
+	dedupe   map[string]bool
 }
 
 // NewEvolver wires the three interfaces. Returns ErrNoSubsystems if

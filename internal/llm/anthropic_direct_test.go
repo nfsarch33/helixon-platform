@@ -11,6 +11,8 @@ import (
 )
 
 // anthropicMessagesRequest mirrors the Anthropic /v1/messages wire format.
+//
+//nolint:unused // documented wire-format reference
 type anthropicMessagesRequest struct {
 	Model     string    `json:"model"`
 	Messages  []Message `json:"messages"`
@@ -19,6 +21,8 @@ type anthropicMessagesRequest struct {
 }
 
 // anthropicMessagesResponse mirrors the Anthropic /v1/messages response.
+//
+//nolint:unused // documented wire-format reference
 type anthropicMessagesResponse struct {
 	ID      string `json:"id"`
 	Type    string `json:"type"`
@@ -45,6 +49,7 @@ func (s *staticAnthropicDirectDoer) Do(req *http.Request) (*http.Response, error
 	s.lastReq = req
 	if req.Body != nil {
 		body, _ := io.ReadAll(req.Body)
+		_ = req.Body.Close()
 		s.lastBody = body
 	}
 	if s.err != nil {

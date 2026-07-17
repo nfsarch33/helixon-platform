@@ -128,7 +128,7 @@ func (b *InMemoryBackend) Search(_ context.Context, query, appID, userID string,
 	q := strings.ToLower(query)
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	var out []SearchResult
+	out := make([]SearchResult, 0, len(b.entries))
 	for _, e := range b.entries {
 		if appID != "" && e.AppID != appID {
 			continue

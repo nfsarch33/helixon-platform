@@ -12,10 +12,16 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(2)
+	}
+}
+
+func run() error {
 	dir := filepath.Join(os.Getenv("HOME"), "logs", "runx")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
-		os.Exit(2)
+		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
 	path := notifydb.DefaultPath()
 	db, err := notifydb.Open(path, nil)
@@ -31,9 +37,9 @@ func main() {
 		{ID: "v18654-1-end", Vendor: "brevo", Recipient: "jaslian@gmail.com", Subject: "[END] v18654-1 s3 litestream", Status: "rendered", CreatedUnix: 1752748900, Attempt: 1},
 	} {
 		if err := db.Insert(ctx, r); err != nil {
-			fmt.Fprintf(os.Stderr, "insert %s: %v\n", r.ID, err)
-			os.Exit(2)
+			return fmt.Errorf("insert %s: %w", r.ID, err)
 		}
 		fmt.Printf("seeded %s -> %s\n", r.ID, path)
 	}
+	return nil
 }

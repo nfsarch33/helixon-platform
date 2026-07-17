@@ -230,6 +230,7 @@ func slugify(s string) string {
 	runes := []byte(s)
 	for i := 0; i < len(runes); i++ {
 		c := runes[i]
+		//nolint:exhaustive // runeOther is handled by the default branch below.
 		switch classifyRune(c) {
 		case runeUpper:
 			out, prevDash, prevWasLower = emitUpper(runes, i, out, prevDash, prevWasLower)

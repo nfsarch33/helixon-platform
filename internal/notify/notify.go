@@ -29,8 +29,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/nfsarch33/helixon-platform/internal/tenantid"
 	"time"
+
+	"github.com/nfsarch33/helixon-platform/internal/tenantid"
 
 	"github.com/nfsarch33/helixon-platform/internal/notify/metrics"
 	"github.com/nfsarch33/helixon-platform/internal/notify/notifydb"
