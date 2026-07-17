@@ -28,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/nfsarch33/helixon-platform/internal/tenantid"
 	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/notify/metrics"
@@ -595,6 +597,25 @@ func (d *Dispatcher) WithAuditDB(db *notifydb.DB) *Dispatcher {
 // back to the other vendor before propagating the failure. When a
 // Primary (e.g. RotatingSender) is configured, it is used directly and
 // the round-robin pick is skipped.
+// resolveTenantID derives the tenant id used for cost attribution and
+// audit logging. Per CF-172, the context takes precedence (per-job), the
+// Email.TenantID field is the secondary source (per-call), and the
+// `HELIXON_TENANT_ID` env var is the boot-time fallback. When none are
+// set, the result is "default" so a single-tenant deployment keeps
+// working without config.
+func resolveTenantID(ctx context.Context, m Email) string {
+	// 1. Per-request context (preferred).
+	if v := tenantid.TenantIDFrom(ctx); v != tenantid.DefaultTenantID {
+		return v
+	}
+	// 2. Per-call field on Email struct.
+	if m.TenantID != "" {
+		return m.TenantID
+	}
+	// 3. Boot-time env var.
+	return tenantid.EnvTenantID()
+}
+
 func (d *Dispatcher) Send(ctx context.Context, m Email) error {
 	if m.IdempotencyKey == "" {
 		return fmt.Errorf("%w: IdempotencyKey required", ErrPermanent)
@@ -603,6 +624,10 @@ func (d *Dispatcher) Send(ctx context.Context, m Email) error {
 	if err := ValidateRecipients(m.To); err != nil {
 		return err
 	}
+	// v18675-3 (CF-172): propagate tenant id from context with fallback to
+	// the Email.TenantID field. Single-tenant deployments keep working
+	// without config (env var or context).
+	m.TenantID = resolveTenantID(ctx, m)
 
 	// If a Primary is configured (RotatingSender), use it directly.
 	// xcut-10 (v18518): when BrevoOnly is set, skip Primary entirely

@@ -5,10 +5,13 @@
 package toolresult
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+
+	"github.com/nfsarch33/helixon-platform/internal/tenantid"
 )
 
 // Status is the outcome of a tool call.
@@ -29,6 +32,11 @@ type ToolResult struct {
 	IdempotencyKey string  `json:"idempotency_key"`
 	RetryCount     int     `json:"retry_count"`
 	Hash           string  `json:"hash,omitempty"`
+	// TenantID attributes the cost + audit event to a tenant. v18675-3 (CF-172)
+	// propagates tenant id from the per-job context (preferred) or the
+	// boot-time env var. When empty, downstream audit code treats the result
+	// as belonging to the "default" tenant.
+	TenantID string `json:"tenant_id,omitempty"`
 }
 
 // NewToolResult builds a ToolResult with a deterministic idempotency key
@@ -48,6 +56,32 @@ func NewToolResult(toolName, argsJSON string, status Status, output, errStr stri
 		IdempotencyKey: hex.EncodeToString(idemHash[:8]),
 		Hash:           hex.EncodeToString(contentHash[:8]),
 	}
+}
+
+// NewToolResultWithTenant is the v18675-3 (CF-172) entry point for
+// building a ToolResult with explicit tenant attribution. Callers SHOULD
+// prefer this helper when a tenant id is available from the request
+// context; downstream audit/cost code reads `TenantID` to attribute the
+// result. When tenantID is empty, the result is treated as belonging to
+// the "default" tenant (pre-multitenancy behaviour).
+func NewToolResultWithTenant(toolName, argsJSON string, status Status, output, errStr string, latencyMs int64, costUSD float64, tenantID string) ToolResult {
+	r := NewToolResult(toolName, argsJSON, status, output, errStr, latencyMs, costUSD)
+	r.TenantID = tenantID
+	return r
+}
+
+// ResolveTenantID returns the tenant id to attach to a ToolResult,
+// preferring the per-request context over the Email.TenantID-style
+// fallback. Centralised here so every tool executor uses the same
+// resolution rule.
+func ResolveTenantID(ctx context.Context, fallback string) string {
+	if v := tenantid.TenantIDFrom(ctx); v != tenantid.DefaultTenantID {
+		return v
+	}
+	if fallback != "" {
+		return fallback
+	}
+	return tenantid.EnvTenantID()
 }
 
 // Validate returns an error if the ToolResult is missing required fields.

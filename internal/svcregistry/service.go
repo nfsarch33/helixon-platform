@@ -10,7 +10,7 @@ import (
 // Service is a single registered entry. Field order matches the schema
 // agreed in the v16122-1 brief:
 //
-//	{name, host, port, protocol, owner, status, last_seen_iso, tailscale_ip}
+//	{name, host, port, protocol, owner, status, last_seen_iso, tailscale_ip, tenant_id}
 type Service struct {
 	Name        string `json:"name"`
 	Host        string `json:"host"`
@@ -20,6 +20,11 @@ type Service struct {
 	Status      string `json:"status"`        // "up" | "down" | "unknown"
 	LastSeenISO string `json:"last_seen_iso"` // RFC3339
 	TailscaleIP string `json:"tailscale_ip"`
+	// TenantID (v18675-3, CF-172) attributes the service registration to a
+	// tenant. Single-tenant deployments leave this empty and downstream
+	// cost code treats it as "default". Multi-tenant deployments pass the
+	// boot-time HELIXON_TENANT_ID env var or the per-request context value.
+	TenantID string `json:"tenant_id,omitempty"`
 }
 
 // Operation names for the Prometheus counter labels.
