@@ -1,10 +1,11 @@
 // Command helixon-eval is the v16129 Sprint 18 HelixonEval R3 binary.
 //
-// It exposes four subcommands:
+// It exposes five subcommands:
 //
 //	helixon-eval run           -- score one or all golden tasks
 //	helixon-eval report        -- render the aggregate report to stdout (or --out)
 //	helixon-eval list-tasks    -- print the 5-task golden set
+//	helixon-eval demo          -- (v18684-5) live LLM demo against 1Password-backed backend
 //	helixon-eval version       -- print version and exit
 //
 // Sprint 18 ships STAGING EVAL ONLY. Aliyun quota is exhausted, so the
@@ -13,6 +14,13 @@
 // qwen3.7-plus/qwen3.7-max/MiniMax-M3 over HTTP. The sprint plan
 // carries CARRY-056 — operator gates the public helixon-eval repo
 // creation, so this binary currently lives inside helixon-platform.
+//
+// v18684-5: the new `demo` subcommand bypasses the staging offline
+// pipeline and issues ONE live chat-completion call against a configured
+// backend (minimax or qwen) so operators can verify the end-to-end
+// credential + LLM wiring on demand. It writes a single NDJSON line to
+// ~/logs/helixon-eval-demo.ndjson; the full 7-task matrix expansion
+// lives in v18685-3.
 package main
 
 import (
@@ -56,6 +64,7 @@ next sprint will plumb live API calls when Aliyun quota is restored.`,
 		newRunCmd(),
 		newReportCmd(),
 		newListTasksCmd(),
+		newDemoCmd(),
 		newVersionCmd(),
 	)
 	return root
