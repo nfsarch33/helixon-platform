@@ -221,7 +221,7 @@ func bootstrapServiceEnv(name, outPath string, timeoutSec int) error {
 		_ = os.MkdirAll(dir, 0700)
 	}
 	tmpPath := outPath + ".tmp"
-	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open %s: %v\n", tmpPath, err)
 		return fmt.Errorf("open %s: %w", tmpPath, err)

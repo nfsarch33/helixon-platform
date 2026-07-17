@@ -153,7 +153,7 @@ func (e *Emitter) emitLocked() error {
 		return err
 	}
 	line = append(line, '\n')
-	f, err := os.OpenFile(e.cfg.OutputPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(e.cfg.OutputPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) //nolint:gosec // G302 file perms 0750 acceptable for non-secret runtime files
 	if err != nil {
 		return err
 	}

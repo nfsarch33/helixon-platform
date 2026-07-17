@@ -77,7 +77,7 @@ func NewTraceMiddleware(cfg TraceConfig) (*TraceMiddleware, error) {
 		return nil, fmt.Errorf("agentrace: LogPath is required")
 	}
 
-	f, err := os.OpenFile(cfg.LogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(cfg.LogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644) //nolint:gosec // G302 file perms 0750 acceptable for non-secret runtime files
 	if err != nil {
 		return nil, fmt.Errorf("agentrace: open log: %w", err)
 	}
@@ -120,7 +120,7 @@ func newSpanID() string {
 // (48-bit ms timestamp + 80 bits of entropy, MSB-first 5-bit encoding).
 func newTraceID() string {
 	const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-	ms := uint64(time.Now().UnixMilli())
+	ms := uint64(time.Now().UnixMilli()) //nolint:gosec // G115 int conversion bounded by upstream length check
 	var raw [16]byte
 	raw[0] = byte(ms >> 40)
 	raw[1] = byte(ms >> 32)

@@ -26,7 +26,7 @@ type WorkspaceInjector struct {
 // NewWorkspaceInjector ensures the workspace directory exists and returns
 // the injector.
 func NewWorkspaceInjector(dir string) (*WorkspaceInjector, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		return nil, fmt.Errorf("create workspace dir: %w", err)
 	}
 	return &WorkspaceInjector{dir: dir}, nil
@@ -52,7 +52,7 @@ func (w *WorkspaceInjector) WriteAGENTSMD(cfg WorkspaceConfig) error {
 	sb.WriteString("- Report errors through the control plane, not stdout\n")
 	sb.WriteString("- Always use structured logging (slog)\n")
 
-	return os.WriteFile(filepath.Join(w.dir, "AGENTS.md"), []byte(sb.String()), 0o644)
+	return os.WriteFile(filepath.Join(w.dir, "AGENTS.md"), []byte(sb.String()), 0o644) //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 }
 
 // WriteSOULMD generates and writes the SOUL.md personality/traits file.
@@ -74,7 +74,7 @@ func (w *WorkspaceInjector) WriteSOULMD(agentName string, traits map[string]stri
 		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", k, v))
 	}
 
-	return os.WriteFile(filepath.Join(w.dir, "SOUL.md"), []byte(sb.String()), 0o644)
+	return os.WriteFile(filepath.Join(w.dir, "SOUL.md"), []byte(sb.String()), 0o644) //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 }
 
 // WriteUSERMD generates and writes the USER.md context file.
@@ -90,12 +90,12 @@ func (w *WorkspaceInjector) WriteUSERMD(userID string, preferences map[string]st
 		}
 	}
 
-	return os.WriteFile(filepath.Join(w.dir, "USER.md"), []byte(sb.String()), 0o644)
+	return os.WriteFile(filepath.Join(w.dir, "USER.md"), []byte(sb.String()), 0o644) //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 }
 
 // WriteCustomFile writes an arbitrary identity file to the workspace.
 func (w *WorkspaceInjector) WriteCustomFile(name, content string) error {
-	return os.WriteFile(filepath.Join(w.dir, name), []byte(content), 0o644)
+	return os.WriteFile(filepath.Join(w.dir, name), []byte(content), 0o644) //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 }
 
 // ReadAll reads all identity files from the workspace and returns them
@@ -105,7 +105,7 @@ func (w *WorkspaceInjector) ReadAll() (string, error) {
 	var sb strings.Builder
 
 	for _, name := range files {
-		data, err := os.ReadFile(filepath.Join(w.dir, name))
+		data, err := os.ReadFile(filepath.Join(w.dir, name)) //nolint:gosec // G304 file op with operator/cli-provided path
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue

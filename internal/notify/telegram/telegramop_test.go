@@ -37,7 +37,7 @@ func newStubOpClient(t *testing.T, srvURL, secret string) *onepassword.Client { 
 // path: a stub server returns a bot token, the resolver fetches it,
 // and the resulting Telegram client is configured to use that token.
 func TestNewFromOpWithResolver_ResolvesAndReturnsClient(t *testing.T) {
-	const wantToken = "999:AAH-real-bot-token"
+	const wantToken = "999:AAH-real-bot-token" //nolint:gosec // G101 test fixture
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`"` + wantToken + `"`))

@@ -198,7 +198,7 @@ func newReportCmd() *cobra.Command {
 			}
 			w := cmd.OutOrStdout()
 			if outFile != "" {
-				f, err := os.Create(outFile)
+				f, err := os.Create(outFile) //nolint:gosec // G304 file op with operator/cli-provided path
 				if err != nil {
 					return err
 				}

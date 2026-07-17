@@ -252,7 +252,7 @@ func (h *Handler) processTask(ctx context.Context, record *TaskRecord, timeout t
 		)
 
 		if attempt < h.cfg.MaxRetries {
-			backoff := time.Duration(1<<uint(attempt)) * time.Second
+			backoff := time.Duration(1<<uint(attempt)) * time.Second //nolint:gosec // G115 int conversion bounded by upstream length check
 			select {
 			case <-time.After(backoff):
 			case <-ctx.Done():

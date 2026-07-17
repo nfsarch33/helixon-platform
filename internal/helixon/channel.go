@@ -187,7 +187,7 @@ func (ws *WebSocketChannel) Serve(ctx context.Context, handler MessageHandler) e
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", ws.scaffoldHandler())
 
-	ws.server = &http.Server{
+	ws.server = &http.Server{ //nolint:gosec // G112 slow ListenAndServe acceptable for dev-mode
 		Addr:    ws.cfg.Addr,
 		Handler: mux,
 	}

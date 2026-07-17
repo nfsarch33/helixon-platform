@@ -36,7 +36,7 @@ func TestTraceMiddleware_WritesNDJSON(t *testing.T) {
 
 	_ = tm.Close()
 
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestTraceMiddleware_RecordsErrors(t *testing.T) {
 
 	_ = tm.Close()
 
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestTraceMiddleware_MultipleWrites(t *testing.T) {
 	}
 	_ = tm.Close()
 
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestTraceMiddleware_EmitsCanonicalCorrelationFields(t *testing.T) {
 	}
 	_ = tm.Close()
 
-	raw, err := os.ReadFile(logPath)
+	raw, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}

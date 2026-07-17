@@ -68,7 +68,7 @@ func writeFixtureMatrix(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "qwen36-matrix.yaml")
-	require.NoError(t, os.WriteFile(path, []byte(fixtureMatrix), 0o644))
+	require.NoError(t, os.WriteFile(path, []byte(fixtureMatrix), 0o644)) //nolint:gosec // G306 test fixture
 	return path
 }
 
@@ -166,7 +166,7 @@ func TestPick_MissingMatrixFileFails(t *testing.T) {
 func TestPick_AllBlockedFailsWithNoReadyCell(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "qwen36-matrix.yaml")
-	require.NoError(t, os.WriteFile(path, []byte(
+	require.NoError(t, os.WriteFile(path, []byte( //nolint:gosec // G306 test fixture
 		"schema_version: 1\ncells:\n  X: {node: wsl1, gpu_class: rtx2070, gpu_slot: gpu0, model_id: blocked, repo: r/r, revision: main, file: m, expected_bytes: 0, status: metadata_blocked, engine: llama.cpp, host_port: 8001, max_model_len: 8192, min_free_mib: 1536, local_path: /tmp/m}\n",
 	), 0o644))
 

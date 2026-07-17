@@ -11,7 +11,7 @@ func writeTmpRegistry(t *testing.T, body string) string {
 	t.Helper()
 	d := t.TempDir()
 	p := filepath.Join(d, "registry.yaml")
-	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatal(err)
 	}
 	return p

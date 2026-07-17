@@ -178,11 +178,11 @@ func (r *Registry) Save() error {
 	if err != nil {
 		return fmt.Errorf("svcregistry: encode: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(r.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(r.path), 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		return fmt.Errorf("svcregistry: mkdir %s: %w", filepath.Dir(r.path), err)
 	}
 	tmp := r.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o644); err != nil { //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 		return fmt.Errorf("svcregistry: write %s: %w", tmp, err)
 	}
 	if err := os.Rename(tmp, r.path); err != nil {

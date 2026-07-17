@@ -80,7 +80,7 @@ type Registry struct {
 
 // Load reads registry.yaml from disk and parses it.
 func Load(path string) (*Registry, error) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}

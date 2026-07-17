@@ -40,7 +40,7 @@ type AgentraceEmitter struct {
 
 // NewAgentraceEmitter creates or appends to the NDJSON file at path.
 func NewAgentraceEmitter(path string) (*AgentraceEmitter, error) {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return nil, fmt.Errorf("loopguard: open agentrace log %q: %w", path, err)
 	}

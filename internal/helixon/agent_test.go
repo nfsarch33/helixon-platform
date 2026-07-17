@@ -249,7 +249,7 @@ func TestWithAgentrace_RecordsToolCalls(t *testing.T) {
 		t.Fatalf("traced.Close: %v", err)
 	}
 
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read agentrace log: %v", err)
 	}

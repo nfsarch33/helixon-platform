@@ -58,7 +58,7 @@ func AutoresearchTool(cfg AutoresearchConfig) tooldispatch.ToolDef {
 			}
 			runCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 			defer cancel()
-			cmd := exec.CommandContext(runCtx, cfg.Binary, "autoresearch", "run",
+			cmd := exec.CommandContext(runCtx, cfg.Binary, "autoresearch", "run", //nolint:gosec // G204 subprocess executes pinned tool path
 				"--iterations", fmt.Sprintf("%d", iters))
 			cmd.Env = os.Environ()
 			out, err := cmd.CombinedOutput()

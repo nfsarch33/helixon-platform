@@ -44,7 +44,7 @@ func tempLogPath(t *testing.T) string {
 
 func readEvents(t *testing.T, path string) []agentraceEvent {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}

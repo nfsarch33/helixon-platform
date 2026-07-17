@@ -153,7 +153,7 @@ func TestCache_LoadFromExistingFile(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	b, _ := json.Marshal(rec)
-	_ = os.WriteFile(p, append(b, '\n'), 0o644)
+	_ = os.WriteFile(p, append(b, '\n'), 0o644) //nolint:gosec // G306 test fixture
 
 	c, err := New(Options{Path: p})
 	if err != nil {

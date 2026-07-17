@@ -91,7 +91,7 @@ func TestNDJSONAppend_ToFileIsAppendOnly(t *testing.T) {
 	require.NoError(t, w2.Write(sampleEvent("qwen36-27b-q4", 2, 400, 200, "C1")))
 	require.NoError(t, w2.Close())
 
-	raw, err := os.ReadFile(p)
+	raw, err := os.ReadFile(p) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
 	assert.Len(t, lines, 3, "append must preserve prior rows")

@@ -496,7 +496,7 @@ func TestBootstrapServiceEnv_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	data, rerr := os.ReadFile(outPath)
+	data, rerr := os.ReadFile(outPath) //nolint:gosec // G304 test fixture
 	if rerr != nil {
 		t.Fatalf("could not read output: %v", rerr)
 	}

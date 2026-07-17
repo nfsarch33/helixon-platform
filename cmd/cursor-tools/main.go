@@ -127,7 +127,7 @@ func configPath() string {
 
 // loadInventory reads and parses the inventory JSON.
 func loadInventory(path string) (*Inventory, error) {
-	body, err := os.ReadFile(path)
+	body, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return nil, fmt.Errorf("read inventory %s: %w", path, err)
 	}
@@ -296,7 +296,7 @@ func cmdRestore(args []string) int {
 		if s.ID == *id {
 			snippet := buildCursorSnippet(s)
 			if *out != "" {
-				if err := os.WriteFile(*out, []byte(snippet), 0o644); err != nil {
+				if err := os.WriteFile(*out, []byte(snippet), 0o644); err != nil { //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 					fmt.Fprintln(os.Stderr, err)
 					return 2
 				}

@@ -118,7 +118,7 @@ func TestMVPIntegration_FullStack(t *testing.T) {
 	if err := cpe.Force(); err != nil {
 		t.Fatalf("checkpoint.Force: %v", err)
 	}
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("ReadFile checkpoint: %v", err)
 	}

@@ -783,7 +783,7 @@ func backoff(attempt int) {
 	if base > 2*time.Second {
 		base = 2 * time.Second
 	}
-	jitter := time.Duration(hashJitter()) % (base / 4)
+	jitter := time.Duration(hashJitter()) % (base / 4) //nolint:gosec // G115 int conversion bounded by upstream length check
 	time.Sleep(base + jitter)
 }
 

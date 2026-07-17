@@ -76,7 +76,7 @@ func TestLoadConfig_ParsesProviderBlock(t *testing.T) {
 		`  model: qwen2.5-7b`,
 		`  timeout: 30s`,
 	}, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write: %v", err)
 	}
 	cfg, err := LoadConfig(path)

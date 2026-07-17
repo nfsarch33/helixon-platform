@@ -15,7 +15,7 @@ func withTempInventory(t *testing.T, inv Inventory) string {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "inv.json")
 	body, _ := json.Marshal(inv)
-	if err := os.WriteFile(p, body, 0o644); err != nil {
+	if err := os.WriteFile(p, body, 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write inv: %v", err)
 	}
 	t.Setenv("HELIXON_CURSOR_TOOLS_INVENTORY", p)
@@ -49,7 +49,7 @@ func TestLoadInventory_OK(t *testing.T) {
 func TestLoadInventory_MalformedJSON(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "bad.json")
-	if err := os.WriteFile(p, []byte("{not json"), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte("{not json"), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatal(err)
 	}
 	if _, err := loadInventory(p); err == nil {

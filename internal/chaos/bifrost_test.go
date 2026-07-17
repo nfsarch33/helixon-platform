@@ -93,7 +93,7 @@ func RunChaos(ctx context.Context, t *testing.T) (passed, failed int) { //nolint
 func RunRandomVendorFailure(ctx context.Context, t *testing.T) error { //nolint:revive // unused-parameter required by interface
 	var requestCount atomic.Int32
 	var failureWindow atomic.Int32
-	failureWindow.Store(int32(rand.Intn(3) + 1)) // 1..3 calls fail
+	failureWindow.Store(int32(rand.Intn(3) + 1)) // 1..3 calls fail //nolint:gosec // G404 test fixture weak rand
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		n := requestCount.Add(1)

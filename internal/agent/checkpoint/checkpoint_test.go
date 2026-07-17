@@ -22,7 +22,7 @@ func TestCheckpoint_OnToolCall_FiresAfterN(t *testing.T) {
 		}
 	}
 	// 5th call should fire.
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestCheckpoint_ForceEmits(t *testing.T) {
 	if err := e.Force(); err != nil {
 		t.Fatalf("Force: %v", err)
 	}
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if len(data) == 0 {
 		t.Fatal("Force should emit; got 0 bytes")
 	}
@@ -78,7 +78,7 @@ func TestCheckpoint_CarriesSignal(t *testing.T) {
 	e.SetSignal(SignalPartialSave)
 	_ = e.OnToolCall()
 
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	var cp Checkpoint
 	if err := json.Unmarshal(bytesTrimSpace(data), &cp); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
@@ -123,7 +123,7 @@ func TestCheckpoint_Tick_FiresWhenIntervalElapsed(t *testing.T) {
 	if err := e.Tick(); err != nil {
 		t.Fatalf("Tick: %v", err)
 	}
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestCheckpoint_SetCountsPersists(t *testing.T) {
 	e.SetCounts(7, 12, 0)
 	_ = e.OnToolCall()
 
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	var cp Checkpoint
 	if err := json.Unmarshal(bytesTrimSpace(data), &cp); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
@@ -177,7 +177,7 @@ func TestCheckpoint_SetBudgetPersists(t *testing.T) {
 	e.SetBudget(42)
 	_ = e.OnToolCall()
 
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	var cp Checkpoint
 	if err := json.Unmarshal(bytesTrimSpace(data), &cp); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
@@ -194,7 +194,7 @@ func TestCheckpoint_TimestampIsUTC(t *testing.T) {
 	e := New(Config{EveryNToolCalls: 1, OutputPath: logPath})
 	_ = e.OnToolCall()
 
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	var cp Checkpoint
 	if err := json.Unmarshal(bytesTrimSpace(data), &cp); err != nil {
 		t.Fatalf("Unmarshal: %v", err)

@@ -60,7 +60,7 @@ func LoadAndValidate(path string) (RuntimeConfig, error) {
 // writeFileImpl is exposed only for tests in the same package; package-level
 // test helpers are kept tiny so the test files stay readable.
 func writeFileImpl(path string, body []byte) error {
-	return os.WriteFile(path, body, 0o644)
+	return os.WriteFile(path, body, 0o644) //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 }
 
 // Compile-time assurance that time package import is used in this file.

@@ -102,7 +102,7 @@ func ShellTool(cfg ShellConfig) tooldispatch.ToolDef {
 					argv = append(argv, s)
 				}
 			}
-			cmd := exec.CommandContext(ctx, cmdName, argv...)
+			cmd := exec.CommandContext(ctx, cmdName, argv...) //nolint:gosec // G204 subprocess executes pinned tool path
 			out, err := cmd.CombinedOutput()
 			result := truncateBytes(string(out), cfg.MaxOutputBytes)
 			if err != nil {
@@ -423,7 +423,7 @@ func FileReadTool(cfg FileReadConfig) tooldispatch.ToolDef {
 			if err := validateAllowedPath(path, cfg.AllowedPaths); err != nil {
 				return "", err
 			}
-			data, err := os.ReadFile(path)
+			data, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 			if err != nil {
 				return "", fmt.Errorf("file_read: %w", err)
 			}
@@ -480,10 +480,10 @@ func FileWriteTool(cfg FileWriteConfig) tooldispatch.ToolDef {
 				return "", fmt.Errorf("content exceeds max size of %d bytes", cfg.MaxBytes)
 			}
 			dir := filepath.Dir(path)
-			if err := os.MkdirAll(dir, 0o755); err != nil {
+			if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 				return "", fmt.Errorf("file_write: create directory: %w", err)
 			}
-			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil { //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 				return "", fmt.Errorf("file_write: %w", err)
 			}
 			return fmt.Sprintf("wrote %d bytes to %s", len(content), path), nil

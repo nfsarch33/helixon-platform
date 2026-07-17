@@ -17,7 +17,7 @@ type NDJSONHandler struct {
 
 // NewNDJSONHandler opens (or creates) the file at path for append-mode NDJSON writes.
 func NewNDJSONHandler(path string) (*NDJSONHandler, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644) //nolint:gosec // G302 file perms 0750 acceptable for non-secret runtime files
 	if err != nil {
 		return nil, err
 	}

@@ -35,7 +35,7 @@ func TestReportWriter_WritesNDJSON(t *testing.T) {
 		t.Fatalf("Write: %v", err)
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestReportWriter_AppendsMultipleRuns(t *testing.T) {
 		}
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
