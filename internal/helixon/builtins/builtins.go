@@ -193,7 +193,7 @@ func WebFetchTool(cfg WebFetchConfig) tooldispatch.ToolDef {
 // MemoryTool wires the runtime's HybridSearcher into a tool. Pass a nil
 // searcher to disable: the tool will register but every call returns an
 // "unconfigured" error, keeping the schema visible to the LLM.
-func MemoryTool(searcher *memory.HybridSearcher, defaultAppID, defaultUserID string) tooldispatch.ToolDef {
+func MemoryTool(searcher *memory.HybridSearcher, defaultAppID, defaultUserID, defaultTenantID string) tooldispatch.ToolDef {
 	return tooldispatch.ToolDef{
 		Name:        "memory",
 		Description: "Read, write, or search the agent's hybrid memory store.",
@@ -201,12 +201,13 @@ func MemoryTool(searcher *memory.HybridSearcher, defaultAppID, defaultUserID str
 			"type": "object",
 			"required": ["op"],
 			"properties": {
-				"op":      {"type": "string", "description": "One of: read, write, search."},
-				"id":      {"type": "string", "description": "Memory id for read."},
-				"query":   {"type": "string", "description": "Query string for search."},
-				"content": {"type": "string", "description": "Content to write."},
-				"app_id":  {"type": "string", "description": "Override default app_id."},
-				"user_id": {"type": "string", "description": "Override default user_id."}
+				"op":        {"type": "string", "description": "One of: read, write, search."},
+				"id":        {"type": "string", "description": "Memory id for read."},
+				"query":     {"type": "string", "description": "Query string for search."},
+				"content":   {"type": "string", "description": "Content to write."},
+				"app_id":    {"type": "string", "description": "Override default app_id."},
+				"user_id":   {"type": "string", "description": "Override default user_id."},
+				"tenant_id": {"type": "string", "description": "Override default tenant_id (multi-tenancy isolation; v18684-4)."}
 			}
 		}`),
 		Timeout: 15 * time.Second,
@@ -216,13 +217,14 @@ func MemoryTool(searcher *memory.HybridSearcher, defaultAppID, defaultUserID str
 			}
 			op, _ := args["op"].(string)
 			appID, userID := memoryAppUserID(args, defaultAppID, defaultUserID)
+			tenantID := memoryTenantID(args, defaultTenantID)
 			switch op {
 			case "read":
 				return memoryRead(ctx, searcher, args)
 			case "write":
-				return memoryWrite(ctx, searcher, appID, userID, args)
+				return memoryWrite(ctx, searcher, appID, userID, tenantID, args)
 			case "search":
-				return memorySearch(ctx, searcher, appID, userID, args)
+				return memorySearch(ctx, searcher, appID, userID, tenantID, args)
 			default:
 				return "", fmt.Errorf("memory: unknown op %q", op)
 			}
@@ -245,12 +247,12 @@ func memoryRead(ctx context.Context, searcher *memory.HybridSearcher, args map[s
 }
 
 // memoryWrite handles the memory.write op. Extracted from MemoryTool in v17206 (CC reduction).
-func memoryWrite(ctx context.Context, searcher *memory.HybridSearcher, appID, userID string, args map[string]any) (string, error) {
+func memoryWrite(ctx context.Context, searcher *memory.HybridSearcher, appID, userID, tenantID string, args map[string]any) (string, error) {
 	content, _ := args["content"].(string)
 	if content == "" {
 		return "", errors.New("memory.write: content is required")
 	}
-	m, err := searcher.Write(ctx, content, appID, userID)
+	m, err := searcher.Write(ctx, content, appID, userID, tenantID)
 	if err != nil {
 		return "", err
 	}
@@ -259,12 +261,12 @@ func memoryWrite(ctx context.Context, searcher *memory.HybridSearcher, appID, us
 }
 
 // memorySearch handles the memory.search op. Extracted from MemoryTool in v17206 (CC reduction).
-func memorySearch(ctx context.Context, searcher *memory.HybridSearcher, appID, userID string, args map[string]any) (string, error) {
+func memorySearch(ctx context.Context, searcher *memory.HybridSearcher, appID, userID, tenantID string, args map[string]any) (string, error) {
 	q, _ := args["query"].(string)
 	if q == "" {
 		return "", errors.New("memory.search: query is required")
 	}
-	results, err := searcher.Search(ctx, q, appID, userID)
+	results, err := searcher.Search(ctx, q, appID, userID, tenantID)
 	if err != nil {
 		return "", err
 	}
@@ -283,6 +285,17 @@ func memoryAppUserID(args map[string]any, defaultApp, defaultUser string) (strin
 		userID = defaultUser
 	}
 	return appID, userID
+}
+
+// memoryTenantID extracts optional tenant_id override with default. v18684-4:
+// added to propagate multi-tenant isolation from the tool surface to the
+// HybridSearcher. An empty tenantID matches all tenants (backward-compat).
+func memoryTenantID(args map[string]any, defaultTenant string) string {
+	tid, _ := args["tenant_id"].(string)
+	if tid == "" {
+		tid = defaultTenant
+	}
+	return tid
 }
 
 // SprintboardTool wraps the controlplane.SprintboardClient.
@@ -508,15 +521,16 @@ func RegisterAll(reg *tooldispatch.Registry, opts Options) error {
 
 // Options bundles config for RegisterAll.
 type Options struct {
-	Shell        *ShellConfig
-	WebFetch     *WebFetchConfig
-	FileRead     *FileReadConfig
-	FileWrite    *FileWriteConfig
-	Memory       *memory.HybridSearcher
-	MemoryAppID  string
-	MemoryUserID string
-	Sprintboard  *controlplane.SprintboardClient
-	Autoresearch *AutoresearchConfig
+	Shell          *ShellConfig
+	WebFetch       *WebFetchConfig
+	FileRead       *FileReadConfig
+	FileWrite      *FileWriteConfig
+	Memory         *memory.HybridSearcher
+	MemoryAppID    string
+	MemoryUserID   string
+	MemoryTenantID string // v18684-4 multi-tenancy: propagated to HybridSearcher
+	Sprintboard    *controlplane.SprintboardClient
+	Autoresearch   *AutoresearchConfig
 }
 
 // Defs returns the slice of ToolDefs that Options describes, in stable
@@ -536,7 +550,7 @@ func (o Options) Defs() []tooldispatch.ToolDef {
 		defs = append(defs, FileWriteTool(*o.FileWrite))
 	}
 	if o.Memory != nil {
-		defs = append(defs, MemoryTool(o.Memory, o.MemoryAppID, o.MemoryUserID))
+		defs = append(defs, MemoryTool(o.Memory, o.MemoryAppID, o.MemoryUserID, o.MemoryTenantID))
 	}
 	if o.Sprintboard != nil {
 		defs = append(defs, SprintboardTool(o.Sprintboard))

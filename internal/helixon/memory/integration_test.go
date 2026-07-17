@@ -155,13 +155,13 @@ func TestHybridSearcher_EndToEndWriteSearch(t *testing.T) {
 		"another memory about agent evaluation",
 		"third memory for FTS5 ranking",
 	} {
-		_, err := h.Write(ctx, content, "helixon-test", "user-test")
+		_, err := h.Write(ctx, content, "helixon-test", "user-test", "")
 		require.NoError(t, err)
 	}
 
 	// Federated Search should hit FTS5 (memories were indexed locally even
 	// though Engram stub returns nothing on search).
-	results, err := h.Search(ctx, "helixon integration", "helixon-test", "user-test")
+	results, err := h.Search(ctx, "helixon integration", "helixon-test", "user-test", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, results, "expected at least one FTS5 hit")
 	for _, r := range results {
@@ -209,15 +209,15 @@ func TestHybridSearcher_CanonicalAsymmetry(t *testing.T) {
 	stub.failCount = 4
 	stub.mu.Unlock()
 
-	_, err := h.Write(ctx, "this should fail at the canonical layer", "app", "user")
+	_, err := h.Write(ctx, "this should fail at the canonical layer", "app", "user", "")
 	require.Error(t, err, "canonical Write must fail when Engram returns 500")
 	assert.Contains(t, err.Error(), "engram")
 
 	// Recovery: next Write succeeds (failNext/failCount are consumed).
-	_, err = h.Write(ctx, "this should succeed and reach FTS5", "app", "user")
+	_, err = h.Write(ctx, "this should succeed and reach FTS5", "app", "user", "")
 	require.NoError(t, err, "second Write should succeed after single-shot failure")
 
-	results, err := h.Search(ctx, "succeed FTS5", "app", "user")
+	results, err := h.Search(ctx, "succeed FTS5", "app", "user", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, results, "FTS5 mirror should hold the successful Write")
 }
@@ -230,7 +230,7 @@ func TestHybridSearcher_MissingEngram(t *testing.T) {
 	db := openTempSQLite(t)
 	h := NewHybridSearcher(db, nil, HybridSearchConfig{}, nil)
 
-	_, err := h.Write(ctx, "x", "app", "user")
+	_, err := h.Write(ctx, "x", "app", "user", "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "engram client not configured")
 

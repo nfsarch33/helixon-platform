@@ -113,7 +113,7 @@ func TestHybridSearcher_FederatedSearch_MergesAllThreeSources(t *testing.T) {
 	require.NoError(t, searcher.IndexLocal(context.Background(), "lf1", "shared content"))
 	require.NoError(t, searcher.IndexLocal(context.Background(), "lf2", "fts-only memo"))
 
-	results, err := searcher.Search(context.Background(), "shared content", "claude-code", "user-1")
+	results, err := searcher.Search(context.Background(), "shared content", "claude-code", "user-1", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, results)
 
@@ -141,7 +141,7 @@ func TestHybridSearcher_FederatedSearch_Mem0FailureNonFatal(t *testing.T) {
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{}, nil)
 	searcher.WithMem0(mem0)
 
-	results, err := searcher.Search(context.Background(), "shared content", "claude-code", "user-1")
+	results, err := searcher.Search(context.Background(), "shared content", "claude-code", "user-1", "")
 	require.NoError(t, err, "mem0 failure must not fail the federated call")
 	assert.NotEmpty(t, results, "engram results must still be returned")
 }
@@ -160,7 +160,7 @@ func TestHybridSearcher_FederatedWrite_Mem0Mirror(t *testing.T) {
 	searcher.WithMem0(mem0)
 	require.NoError(t, searcher.EnsureSchema(context.Background()))
 
-	mem, err := searcher.Write(context.Background(), "v8800 federated memory", "claude-code", "user-1")
+	mem, err := searcher.Write(context.Background(), "v8800 federated memory", "claude-code", "user-1", "")
 	require.NoError(t, err)
 	require.NotNil(t, mem)
 
@@ -177,7 +177,7 @@ func TestHybridSearcher_FederatedWrite_Mem0FailureNonFatal(t *testing.T) {
 	searcher := NewHybridSearcher(nil, engram, HybridSearchConfig{}, nil)
 	searcher.WithMem0(mem0)
 
-	mem, err := searcher.Write(context.Background(), "still ok", "claude-code", "user-1")
+	mem, err := searcher.Write(context.Background(), "still ok", "claude-code", "user-1", "")
 	require.NoError(t, err, "mem0 mirror failure must not fail canonical write")
 	require.NotNil(t, mem)
 }

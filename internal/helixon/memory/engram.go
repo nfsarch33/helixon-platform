@@ -39,11 +39,18 @@ func (c EngramConfig) withDefaults() EngramConfig {
 }
 
 // Memory represents a stored memory entry from Engram.
+//
+// TenantID isolates memory entries across tenants. An empty TenantID
+// marks a legacy entry (pre-multi-tenancy) and is visible to all tenant
+// filters for backward compatibility — see v18680-3 semantics. A
+// non-empty TenantID is enforced by every Search/Recall call to
+// prevent cross-tenant leaks.
 type Memory struct {
 	ID        string    `json:"id"`
 	Content   string    `json:"content"`
 	AppID     string    `json:"app_id,omitempty"`
 	UserID    string    `json:"user_id,omitempty"`
+	TenantID  string    `json:"tenant_id,omitempty"`
 	Score     float64   `json:"score,omitempty"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
 }
@@ -76,16 +83,18 @@ func NewEngramClient(cfg EngramConfig, logger *slog.Logger) *EngramClient {
 	}
 }
 
-// Add stores a new memory entry.
-func (c *EngramClient) Add(ctx context.Context, content, appID, userID string) (*Memory, error) {
+// Add stores a new memory entry. tenantID stamps the entry with the
+// tenant scope; pass "" for legacy / pre-migration callers.
+func (c *EngramClient) Add(ctx context.Context, content, appID, userID, tenantID string) (*Memory, error) {
 	type engramMsg struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
 	}
 	body := map[string]any{
-		"messages": []engramMsg{{Role: "user", Content: content}},
-		"app_id":   appID,
-		"user_id":  userID,
+		"messages":  []engramMsg{{Role: "user", Content: content}},
+		"app_id":    appID,
+		"user_id":   userID,
+		"tenant_id": tenantID,
 	}
 	data, _ := json.Marshal(body)
 
@@ -101,16 +110,19 @@ func (c *EngramClient) Add(ctx context.Context, content, appID, userID string) (
 	return &mem, nil
 }
 
-// Search queries memories by semantic similarity.
-func (c *EngramClient) Search(ctx context.Context, query, appID, userID string, limit int) ([]SearchResult, error) {
+// Search queries memories by semantic similarity. tenantID filters
+// results by tenant per v18684-4 multi-tenancy hardening; an empty
+// tenantID matches all tenants.
+func (c *EngramClient) Search(ctx context.Context, query, appID, userID, tenantID string, limit int) ([]SearchResult, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 	body := map[string]any{
-		"query":   query,
-		"app_id":  appID,
-		"user_id": userID,
-		"limit":   limit,
+		"query":     query,
+		"app_id":    appID,
+		"user_id":   userID,
+		"tenant_id": tenantID,
+		"limit":     limit,
 	}
 	data, _ := json.Marshal(body)
 

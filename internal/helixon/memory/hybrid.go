@@ -12,10 +12,11 @@ import (
 
 // HybridResult combines FTS5 and vector search results with a unified score.
 type HybridResult struct {
-	ID      string  `json:"id"`
-	Content string  `json:"content"`
-	Source  string  `json:"source"`
-	Score   float64 `json:"score"`
+	ID       string  `json:"id"`
+	Content  string  `json:"content"`
+	TenantID string  `json:"tenant_id,omitempty"`
+	Source   string  `json:"source"`
+	Score    float64 `json:"score"`
 }
 
 // HybridSearchConfig controls the blending of FTS5, vector, and Mem0 search.
@@ -80,7 +81,10 @@ func (h *HybridSearcher) WithMem0(client Mem0Client) {
 // Search runs FTS5, vector, and Mem0 (when wired) in parallel, then merges
 // and re-ranks by content. A failure in any single backend is logged but
 // does not fail the federated call.
-func (h *HybridSearcher) Search(ctx context.Context, query, appID, userID string) ([]HybridResult, error) {
+//
+// tenantID filters results by tenant per v18684-4 multi-tenancy
+// hardening. An empty tenantID matches all tenants (legacy callers).
+func (h *HybridSearcher) Search(ctx context.Context, query, appID, userID, tenantID string) ([]HybridResult, error) {
 	type resultSet struct {
 		results []HybridResult
 		err     error
@@ -100,7 +104,7 @@ func (h *HybridSearcher) Search(ctx context.Context, query, appID, userID string
 	}()
 
 	go func() {
-		results, err := h.vectorSearch(ctx, query, appID, userID)
+		results, err := h.vectorSearch(ctx, query, appID, userID, tenantID)
 		vecCh <- resultSet{results, err}
 	}()
 
@@ -138,6 +142,18 @@ func (h *HybridSearcher) Search(ctx context.Context, query, appID, userID string
 
 	merged := h.merge(ftsResults, vecResults, memResults)
 
+	// Tenant isolation: drop entries whose TenantID does not match
+	// the caller. An empty TenantID (legacy entry) is always visible.
+	if tenantID != "" {
+		filtered := merged[:0]
+		for _, m := range merged {
+			if m.TenantID == "" || m.TenantID == tenantID {
+				filtered = append(filtered, m)
+			}
+		}
+		merged = filtered
+	}
+
 	if len(merged) > h.cfg.MaxResults {
 		merged = merged[:h.cfg.MaxResults]
 	}
@@ -150,11 +166,17 @@ func (h *HybridSearcher) Search(ctx context.Context, query, appID, userID string
 // If the local FTS5 mirror fails after a green canonical write, the error
 // is logged but the canonical Memory is still returned (canonical/secondary
 // asymmetry per ADR feedback-dual-write-canonical-asymmetry).
-func (h *HybridSearcher) Write(ctx context.Context, content, appID, userID string) (*Memory, error) {
+//
+// tenantID stamps the entry with the tenant scope per v18684-4
+// multi-tenancy hardening; pass "" for legacy callers.
+func (h *HybridSearcher) Write(ctx context.Context, content, appID, userID, tenantID string) (*Memory, error) {
 	if h.engram == nil {
 		return nil, fmt.Errorf("hybrid: engram client not configured")
 	}
-	mem, err := h.engram.Add(ctx, content, appID, userID)
+	mem, err := h.engram.Add(ctx, content, appID, userID, tenantID)
+	if mem != nil && mem.TenantID == "" {
+		mem.TenantID = tenantID
+	}
 	if err != nil {
 		return nil, fmt.Errorf("hybrid: engram write: %w", err)
 	}
@@ -266,12 +288,12 @@ func (r HybridResult) normalize(results []HybridResult) []HybridResult {
 	return append(results, r)
 }
 
-func (h *HybridSearcher) vectorSearch(ctx context.Context, query, appID, userID string) ([]HybridResult, error) {
+func (h *HybridSearcher) vectorSearch(ctx context.Context, query, appID, userID, tenantID string) ([]HybridResult, error) {
 	if h.engram == nil {
 		return nil, nil
 	}
 
-	searchResults, err := h.engram.Search(ctx, query, appID, userID, h.cfg.MaxResults)
+	searchResults, err := h.engram.Search(ctx, query, appID, userID, tenantID, h.cfg.MaxResults)
 	if err != nil {
 		return nil, err
 	}
@@ -279,10 +301,11 @@ func (h *HybridSearcher) vectorSearch(ctx context.Context, query, appID, userID 
 	results := make([]HybridResult, 0, len(searchResults))
 	for _, sr := range searchResults {
 		results = append(results, HybridResult{
-			ID:      sr.ID,
-			Content: sr.Content,
-			Source:  "engram",
-			Score:   sr.Score,
+			ID:       sr.ID,
+			Content:  sr.Content,
+			TenantID: sr.TenantID,
+			Source:   "engram",
+			Score:    sr.Score,
 		})
 	}
 	return results, nil

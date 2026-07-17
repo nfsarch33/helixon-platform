@@ -216,7 +216,7 @@ func memorySearchHandler(r *Runtime) tooldispatch.ToolFunc {
 		if query == "" {
 			return "", fmt.Errorf("query is required")
 		}
-		results, err := r.memory.Search(ctx, query, r.cfg.AgentID, "")
+		results, err := r.memory.Search(ctx, query, r.cfg.AgentID, "", r.cfg.TenantID)
 		if err != nil {
 			return "", err
 		}
@@ -236,7 +236,7 @@ func memoryWriteHandler(r *Runtime) tooldispatch.ToolFunc {
 			appID = r.cfg.AgentID
 		}
 		userID, _ := args["user_id"].(string)
-		mem, err := r.memory.Write(ctx, content, appID, userID)
+		mem, err := r.memory.Write(ctx, content, appID, userID, r.cfg.TenantID)
 		if err != nil {
 			return "", err
 		}

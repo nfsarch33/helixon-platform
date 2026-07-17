@@ -65,7 +65,7 @@ func (b *EngramBackend) Store(ctx context.Context, entry *Memory) error {
 	}
 
 	// Best-effort write to Engram.
-	_, err := b.client.Add(ctx, entry.Content, entry.AppID, entry.UserID)
+	_, err := b.client.Add(ctx, entry.Content, entry.AppID, entry.UserID, entry.TenantID)
 	if err != nil {
 		b.fallbackCount.Add(1)
 		b.logger.Warn("engram store failed; using fallback", slog.String("err", err.Error()))
@@ -79,10 +79,10 @@ func (b *EngramBackend) Store(ctx context.Context, entry *Memory) error {
 
 // Recall tries the Engram server first; on miss or transient error,
 // consults the local fallback.
-func (b *EngramBackend) Recall(ctx context.Context, id string) (*Memory, error) {
+func (b *EngramBackend) Recall(ctx context.Context, id, tenantID string) (*Memory, error) {
 	// Always check fallback first to keep the read path simple and
 	// avoid a network round-trip when the entry is local-recent.
-	if e, err := b.fallback.Recall(ctx, id); err == nil {
+	if e, err := b.fallback.Recall(ctx, id, tenantID); err == nil {
 		b.recallCount.Add(1)
 		return e, nil
 	}
@@ -103,8 +103,8 @@ func (b *EngramBackend) Recall(ctx context.Context, id string) (*Memory, error) 
 // the long-term source of truth but for v17802 (MVP-5) we keep
 // the read path on the hot cache to avoid network round-trips
 // on every agent step.
-func (b *EngramBackend) Search(ctx context.Context, query, appID, userID string, limit int) ([]SearchResult, error) {
-	results, err := b.fallback.Search(ctx, query, appID, userID, limit)
+func (b *EngramBackend) Search(ctx context.Context, query, appID, userID, tenantID string, limit int) ([]SearchResult, error) {
+	results, err := b.fallback.Search(ctx, query, appID, userID, tenantID, limit)
 	if err != nil {
 		return nil, err
 	}

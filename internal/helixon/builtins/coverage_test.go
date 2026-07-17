@@ -83,7 +83,7 @@ func TestSprintboardTool_NilClientConstructs(t *testing.T) {
 // must not panic at construction; invocation will fail and that is
 // expected and asserted here.
 func TestMemoryTool_NilSearcherConstructs(t *testing.T) {
-	def := builtins.MemoryTool(nil, "app", "user")
+	def := builtins.MemoryTool(nil, "app", "user", "")
 	if def.Name != "memory" {
 		t.Fatalf("expected memory; got %q", def.Name)
 	}
@@ -169,7 +169,7 @@ var _ = context.Background
 // (the only state we can test without a real HybridSearcher), every
 // op must surface the same "unconfigured" error.
 func TestMemoryTool_NilSearcherAllOpsError(t *testing.T) {
-	def := builtins.MemoryTool(nil, "app", "user")
+	def := builtins.MemoryTool(nil, "app", "user", "")
 	ctx := context.Background()
 	ops := []string{"read", "write", "search", "unknown_op"}
 	for _, op := range ops {
@@ -185,7 +185,7 @@ func TestMemoryTool_NilSearcherAllOpsError(t *testing.T) {
 // default UserID/AppID are passed to searcher, but since the searcher
 // is nil we surface the unconfigured error before reaching that code.
 func TestMemoryTool_DefaultIDsFlow(t *testing.T) {
-	def := builtins.MemoryTool(nil, "default-app", "default-user")
+	def := builtins.MemoryTool(nil, "default-app", "default-user", "")
 	_, err := def.Handler(context.Background(), map[string]any{"op": "read", "id": "abc"})
 	if err == nil {
 		t.Fatal("expected error from nil searcher")
