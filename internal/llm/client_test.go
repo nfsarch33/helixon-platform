@@ -155,7 +155,7 @@ func TestComplete_TemperatureAndMaxTokens(t *testing.T) {
 
 func TestComplete_RateLimitRetry(t *testing.T) {
 	attempts := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		attempts++
 		if attempts <= 2 {
 			w.WriteHeader(http.StatusTooManyRequests)
@@ -180,7 +180,7 @@ func TestComplete_RateLimitRetry(t *testing.T) {
 }
 
 func TestComplete_ServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error":"internal server error"}`))
 	}))
@@ -198,7 +198,7 @@ func TestComplete_ServerError(t *testing.T) {
 }
 
 func TestComplete_ContextCancellation(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(5 * time.Second)
 		w.Write(fakeCompletionResponse("late", 1, 1))
 	}))
@@ -225,7 +225,7 @@ func TestComplete_EmptyMessages(t *testing.T) {
 }
 
 func TestComplete_InvalidJSON(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{invalid json`))
 	}))
@@ -240,7 +240,7 @@ func TestComplete_InvalidJSON(t *testing.T) {
 }
 
 func TestComplete_UsageTracking(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(fakeCompletionResponse("tracked", 42, 18))
 	}))

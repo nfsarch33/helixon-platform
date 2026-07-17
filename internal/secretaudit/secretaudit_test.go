@@ -18,7 +18,7 @@ type stubResolver struct {
 	returnErr                   error
 }
 
-func (s *stubResolver) ResolveSecret(ctx context.Context, vault, itemUUID, fieldID string) (string, error) {
+func (s *stubResolver) ResolveSecret(ctx context.Context, vault, itemUUID, fieldID string) (string, error) { //nolint:revive // unused-parameter required by interface
 	s.gotVault = vault
 	s.gotItem = itemUUID
 	s.gotField = fieldID

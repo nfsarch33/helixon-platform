@@ -351,7 +351,7 @@ func TestSprintboardTool_DispatchViaHTTPServer(t *testing.T) {
 // v17609-2: SprintboardClient network failures surface as errors
 // (registers the doPost error path that wasn't previously exercised).
 func TestSprintboardClient_RegisterFailureSurfacesError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"boom"}`))
 	}))

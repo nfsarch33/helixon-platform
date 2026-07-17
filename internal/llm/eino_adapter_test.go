@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewEinoAdapter_ImplementsToolCallingChatModel(t *testing.T) {
+func TestNewEinoAdapter_ImplementsToolCallingChatModel(t *testing.T) { //nolint:revive // unused-parameter required by interface
 	mock := NewMockProvider()
 	adapter := NewEinoAdapter(mock)
 

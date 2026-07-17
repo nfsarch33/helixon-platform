@@ -111,7 +111,7 @@ func TestSendSlack_LiveServer(t *testing.T) {
 }
 
 func TestSendAll_BothConfigured(t *testing.T) {
-	slackSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	slackSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer func() { slackSrv.Close() }()

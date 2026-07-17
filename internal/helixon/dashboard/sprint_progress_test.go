@@ -10,7 +10,7 @@ import (
 
 func TestSprintProgressFetcher_WithTickets(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":   "sprint-42",
@@ -54,7 +54,7 @@ func TestSprintProgressFetcher_WithTickets(t *testing.T) {
 
 func TestSprintProgressFetcher_WithCounts(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":    "sprint-43",
 			"total": 10,
@@ -81,7 +81,7 @@ func TestSprintProgressFetcher_WithCounts(t *testing.T) {
 
 func TestSprintProgressFetcher_ServerError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("no active sprint"))
 	}))
@@ -96,7 +96,7 @@ func TestSprintProgressFetcher_ServerError(t *testing.T) {
 
 func TestSprintProgressHandler_GET(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		json.NewEncoder(w).Encode(map[string]any{"id": "s1", "total": 5, "done": 3})
 	}))
 	defer func() { srv.Close() }()

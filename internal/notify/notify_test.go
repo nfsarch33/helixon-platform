@@ -140,7 +140,7 @@ func TestResend_ResendFreeTierCollapsesCCIntoTo(t *testing.T) {
 
 func TestResend_4xxFailsFastNoRetry(t *testing.T) {
 	var hit int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&hit, 1)
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"error":"bad api key"}`))
@@ -175,7 +175,7 @@ func TestResend_4xxFailsFastNoRetry(t *testing.T) {
 
 func TestResend_5xxRetriesExponentialBackoffMax3(t *testing.T) {
 	var hit int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		n := atomic.AddInt32(&hit, 1)
 		if n < 4 {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -219,7 +219,7 @@ func TestResend_5xxRetriesExponentialBackoffMax3(t *testing.T) {
 
 func TestResend_5xxExhaustedMaxAttemptsReturnsTransientError(t *testing.T) {
 	var hit int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&hit, 1)
 		w.WriteHeader(http.StatusBadGateway)
 	}))
@@ -253,7 +253,7 @@ func TestResend_5xxExhaustedMaxAttemptsReturnsTransientError(t *testing.T) {
 
 func TestResend_IdempotencyDedup(t *testing.T) {
 	var hit int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		atomic.AddInt32(&hit, 1)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"x"}`))
@@ -295,7 +295,7 @@ func TestResend_NeverLogsAPIKey(t *testing.T) {
 	// Implementation detail: implementation MUST redact the api key in any
 	// logged payload. We test by asserting the Send error path does not
 	// surface the API key in returned error messages.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = io.WriteString(w, "Forbidden: re_secret_DO_NOT_LOG")
 	}))
@@ -361,7 +361,7 @@ func TestBrevo_SuccessFirstAttempt(t *testing.T) {
 
 func TestBrevo_4xxFailFast(t *testing.T) {
 	var hit int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&hit, 1)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"code":"invalid_parameter","message":"bad"}`))
@@ -397,13 +397,13 @@ func TestDispatcher_RoundRobin(t *testing.T) {
 	// Use two httptest servers as Resend + Brevo; verify round-robin
 	// alternates between them and idempotency is per-job.
 	var rHits, bHits int32
-	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		atomic.AddInt32(&rHits, 1)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"r"}`))
 	}))
 	defer func() { resend.Close() }()
-	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		atomic.AddInt32(&bHits, 1)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"messageId":"b"}`))
@@ -447,13 +447,13 @@ func TestDispatcher_RoundRobin(t *testing.T) {
 // and never touch the Resend client.
 func TestDispatcher_BrevoOnly_RoutesOnlyToBrevo(t *testing.T) {
 	var rHits, bHits int32
-	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		atomic.AddInt32(&rHits, 1)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"r"}`))
 	}))
 	defer func() { resend.Close() }()
-	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		atomic.AddInt32(&bHits, 1)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"messageId":"b"}`))
@@ -494,12 +494,12 @@ func TestDispatcher_BrevoOnly_RoutesOnlyToBrevo(t *testing.T) {
 
 func TestDispatcher_FallbackToBrevoOnResendExhaustion(t *testing.T) {
 	var rHits, bHits int32
-	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	resend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		atomic.AddInt32(&rHits, 1)
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer func() { resend.Close() }()
-	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	brevo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&bHits, 1)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"messageId":"fb"}`))
@@ -563,7 +563,7 @@ func TestResend_AuditDB_RecordsSuccess(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"id":"ok-1"}`))
 	}))
@@ -604,7 +604,7 @@ func TestResend_AuditDB_RecordsError(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"bad input"}`))
 	}))
@@ -641,7 +641,7 @@ func TestBrevo_AuditDB_RecordsSuccess(t *testing.T) {
 	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
 	defer func() { _ = db.Close() }()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"messageId":"brevo-1"}`))
 	}))
@@ -672,7 +672,7 @@ func TestResend_AuditDB_RecordsDeadLetter(t *testing.T) {
 	db, _ := notifydb.Open(dir+"/audit.sqlite3", nil)
 	defer func() { _ = db.Close() }()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error":"oops"}`))
 	}))

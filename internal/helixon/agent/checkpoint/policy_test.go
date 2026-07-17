@@ -14,7 +14,7 @@ type fakeFlusher struct {
 	failOn atomic.Int64
 }
 
-func (f *fakeFlusher) Flush(ctx context.Context) error {
+func (f *fakeFlusher) Flush(ctx context.Context) error { //nolint:revive // unused-parameter required by interface
 	n := f.count.Add(1)
 	if f.failOn.Load() != 0 && n == f.failOn.Load() {
 		return errors.New("simulated flush failure")

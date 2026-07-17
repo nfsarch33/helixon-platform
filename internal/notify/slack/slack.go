@@ -163,7 +163,7 @@ func executeSendRequest(ctx context.Context, httpc *http.Client, url string, bod
 //	2xx                              -> StatusSuccess
 //	4xx (HTTP status code in [400, 500)) -> StatusBadRequest
 //	5xx + network errors              -> StatusDeadLetter
-func classifyResponse(ctx context.Context, resp *http.Response) (metrics.Status, error) {
+func classifyResponse(ctx context.Context, resp *http.Response) (metrics.Status, error) { //nolint:revive // unused-parameter required by interface
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return metrics.StatusSuccess, nil

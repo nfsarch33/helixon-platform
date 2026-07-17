@@ -54,7 +54,7 @@ func TestStreamComplete_ContentChunks(t *testing.T) {
 }
 
 func TestStreamComplete_ToolCalls(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		flusher, ok := w.(http.Flusher)
 		require.True(t, ok)
 

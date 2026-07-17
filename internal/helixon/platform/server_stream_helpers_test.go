@@ -132,7 +132,7 @@ func TestHandleStream_NotConfigured(t *testing.T) {
 // TestHandleStream_NoFlusher writes 500 when transport does not support Flusher.
 func TestHandleStream_NoFlusher(t *testing.T) {
 	t.Parallel()
-	s := &Server{cfg: Config{StreamHandler: func(ctx context.Context, m helixon.IncomingMessage, emit func(string) error) error {
+	s := &Server{cfg: Config{StreamHandler: func(ctx context.Context, m helixon.IncomingMessage, emit func(string) error) error { //nolint:revive // unused-parameter required by interface
 		return nil
 	}}, logger: newDiscardLogger()}
 	req := httptest.NewRequest("POST", "/v1/messages/stream",
@@ -149,7 +149,7 @@ func TestHandleStream_NoFlusher(t *testing.T) {
 func TestHandleStream_HappyPath(t *testing.T) {
 	t.Parallel()
 	s := &Server{cfg: Config{
-		StreamHandler: func(ctx context.Context, m helixon.IncomingMessage, emit func(string) error) error {
+		StreamHandler: func(ctx context.Context, m helixon.IncomingMessage, emit func(string) error) error { //nolint:revive // unused-parameter required by interface
 			if err := emit("hello"); err != nil {
 				return err
 			}
@@ -174,7 +174,7 @@ func TestHandleStream_HappyPath(t *testing.T) {
 func TestHandleStream_HandlerError(t *testing.T) {
 	t.Parallel()
 	s := &Server{cfg: Config{
-		StreamHandler: func(ctx context.Context, m helixon.IncomingMessage, emit func(string) error) error {
+		StreamHandler: func(ctx context.Context, m helixon.IncomingMessage, emit func(string) error) error { //nolint:revive // unused-parameter required by interface
 			return errors.New("bad provider")
 		},
 		HeartbeatInterval: 100 * time.Millisecond,

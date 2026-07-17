@@ -145,7 +145,7 @@ func TestOpenAIDirectClient_Health_Unhealthy(t *testing.T) {
 	}
 }
 
-func TestOpenAIDirectClient_ProviderInterface(t *testing.T) {
+func TestOpenAIDirectClient_ProviderInterface(t *testing.T) { //nolint:revive // unused-parameter required by interface
 	var _ Provider = (*OpenAIDirectClient)(nil)
 	var _ StreamProvider = (*OpenAIDirectClient)(nil)
 	var _ HealthChecker = (*OpenAIDirectClient)(nil)

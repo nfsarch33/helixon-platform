@@ -108,9 +108,9 @@ func invokeBinary(binaryPath string, args []string) ([]byte, error) {
 	return cmd.CombinedOutput()
 }
 
-func tail(s string, max int) string {
-	if len(s) <= max {
+func tail(s string, maxLen int) string {
+	if len(s) <= maxLen {
 		return s
 	}
-	return "..." + s[len(s)-max:]
+	return "..." + s[len(s)-maxLen:]
 }

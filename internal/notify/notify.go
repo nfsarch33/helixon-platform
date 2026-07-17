@@ -885,7 +885,7 @@ type retryActor interface {
 // retryWithBackoff drives the per-attempt loop. It is intentionally small
 // (CC ≤ 4) because every behavioural branch is delegated to the actor.
 // CC=4.
-func retryWithBackoff(ctx context.Context, maxAttempt int, body []byte, m Email, actor retryActor) error { //nolint:unparam // body parameter reserved for templated retry bodies in future path
+func retryWithBackoff(ctx context.Context, maxAttempt int, body []byte, m Email, actor retryActor) error { //nolint:unparam // body parameter reserved for templated retry bodies in future path //nolint:revive // unused-parameter required by interface
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempt; attempt++ {
 		actor.onAttempt(ctx, attempt)

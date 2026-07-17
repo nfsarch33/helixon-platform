@@ -183,7 +183,7 @@ func (ws *WebSocketChannel) Name() string { return "websocket" }
 // Serve starts the WebSocket server. Full WebSocket upgrade handling requires
 // gorilla/websocket; this scaffold provides the HTTP shell that will be
 // completed when Go module resolution is available.
-func (ws *WebSocketChannel) Serve(ctx context.Context, handler MessageHandler) error {
+func (ws *WebSocketChannel) Serve(ctx context.Context, handler MessageHandler) error { //nolint:revive // unused-parameter required by interface
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", ws.scaffoldHandler())
 

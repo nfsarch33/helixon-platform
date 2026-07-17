@@ -106,8 +106,32 @@ func TestErrcheck_StableBoundary(t *testing.T) {
 	}
 }
 
-// TestRevive_StableBoundary is a placeholder test for v18684-2
-// (revive sub-story). It only checks the boundary, not a reduction.
+// TestRevive_Below100 is the v18684-2 invariant for the revive linter.
+// v18684-2 sub-scope (this sprint):
+//   - redefines-builtin-id: rename `min`/`max`/`len` parameter shadows (13 → 0)
+//   - unused-parameter: rename to `_` or `//nolint:revive` for interface-required (151 → ~15)
+//   - context-as-argument: ensure ctx is first param where applicable (2 remaining)
+//
+// The remaining revive issues (~50) are exported godoc comments on
+// stable callback/handler interfaces — these are deferred to v18685+
+// per sub-scope discipline. Target: 229 → <=100 (this sprint).
+func TestRevive_Below100(t *testing.T) {
+	out, err := runLint(t)
+	if err != nil && out == "" {
+		t.Skipf("golangci-lint run failed: %v", err)
+	}
+	got := categoryCount(out, "revive")
+	if got < 0 {
+		t.Skipf("no revive summary line: %s", out)
+	}
+	if got >= 100 {
+		t.Errorf("revive count = %d, want < 100 (v18684-2 target from 229); sample output: %s",
+			got, lastLines(out, 15))
+	}
+}
+
+// TestRevive_StableBoundary ensures revive count did not regress above
+// the v18684-2 starting 229.
 func TestRevive_StableBoundary(t *testing.T) {
 	out, err := runLint(t)
 	if err != nil && out == "" {
@@ -117,8 +141,8 @@ func TestRevive_StableBoundary(t *testing.T) {
 	if got < 0 {
 		t.Skipf("no revive summary line: %s", out)
 	}
-	if got > 230 {
-		t.Errorf("revive count = %d, must not exceed v18684-1 starting 230", got)
+	if got > 229 {
+		t.Errorf("revive count = %d, must not regress above v18684-2 starting 229", got)
 	}
 }
 

@@ -120,9 +120,9 @@ func SanitizeSummary(s string) string {
 		}
 		return r
 	}, s)
-	const max = 4000
-	if len(s) > max {
-		s = s[:max-3] + "..."
+	const maxChars = 4000
+	if len(s) > maxChars {
+		s = s[:maxChars-3] + "..."
 	}
 	return s
 }

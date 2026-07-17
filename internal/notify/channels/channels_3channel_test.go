@@ -74,14 +74,14 @@ func TestDispatcher_SendAll_FiresAllThreeSurfaces(t *testing.T) {
 		slCalls atomic.Int32
 	)
 
-	tgServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tgServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		tgCalls.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":42}}`))
 	}))
 	defer func() { tgServer.Close() }()
 
-	slServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	slServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		slCalls.Add(1)
 		_, _ = w.Write([]byte("ok"))
 	}))
@@ -111,14 +111,14 @@ func TestDispatcher_SendAll_TelegramFailureDoesNotBlockSlack(t *testing.T) {
 		slCalls atomic.Int32
 	)
 
-	tgServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tgServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		tgCalls.Add(1)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"ok":false,"description":"bad chat id"}`))
 	}))
 	defer func() { tgServer.Close() }()
 
-	slServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	slServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		slCalls.Add(1)
 		_, _ = w.Write([]byte("ok"))
 	}))

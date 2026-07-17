@@ -135,7 +135,7 @@ func (r *Runtime) Init(ctx context.Context) error {
 
 // Configure wires channels, memory, and control plane connections.
 // Transitions: Init -> Configured.
-func (r *Runtime) Configure(ctx context.Context, opts ...ConfigOption) error {
+func (r *Runtime) Configure(ctx context.Context, opts ...ConfigOption) error { //nolint:revive // unused-parameter required by interface
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

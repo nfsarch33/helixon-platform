@@ -187,7 +187,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []
 // checkRunTermination returns ErrTimeout when ctx is done and ErrBudgetExhaust
 // when the in+out token sum is greater than MaxTokens. iter and maxIter are
 // reserved for the future iterations-overflow guard.
-func checkRunTermination(ctx context.Context, r *RunResult, iter, maxTokens, maxIter int) error {
+func checkRunTermination(ctx context.Context, r *RunResult, iter, maxTokens, maxIter int) error { //nolint:revive // unused-parameter required by interface
 	if ctx.Err() != nil {
 		r.Err = ErrTimeout
 		return ErrTimeout
@@ -217,7 +217,7 @@ func (a *Agent) notifyRunStart(ctx context.Context, sessionID string, iter int, 
 
 // invokeModel builds the CompletionRequest and calls provider.Complete.
 // Wraps transport errors with the iteration number for diagnostics.
-func (a *Agent) invokeModel(ctx context.Context, sessionID string, messages []llm.Message, iter int) (*llm.CompletionResponse, error) {
+func (a *Agent) invokeModel(ctx context.Context, sessionID string, messages []llm.Message, iter int) (*llm.CompletionResponse, error) { //nolint:revive // unused-parameter required by interface
 	req := llm.CompletionRequest{Messages: messages, Tools: a.tools.Available()}
 	resp, err := a.provider.Complete(ctx, req)
 	if err != nil {

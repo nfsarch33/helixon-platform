@@ -46,7 +46,7 @@ func TestAckAlert_DryRunAppendsNothing(t *testing.T) {
 	inc := filepath.Join(dir, "incidents.ndjson")
 
 	var calls int
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		calls++
 		w.WriteHeader(200)
 		_ = json.NewEncoder(w).Encode(SilenceResponse{SilenceID: "x"})
@@ -179,7 +179,7 @@ func TestListAlerts_Reachable(t *testing.T) {
 }
 
 func TestListAlerts_BadStatus(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer func() { srv.Close() }()

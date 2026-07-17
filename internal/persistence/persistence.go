@@ -64,7 +64,7 @@ func NewInMemoryBackend() *InMemoryBackend {
 }
 
 // Save persists state to memory.
-func (b *InMemoryBackend) Save(ctx context.Context, state State) error {
+func (b *InMemoryBackend) Save(ctx context.Context, state State) error { //nolint:revive // unused-parameter required by interface
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	state.UpdatedAt = time.Now().UTC()
@@ -73,7 +73,7 @@ func (b *InMemoryBackend) Save(ctx context.Context, state State) error {
 }
 
 // Load retrieves the latest state for the given agentID.
-func (b *InMemoryBackend) Load(ctx context.Context, agentID string) (State, error) {
+func (b *InMemoryBackend) Load(ctx context.Context, agentID string) (State, error) { //nolint:revive // unused-parameter required by interface
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	s, ok := b.states[agentID]

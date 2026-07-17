@@ -356,7 +356,7 @@ func TestValidateArrayAndObjectTypes_v12022(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalidArguments)
 }
 
-func TestUnregisterMidConcurrentExecute_v12022(t *testing.T) {
+func TestUnregisterMidConcurrentExecute_v12022(t *testing.T) { //nolint:revive // unused-parameter required by interface
 	reg := NewRegistry(nil)
 	_ = reg.Register(ToolDef{
 		Name: "ephemeral",

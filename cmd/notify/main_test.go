@@ -234,7 +234,7 @@ func TestRunNotify_BothPaths(t *testing.T) {
 
 func TestTelegramWithStrikes_SucceedsFirstAttempt(t *testing.T) {
 	// happy-path server: returns valid JSON with ok=true
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":1}}`)
@@ -255,7 +255,7 @@ func TestTelegramWithStrikes_SucceedsFirstAttempt(t *testing.T) {
 
 func TestTelegramWithStrikes_FallbackAfterExhaustion(t *testing.T) {
 	// always-fail server
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(srv.Close)

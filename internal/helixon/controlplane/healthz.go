@@ -77,7 +77,7 @@ func (s *HealthzServer) ReqCount() int64 {
 	return s.reqCount.Load()
 }
 
-func (s *HealthzServer) handleHealthz(w http.ResponseWriter, r *http.Request) {
+func (s *HealthzServer) handleHealthz(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 	s.reqCount.Add(1)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -88,7 +88,7 @@ func (s *HealthzServer) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *HealthzServer) handleReadyz(w http.ResponseWriter, r *http.Request) {
+func (s *HealthzServer) handleReadyz(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 	s.reqCount.Add(1)
 	w.Header().Set("Content-Type", "application/json")
 	checks := map[string]string{

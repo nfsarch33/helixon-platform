@@ -29,7 +29,7 @@ func TestLoadServeConfig_ValidHeartbeat(t *testing.T) {
 	}
 }
 
-func TestPrintServeBanner(t *testing.T) {
+func TestPrintServeBanner(t *testing.T) { //nolint:revive // unused-parameter required by interface
 	// We don't have a runtime here, but we can verify the helper exists and
 	// is exported internally. The runtime banner uses rt.Phase(), etc.
 	// For a unit test we just verify the function doesn't panic on nil

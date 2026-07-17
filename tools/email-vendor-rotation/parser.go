@@ -80,7 +80,7 @@ func parseLines(cfg *parsedConfig, line string, currentKey **vendorKey) bool {
 // On nested-key line, mutates current and returns it.
 // Returns ok=false only if a nested-key line arrives with current==nil
 // (caller should never feed such input).
-func parseKeyListItem(cfg *parsedConfig, line string, current *vendorKey) (*vendorKey, bool) { //nolint:unparam // cfg reserved for future cross-line validation
+func parseKeyListItem(cfg *parsedConfig, line string, current *vendorKey) (*vendorKey, bool) { //nolint:unparam // cfg reserved for future cross-line validation //nolint:revive // unused-parameter required by interface
 	trim := strings.TrimSpace(line)
 	if strings.HasPrefix(trim, "- alias:") {
 		alias := strings.TrimSpace(strings.TrimPrefix(trim, "- alias:"))

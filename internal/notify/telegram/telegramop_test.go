@@ -24,7 +24,7 @@ import (
 // newStubOpClient returns an onepassword.Client pointed at the supplied
 // httptest server. The stub server's handler is invoked once per Resolve
 // call; tests assert on call counts.
-func newStubOpClient(t *testing.T, srvURL, secret string) *onepassword.Client {
+func newStubOpClient(t *testing.T, srvURL, secret string) *onepassword.Client { //nolint:revive // unused-parameter required by interface
 	t.Helper()
 	return &onepassword.Client{
 		Token:    "fake-token-for-test",

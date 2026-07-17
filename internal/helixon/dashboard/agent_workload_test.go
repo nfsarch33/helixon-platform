@@ -42,7 +42,7 @@ func TestAgentWorkloadFetcher_Success(t *testing.T) {
 
 func TestAgentWorkloadFetcher_WrappedResponse(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"agents": []AgentInfo{{AgentID: "a1", Status: "active"}},
@@ -62,7 +62,7 @@ func TestAgentWorkloadFetcher_WrappedResponse(t *testing.T) {
 
 func TestAgentWorkloadFetcher_ServerError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("db error"))
 	}))
@@ -77,7 +77,7 @@ func TestAgentWorkloadFetcher_ServerError(t *testing.T) {
 
 func TestAgentWorkloadHandler_GET(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		json.NewEncoder(w).Encode([]AgentInfo{{AgentID: "x", Status: "active"}})
 	}))
 	defer func() { srv.Close() }()

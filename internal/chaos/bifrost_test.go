@@ -68,7 +68,7 @@ var AllScenarios = []Scenario{
 
 // RunChaos iterates AllScenarios and reports results. The k8s cron
 // calls this. Returns the count of scenarios that PASS.
-func RunChaos(ctx context.Context, t *testing.T) (passed, failed int) {
+func RunChaos(ctx context.Context, t *testing.T) (passed, failed int) { //nolint:revive // unused-parameter required by interface
 	for _, s := range AllScenarios {
 		if !s.Enabled {
 			continue
@@ -90,12 +90,12 @@ func RunChaos(ctx context.Context, t *testing.T) (passed, failed int) {
 // brevo) and serves 503 for a random 1-3 consecutive calls before
 // returning 200. Verifies the email dispatcher recovers via the
 // weighted LRU rotation.
-func RunRandomVendorFailure(ctx context.Context, t *testing.T) error {
+func RunRandomVendorFailure(ctx context.Context, t *testing.T) error { //nolint:revive // unused-parameter required by interface
 	var requestCount atomic.Int32
 	var failureWindow atomic.Int32
 	failureWindow.Store(int32(rand.Intn(3) + 1)) // 1..3 calls fail
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		n := requestCount.Add(1)
 		if n <= failureWindow.Load() {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -123,7 +123,7 @@ func RunRandomVendorFailure(ctx context.Context, t *testing.T) error {
 // RunSlowVendor serves responses with a 5-second sleep. Verifies
 // callers respect context cancellation. (Falls in failure mode for
 // the dispatcher's 30s default; expected to fail-fast.)
-func RunSlowVendor(ctx context.Context, t *testing.T) error {
+func RunSlowVendor(ctx context.Context, _ *testing.T) error {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-time.After(5 * time.Second):
@@ -148,9 +148,9 @@ func RunSlowVendor(ctx context.Context, t *testing.T) error {
 
 // RunIntermittent4xx serves 400 on the 2nd call. Verifies the
 // retry policy treats 4xx as deterministic (fail-fast; no retry).
-func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
+func RunIntermittent4xx(ctx context.Context, t *testing.T) error { //nolint:revive // unused-parameter required by interface
 	var requestCount atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		n := requestCount.Add(1)
 		if n == 2 {
 			w.WriteHeader(http.StatusBadRequest)
@@ -188,8 +188,8 @@ func RunIntermittent4xx(ctx context.Context, t *testing.T) error {
 // RunFullOutage simulates every vendor returning 503. Verifies the
 // DLQ worker captures the failures and the system does not crash.
 // Operator-gated; manual trigger only.
-func RunFullOutage(ctx context.Context, t *testing.T) error {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func RunFullOutage(ctx context.Context, t *testing.T) error { //nolint:revive // unused-parameter required by interface
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer func() { srv.Close() }()

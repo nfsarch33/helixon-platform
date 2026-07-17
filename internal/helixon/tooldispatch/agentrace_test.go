@@ -24,7 +24,7 @@ type stubExecutor struct {
 	delay  time.Duration
 }
 
-func (s *stubExecutor) Execute(ctx context.Context, name, argsJSON string) (string, error) {
+func (s *stubExecutor) Execute(ctx context.Context, name, argsJSON string) (string, error) { //nolint:revive // unused-parameter required by interface
 	s.mu.Lock()
 	s.calls = append(s.calls, name)
 	s.mu.Unlock()

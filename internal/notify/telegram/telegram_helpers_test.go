@@ -152,7 +152,7 @@ func TestSendMessageTo_EndToEnd_HappyPath(t *testing.T) {
 // server and asserts BadRequest status propagates.
 func TestSendMessageTo_EndToEnd_BadRequest(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"ok":false,"description":"invalid chat"}`))
 	}))

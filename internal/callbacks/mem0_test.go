@@ -109,7 +109,7 @@ func TestMem0Handler_OnError_WritesCapsule(t *testing.T) {
 
 func TestMem0Handler_OnStart_NoOp(t *testing.T) {
 	requestCount := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		requestCount++
 		w.WriteHeader(200)
 	}))

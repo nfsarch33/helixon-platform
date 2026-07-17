@@ -15,7 +15,7 @@ func TestCICDStatusFetcher_Success(t *testing.T) {
 		{ID: 2, Status: "failed", Ref: "feat/x"},
 		{ID: 3, Status: "success", Ref: "main"},
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(pipelines)
 	}))
@@ -37,7 +37,7 @@ func TestCICDStatusFetcher_Success(t *testing.T) {
 
 func TestCICDStatusFetcher_Empty(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("[]"))
 	}))
@@ -80,7 +80,7 @@ func TestCICDStatusFetcher_WithToken(t *testing.T) {
 
 func TestCICDStatusHandler_GET(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		json.NewEncoder(w).Encode([]PipelineInfo{{ID: 1, Status: "success"}})
 	}))
 	defer func() { srv.Close() }()

@@ -18,7 +18,7 @@ type fakeBrevoClient struct {
 	calls int
 }
 
-func (f *fakeBrevoClient) Send(ctx context.Context, m Email) error {
+func (f *fakeBrevoClient) Send(ctx context.Context, m Email) error { //nolint:revive // unused-parameter required by interface
 	f.calls++
 	return nil
 }
@@ -28,7 +28,7 @@ func (f *fakeBrevoClient) Vendor() string { return "brevo" }
 // tracker rejects non-Brevo clients at construction.
 type fakeResendClient struct{}
 
-func (f *fakeResendClient) Send(ctx context.Context, m Email) error { return nil }
+func (f *fakeResendClient) Send(ctx context.Context, m Email) error { return nil } //nolint:revive // unused-parameter required by interface
 func (f *fakeResendClient) Vendor() string                          { return "resend" }
 
 // newTestDB returns a fresh temp-file notifydb for tracker tests.
