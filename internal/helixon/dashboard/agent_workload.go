@@ -12,6 +12,7 @@ import (
 // AgentInfo describes a registered agent and its current workload.
 type AgentInfo struct {
 	AgentID      string `json:"agent_id"`
+	TenantID     string `json:"tenant_id,omitempty"`
 	Status       string `json:"status"`
 	CurrentTask  string `json:"current_task,omitempty"`
 	Capabilities string `json:"capabilities,omitempty"`
@@ -29,6 +30,7 @@ type AgentWorkloadResponse struct {
 // AgentWorkloadFetcher queries SprintBoard for active agents and their tickets.
 type AgentWorkloadFetcher struct {
 	sprintboardURL string
+	tenantID       string // optional: when set, forwarded as tenant_id query param (v18685-1)
 	client         *http.Client
 }
 
@@ -43,9 +45,22 @@ func NewAgentWorkloadFetcher(sprintboardURL string) *AgentWorkloadFetcher {
 	}
 }
 
+// NewAgentWorkloadFetcherWithTenant creates a fetcher that scopes requests
+// to a specific tenant. Use this in v18685-1+ when the dashboard serves
+// per-tenant views.
+func NewAgentWorkloadFetcherWithTenant(sprintboardURL, tenantID string) *AgentWorkloadFetcher {
+	f := NewAgentWorkloadFetcher(sprintboardURL)
+	f.tenantID = tenantID
+	return f
+}
+
 // Fetch retrieves the current agent workload from SprintBoard.
 func (f *AgentWorkloadFetcher) Fetch(ctx context.Context) (*AgentWorkloadResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.sprintboardURL+"/api/v1/agents", nil)
+	url := f.sprintboardURL + "/api/v1/agents"
+	if f.tenantID != "" {
+		url = url + "?tenant_id=" + f.tenantID
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("agent workload: build request: %w", err)
 	}
@@ -105,6 +120,31 @@ func AgentWorkloadHandler(fetcher *AgentWorkloadFetcher) http.Handler {
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+}
+
+// TenantAgentWorkloadHandler returns an HTTP handler that reads the
+// X-Tenant-ID request header and scopes the upstream sprintboard query
+// to that tenant. Falls back to the unfiltered fetcher if the header
+// is missing (operator discretion).
+func TenantAgentWorkloadHandler(fetcher *AgentWorkloadFetcher) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		tenantID := r.Header.Get("X-Tenant-ID")
+		f := fetcher
+		if tenantID != "" {
+			f = NewAgentWorkloadFetcherWithTenant(fetcher.sprintboardURL, tenantID)
+		}
+		resp, err := f.Fetch(r.Context())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("fetch error: %v", err), http.StatusBadGateway)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	})

@@ -16,6 +16,7 @@ type SprintboardConfig struct {
 	BaseURL      string
 	AgentName    string
 	Capabilities string
+	TenantID     string // optional: stamped on every outbound payload (v18685-1)
 	Logger       *slog.Logger
 }
 
@@ -55,6 +56,7 @@ func NewSprintboardClient(cfg SprintboardConfig, logger *slog.Logger) *Sprintboa
 // AgentRegistration is the payload for auto-registration.
 type AgentRegistration struct {
 	AgentID      string `json:"agent_id"`
+	TenantID     string `json:"tenant_id,omitempty"`
 	Capabilities string `json:"capabilities"`
 	Status       string `json:"status"`
 	RegisteredAt string `json:"registered_at"`
@@ -64,6 +66,7 @@ type AgentRegistration struct {
 func (c *SprintboardClient) Register(ctx context.Context) error {
 	reg := AgentRegistration{
 		AgentID:      c.cfg.AgentName,
+		TenantID:     c.cfg.TenantID,
 		Capabilities: c.cfg.Capabilities,
 		Status:       "active",
 		RegisteredAt: time.Now().UTC().Format(time.RFC3339),
@@ -95,7 +98,8 @@ type Ticket struct {
 // ClaimTicket atomically claims a ticket for this agent.
 func (c *SprintboardClient) ClaimTicket(ctx context.Context, ticketID string) error {
 	data, _ := json.Marshal(map[string]string{
-		"agent_id": c.cfg.AgentName,
+		"agent_id":  c.cfg.AgentName,
+		"tenant_id": c.cfg.TenantID,
 	})
 	path := fmt.Sprintf("/api/v1/tickets/%s/claim", ticketID)
 	_, err := c.doPost(ctx, path, data)
