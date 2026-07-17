@@ -17,9 +17,10 @@ import (
 // AgentraceConfig controls how a TracedExecutor records NDJSON events.
 // LogPath is required; all other fields have sensible defaults.
 type AgentraceConfig struct {
-	LogPath string
-	AgentID string
-	Server  string
+	LogPath  string
+	AgentID  string
+	Server   string
+	TenantID string // optional: stamps every recorded event with this tenant ID (v18685-1)
 
 	Now func() time.Time
 }
@@ -87,6 +88,7 @@ func (t *TracedExecutor) Execute(ctx context.Context, name string, argsJSON stri
 		Tool:       name,
 		Server:     t.cfg.Server,
 		AgentID:    t.cfg.AgentID,
+		TenantID:   t.cfg.TenantID,
 		DurationMS: elapsed.Milliseconds(),
 		Success:    err == nil,
 	}
@@ -127,6 +129,7 @@ type agentraceEvent struct {
 	Tool         string `json:"tool,omitempty"`
 	Server       string `json:"server,omitempty"`
 	AgentID      string `json:"agent_id,omitempty"`
+	TenantID     string `json:"tenant_id,omitempty"`
 	DurationMS   int64  `json:"duration_ms,omitempty"`
 	Success      bool   `json:"success"`
 	ErrorMessage string `json:"error_message,omitempty"`

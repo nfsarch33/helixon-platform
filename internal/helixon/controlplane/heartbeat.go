@@ -13,6 +13,7 @@ import (
 type HeartbeatConfig struct {
 	Interval time.Duration
 	AgentID  string
+	TenantID string // optional: stamped on every HeartbeatPayload (v18685-1)
 	Logger   *slog.Logger
 }
 
@@ -32,6 +33,7 @@ func (c HeartbeatConfig) withDefaults() HeartbeatConfig {
 // HeartbeatPayload is the periodic health report.
 type HeartbeatPayload struct {
 	AgentID      string            `json:"agent_id"`
+	TenantID     string            `json:"tenant_id,omitempty"`
 	Status       string            `json:"status"`
 	Uptime       string            `json:"uptime"`
 	Iterations   int               `json:"iterations"`
@@ -155,6 +157,7 @@ func (m *HeartbeatMonitor) buildPayload() HeartbeatPayload {
 
 	return HeartbeatPayload{
 		AgentID:      m.cfg.AgentID,
+		TenantID:     m.cfg.TenantID,
 		Status:       "running",
 		Uptime:       time.Since(m.startedAt).Round(time.Second).String(),
 		Iterations:   m.iterations,
