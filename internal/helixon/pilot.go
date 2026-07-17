@@ -95,7 +95,7 @@ func LoadPilotConfig() (*PilotConfig, error) {
 		p := PilotDefaults
 		return &p, nil
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		if os.IsNotExist(err) {
 			// File missing → treat as disabled (operator-gated default).

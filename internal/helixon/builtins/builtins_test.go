@@ -117,7 +117,7 @@ func TestSprintboardTool_RegisterClaim_v8900(t *testing.T) {
 func TestFileReadTool_ReadAndTruncate(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "read_test.txt")
-	if err := os.WriteFile(testFile, []byte("hello helixon"), 0o644); err != nil {
+	if err := os.WriteFile(testFile, []byte("hello helixon"), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatal(err)
 	}
 
@@ -143,7 +143,7 @@ func TestFileReadTool_ReadAndTruncate(t *testing.T) {
 func TestFileReadTool_AllowedPaths(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "allowed.txt")
-	if err := os.WriteFile(testFile, []byte("ok"), 0o644); err != nil {
+	if err := os.WriteFile(testFile, []byte("ok"), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatal(err)
 	}
 
@@ -186,7 +186,7 @@ func TestFileWriteTool_WriteAndVerify(t *testing.T) {
 		t.Fatalf("expected byte count in output, got %q", out)
 	}
 
-	data, err := os.ReadFile(testFile)
+	data, err := os.ReadFile(testFile) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
 	}

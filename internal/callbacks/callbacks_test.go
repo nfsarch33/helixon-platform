@@ -149,7 +149,7 @@ func TestNDJSONHandler_WritesEvents(t *testing.T) {
 
 	_ = h.Close()
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
@@ -181,7 +181,7 @@ func TestNDJSONHandler_OnError_IncludesErrorMessage(t *testing.T) {
 
 	_ = h.Close()
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 
 	var evt map[string]any

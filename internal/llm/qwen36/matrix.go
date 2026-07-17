@@ -90,7 +90,7 @@ type Cell struct {
 // Errors are wrapped with context so the CLI can surface a
 // remediation hint to the operator (see cmd/choose-llm).
 func LoadFile(path string) (*Matrix, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return nil, fmt.Errorf("read matrix %q: %w", path, err)
 	}

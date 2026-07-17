@@ -85,7 +85,7 @@ cells:
 func writeMatrixFile(t *testing.T, dir string) string {
 	t.Helper()
 	p := filepath.Join(dir, "qwen36-matrix.yaml")
-	require.NoError(t, os.WriteFile(p, []byte(sampleMatrix), 0o644))
+	require.NoError(t, os.WriteFile(p, []byte(sampleMatrix), 0o644)) //nolint:gosec // G306 test fixture
 	return p
 }
 
@@ -136,7 +136,7 @@ func TestLoad_RejectsMissingFile(t *testing.T) {
 func TestLoad_RejectsMalformedYAML(t *testing.T) {
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "qwen36-matrix.yaml")
-	require.NoError(t, os.WriteFile(bad, []byte(":\n  :\n  - [[\n"), 0o644))
+	require.NoError(t, os.WriteFile(bad, []byte(":\n  :\n  - [[\n"), 0o644)) //nolint:gosec // G306 test fixture
 
 	_, err := LoadFile(bad)
 	require.Error(t, err)
@@ -146,7 +146,7 @@ func TestLoad_RejectsMalformedYAML(t *testing.T) {
 func TestLoad_RejectsEmptyCells(t *testing.T) {
 	dir := t.TempDir()
 	empty := filepath.Join(dir, "qwen36-matrix.yaml")
-	require.NoError(t, os.WriteFile(empty, []byte("schema_version: 1\ncells: {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(empty, []byte("schema_version: 1\ncells: {}\n"), 0o644)) //nolint:gosec // G306 test fixture
 
 	_, err := LoadFile(empty)
 	require.Error(t, err)
@@ -156,13 +156,13 @@ func TestLoad_RejectsEmptyCells(t *testing.T) {
 func TestLookup_ResolvesRelativeRepoRoot(t *testing.T) {
 	dir := t.TempDir()
 	cursorKBSubdir := filepath.Join(dir, "subdir", "nested")
-	require.NoError(t, os.MkdirAll(cursorKBSubdir, 0o755))
+	require.NoError(t, os.MkdirAll(cursorKBSubdir, 0o755)) //nolint:gosec // G301 test fixture
 
 	kbbasedir := filepath.Dir(filepath.Dir(cursorKBSubdir))
-	require.NoError(t, os.MkdirAll(filepath.Join(kbbasedir, "scripts", "fleet"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(kbbasedir, "scripts", "fleet"), 0o755)) //nolint:gosec // G301 test fixture
 
 	matrixPath := filepath.Join(kbbasedir, "scripts", "fleet", "qwen36-matrix.yaml")
-	require.NoError(t, os.WriteFile(matrixPath, []byte(sampleMatrix), 0o644))
+	require.NoError(t, os.WriteFile(matrixPath, []byte(sampleMatrix), 0o644)) //nolint:gosec // G306 test fixture
 
 	m, err := Lookup(kbbasedir)
 	require.NoError(t, err)

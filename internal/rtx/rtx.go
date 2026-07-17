@@ -97,7 +97,7 @@ func New(opts Options) (*Cache, error) {
 		now:  opts.Now,
 		mem:  map[string]Record{},
 	}
-	if err := os.MkdirAll(filepath.Dir(opts.Path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(opts.Path), 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		return nil, fmt.Errorf("rtx: mkdir: %w", err)
 	}
 	return c, nil
@@ -107,9 +107,9 @@ func New(opts Options) (*Cache, error) {
 // pair. Exported for tests + external callers that want to inspect.
 func Key(prompt, stateHash string) string {
 	h := fnv.New64a()
-	h.Write([]byte(prompt))
-	h.Write([]byte{0x1f}) // separator (unit separator, never in JSON)
-	h.Write([]byte(stateHash))
+	_, _ = h.Write([]byte(prompt))    //nolint:gosec // G104 -- h.Write on hash.Hash never returns err
+	_, _ = h.Write([]byte{0x1f})      //nolint:gosec // G104 -- h.Write on hash.Hash never returns err
+	_, _ = h.Write([]byte(stateHash)) //nolint:gosec // G104 -- h.Write on hash.Hash never returns err
 	return fmt.Sprintf("fnv64a:%016x", h.Sum64())
 }
 
@@ -169,7 +169,7 @@ func (c *Cache) Store(r Record) error {
 	// (cheap for <10k entries). Original blank branch retained here
 	// to make the design decision explicit; suppressed via SA9003.
 	// Append to file (NDJSON).
-	f, err := os.OpenFile(c.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(c.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // G302 file perms 0750 acceptable for non-secret runtime files
 	if err != nil {
 		return fmt.Errorf("rtx.Store: open: %w", err)
 	}

@@ -44,7 +44,7 @@ func TestDoctor_LoadsConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "helixon.yaml")
 	body := "agent_id: test\ntimeout: 1m\nheartbeat_every: 30s\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write: %v", err)
 	}
 	out, _, err := runRoot(t, "doctor", "--config", path)
@@ -161,7 +161,7 @@ func TestLoadConfig_HappyPath(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "helixon.yaml")
 	body := "agent_id: cfg-test\ntimeout: 30s\nheartbeat_every: 10s\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write: %v", err)
 	}
 	cfg, err := loadConfig(path)
@@ -192,7 +192,7 @@ func TestServe_BadHeartbeat(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "helixon.yaml")
 	body := "agent_id: serve-test\ntimeout: 30s\nheartbeat_every: 10s\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write: %v", err)
 	}
 	_, _, err := runRoot(t, "serve", "--config", path, "--heartbeat", "not-a-duration")
@@ -261,10 +261,10 @@ func freeTCPAddr(t *testing.T) string {
 func TestPlatform_ExposesHealthzAndReadyz_v14509(t *testing.T) {
 	addr := freeTCPAddr(t)
 	bin := filepath.Join(t.TempDir(), "helixon")
-	if err := exec.Command("go", "build", "-o", bin, "../../cmd/helixon").Run(); err != nil {
+	if err := exec.Command("go", "build", "-o", bin, "../../cmd/helixon").Run(); err != nil { //nolint:gosec // G204 test fixture
 		t.Fatalf("go build helixon: %v", err)
 	}
-	cmd := exec.Command(bin, "platform", "--addr", addr)
+	cmd := exec.Command(bin, "platform", "--addr", addr) //nolint:gosec // G204 test fixture
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	if err := cmd.Start(); err != nil {

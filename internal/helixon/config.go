@@ -46,7 +46,7 @@ func LoadConfig(path string) (RuntimeConfig, error) {
 	if path == "" {
 		return RuntimeConfig{}, errors.New("helixon: empty config path")
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return RuntimeConfig{}, fmt.Errorf("helixon: read %s: %w", path, err)
 	}

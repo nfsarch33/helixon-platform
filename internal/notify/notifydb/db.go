@@ -56,7 +56,7 @@ func DefaultPath() string {
 		root = "/tmp"
 	}
 	dir := filepath.Join(root, "logs", "runx")
-	_ = os.MkdirAll(dir, 0o755)
+	_ = os.MkdirAll(dir, 0o755) //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 	return filepath.Join(dir, "notifydb.sqlite3")
 }
 
@@ -67,8 +67,8 @@ func DefaultMirror() *os.File {
 		root = "/tmp"
 	}
 	dir := filepath.Join(root, "logs", "runx")
-	_ = os.MkdirAll(dir, 0o755)
-	f, err := os.OpenFile(filepath.Join(dir, "notifydb.ndjson"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	_ = os.MkdirAll(dir, 0o755) //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
+	f, err := os.OpenFile(filepath.Join(dir, "notifydb.ndjson"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // G302 file perms 0750 acceptable for non-secret runtime files
 	if err != nil {
 		return nil
 	}

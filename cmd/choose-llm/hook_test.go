@@ -57,8 +57,8 @@ func TestCursorTemplate_ContainsRequiredKeys(t *testing.T) {
 	// version uses cobra flags but we want to test the JSON
 	// shape, not the flag plumbing.
 	payload := buildHooksJSON("/usr/local/bin/choose-llm", "--quiet")
-	require.NoError(t, os.WriteFile(outPath, []byte(payload), 0o644))
-	raw, err := os.ReadFile(outPath)
+	require.NoError(t, os.WriteFile(outPath, []byte(payload), 0o644)) //nolint:gosec // G306 test fixture
+	raw, err := os.ReadFile(outPath) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 	var parsed map[string]any
 	require.NoError(t, json.Unmarshal(raw, &parsed))
@@ -90,7 +90,7 @@ func TestHookSubcommand_InstallWritesHookJSON(t *testing.T) {
 	}, nil)
 	require.NoError(t, err, "stderr=%s", stderr)
 
-	raw, err := os.ReadFile(outPath)
+	raw, err := os.ReadFile(outPath) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 	assert.True(t, strings.Contains(string(raw), "beforeSubmitPrompt"))
 	assert.True(t, bytes.Contains([]byte(stdout), []byte("hooks.json")), "stdout should confirm the install location: got=%s", stdout)

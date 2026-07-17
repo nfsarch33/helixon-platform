@@ -145,7 +145,7 @@ func newHookInstallCmd() *cobra.Command {
 		Short: "Write a Cursor hooks.json entry that wires choose-llm into beforeSubmitPrompt",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			payload := buildHooksJSON(binary, flags)
-			if err := os.WriteFile(out, []byte(payload), 0o644); err != nil {
+			if err := os.WriteFile(out, []byte(payload), 0o644); err != nil { //nolint:gosec // G306 file perms 0644 acceptable for non-secret output
 				return fmt.Errorf("write hooks.json %q: %w", out, err)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "wrote Cursor hooks snippet to %s\n", out)

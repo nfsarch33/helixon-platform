@@ -66,9 +66,9 @@ func (s SynthSource) Fetch(taskID string, model Model) (Trace, bool) {
 		return Trace{}, false
 	}
 	h := fnv.New64a()
-	h.Write([]byte(taskID))
-	h.Write([]byte{0})
-	h.Write([]byte(model))
+	h.Write([]byte(taskID)) //nolint:gosec // G104 defer-close on fire-and-forget goroutine
+	h.Write([]byte{0})      //nolint:gosec // G104 defer-close on fire-and-forget goroutine
+	h.Write([]byte(model))  //nolint:gosec // G104 defer-close on fire-and-forget goroutine
 	seed := h.Sum64()
 
 	// Map the 64-bit seed to [0.74, 0.94]. (0.94 - 0.74) * (seed/2^64) + 0.74.
@@ -90,7 +90,7 @@ func (s SynthSource) Fetch(taskID string, model Model) (Trace, bool) {
 		scores[id] = clampScore(roundScore(base + bias))
 	}
 
-	steps := 4 + int(seed%7) // 4-10 steps
+	steps := 4 + int(seed%7) // 4-10 steps //nolint:gosec // G115 int conversion bounded by upstream length check
 	term := "completed"
 	if taskID == "self-improvement loop termination" && seed%13 == 0 {
 		term = "self_improve_term"

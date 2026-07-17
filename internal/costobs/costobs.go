@@ -87,10 +87,10 @@ func NewWriter(w io.Writer) *Writer {
 // in append mode so concurrent processes can extend the same sink.
 // Existing rows are preserved.
 func OpenFile(p string) (*Writer, error) {
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		return nil, fmt.Errorf("costobs: mkdir parent: %w", err)
 	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644) //nolint:gosec // G302 file perms 0750 acceptable for non-secret runtime files
 	if err != nil {
 		return nil, fmt.Errorf("costobs: open %q: %w", p, err)
 	}

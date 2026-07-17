@@ -211,7 +211,7 @@ func TestRegistrySaveLoad_RoundTrip(t *testing.T) {
 	if err := reg.Save(); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestRegistryLoad_MissingFileIsOK(t *testing.T) {
 func TestRegistryLoad_CorruptFileIsError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "broken.json")
-	if err := os.WriteFile(path, []byte("not json"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("not json"), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatal(err)
 	}
 	reg := New(path)

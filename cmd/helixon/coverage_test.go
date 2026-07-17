@@ -70,5 +70,5 @@ func TestServe_InvalidHeartbeatErrors(t *testing.T) {
 }
 
 func writeFile(path, body string) error {
-	return os.WriteFile(path, []byte(body), 0o644)
+	return os.WriteFile(path, []byte(body), 0o644) //nolint:gosec // G306 test fixture
 }

@@ -26,43 +26,42 @@ linters:
     - unconvert      # unnecessary conversions
     - unparam        # unused parameters
     - whitespace     # whitespace
+  settings:
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G115  # bounded by upstream length check (helixon-eval/tasks.go:93)
+        - G404  # weak rand OK in chaos test fixtures (bifrost_test.go:96)
+    revive:
+      severity: warning
+    misspell:
+      locale: US
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-tags:
+        - experimental
+    staticcheck:
+      checks: ["all"]
+    errorlint:
+      asserts: false
+      comparison: false
+  exclusions:
+    rules:
+      - path: examples/
+        linters:
+          - gocritic
+          - gosec
 
 formatters:
   enable:
     - gofmt
     - goimports
 
-linters-settings:
-  gosec:
-    severity: medium
-    confidence: medium
-  revive:
-    severity: warning
-  misspell:
-    locale: US
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-tags:
-      - experimental
-  staticcheck:
-    checks: ["all"]
-  errorlint:
-    asserts: false
-    comparison: false
-
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-    - path: examples/
-      linters:
-        - gocritic
-        - gosec
   max-issues-per-linter: 50
   max-same-issues: 5
 

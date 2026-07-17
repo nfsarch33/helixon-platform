@@ -60,7 +60,7 @@ func TestCheckpoint_EmitLocked_PathTraversalAlwaysReturnsValid(t *testing.T) {
 			t.Fatalf("OnToolCall %d: %v", i+1, err)
 		}
 	}
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}

@@ -204,10 +204,10 @@ func ackAlert(amURL string, a Alert, window time.Duration, sprintID, createdBy, 
 }
 
 func appendNDJSON(path string, row Incident) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return err
 	}

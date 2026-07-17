@@ -47,7 +47,7 @@ type Rubric struct {
 // allows --prompts to point at a custom file for operator-time
 // prompt-set revision.
 func LoadPromptsFile(p string) ([]Prompt, error) {
-	raw, err := os.ReadFile(p)
+	raw, err := os.ReadFile(p) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return nil, fmt.Errorf("read prompts %q: %w", p, err)
 	}

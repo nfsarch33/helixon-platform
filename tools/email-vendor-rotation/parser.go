@@ -20,7 +20,7 @@ import (
 //
 // loadConfig (CC=3) itself is now a thin orchestrator.
 func loadConfig(path string) (*parsedConfig, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}

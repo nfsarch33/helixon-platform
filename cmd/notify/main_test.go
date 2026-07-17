@@ -78,7 +78,7 @@ func writeBodyFile(t *testing.T, body string) string {
 	t.Helper()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "body.md")
-	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write body file: %v", err)
 	}
 	return p

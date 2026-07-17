@@ -33,7 +33,7 @@ func TestAgentraceEmit_AppendsLoopTripEvent(t *testing.T) {
 		t.Fatalf("Emit: %v", err)
 	}
 
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestAgentraceEmit_ConcurrentSafe(t *testing.T) {
 	}
 	wg.Wait()
 
-	data, _ := os.ReadFile(logPath)
+	data, _ := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
 	if len(lines) != N {
 		t.Fatalf("lines: want %d, got %d", N, len(lines))

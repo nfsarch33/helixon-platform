@@ -122,7 +122,7 @@ func TestLoadFromFile_InvalidJSONLineSkipped(t *testing.T) {
 	gb, _ := json.Marshal(good)
 	contents := append(gb, '\n')
 	contents = append(contents, []byte("not-valid-json\n")...)
-	if err := os.WriteFile(p, contents, 0o644); err != nil {
+	if err := os.WriteFile(p, contents, 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatal(err)
 	}
 

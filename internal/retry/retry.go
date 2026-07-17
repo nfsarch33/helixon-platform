@@ -167,7 +167,7 @@ func jitter(d time.Duration, fraction float64) time.Duration {
 	}
 	span := float64(d) * fraction
 	// rand.Int63n returns in [0, span*2); we offset by -span to get +/- span.
-	delta := time.Duration(rand.Int63n(int64(span*2))) - time.Duration(span)
+	delta := time.Duration(rand.Int63n(int64(span*2))) - time.Duration(span) //nolint:gosec // G404 weak rand acceptable for non-crypto sampling
 	out := d + delta
 	if out < 0 {
 		return 0

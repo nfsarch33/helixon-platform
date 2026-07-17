@@ -113,7 +113,7 @@ func TestAckAlert_WetRunPostsSilenceAndAppendsRow(t *testing.T) {
 		t.Fatalf("second matcher wrong: %+v", gotBody.Matchers[1])
 	}
 
-	body, err := os.ReadFile(inc)
+	body, err := os.ReadFile(inc) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read incidents: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestAppendNDJSON_AppendOnly(t *testing.T) {
 			t.Fatalf("append: %v", err)
 		}
 	}
-	body, _ := os.ReadFile(inc)
+	body, _ := os.ReadFile(inc) //nolint:gosec // G304 test fixture
 	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
 	if len(lines) != 3 {
 		t.Fatalf("expected 3 lines, got %d", len(lines))

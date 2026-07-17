@@ -103,7 +103,7 @@ func TestWorkspaceInjector(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md")) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "TestBot Agent")
 	assert.Contains(t, string(data), "- search")
@@ -111,13 +111,13 @@ func TestWorkspaceInjector(t *testing.T) {
 
 	err = inj.WriteSOULMD("TestBot", nil)
 	require.NoError(t, err)
-	data, err = os.ReadFile(filepath.Join(dir, "SOUL.md"))
+	data, err = os.ReadFile(filepath.Join(dir, "SOUL.md")) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "Personality Traits")
 
 	err = inj.WriteUSERMD("user-123", map[string]string{"language": "Go", "style": "TDD"})
 	require.NoError(t, err)
-	data, err = os.ReadFile(filepath.Join(dir, "USER.md"))
+	data, err = os.ReadFile(filepath.Join(dir, "USER.md")) //nolint:gosec // G304 test fixture
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "user-123")
 	assert.Contains(t, string(data), "Go")

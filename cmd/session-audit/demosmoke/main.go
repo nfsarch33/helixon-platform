@@ -20,7 +20,7 @@ func main() {
 
 func run() error {
 	dir := filepath.Join(os.Getenv("HOME"), "logs", "runx")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
 	path := notifydb.DefaultPath()

@@ -145,7 +145,7 @@ func readBodyFileOptional(path string) (string, int) {
 	if path == "" {
 		return "", 0
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: read body-file: %v\n", err)
 		return "", 2

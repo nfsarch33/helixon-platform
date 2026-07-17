@@ -258,7 +258,7 @@ func selectKey(cfg *parsedConfig, vendor string) *vendorKey {
 
 func readSecret(vault, itemID, field string) (string, error) {
 	ref := fmt.Sprintf("op://%s/%s/%s", vault, itemID, field)
-	out, err := exec.Command("op", "read", ref).Output()
+	out, err := exec.Command("op", "read", ref).Output() //nolint:gosec // G204 subprocess executes pinned tool path
 	if err != nil {
 		return "", fmt.Errorf("op read %s: %w", ref, err)
 	}

@@ -204,7 +204,7 @@ func TestBrevoQuotaTracker_Emit_NDJSONLine(t *testing.T) {
 	tr.emit(QuotaStatus{Level: "alert", Delta: 48 * time.Hour, OldestUse: time.Now().Add(-48 * time.Hour)})
 
 	logPath := filepath.Join(tmp, "logs", "runx", "agentrace-mcp.ndjson")
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // G304 test fixture
 	if err != nil {
 		t.Fatalf("read agentrace log: %v", err)
 	}

@@ -29,7 +29,7 @@ type ReportWriter struct {
 // The parent directory is created if needed.
 func NewReportWriter(path string) (*ReportWriter, error) {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		return nil, err
 	}
 	return &ReportWriter{path: path}, nil
@@ -61,7 +61,7 @@ func (w *ReportWriter) Write(result *SuiteResult) error {
 	}
 	data = append(data, '\n')
 
-	f, err := os.OpenFile(w.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(w.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // G302 file perms 0750 acceptable for non-secret runtime files
 	if err != nil {
 		return err
 	}

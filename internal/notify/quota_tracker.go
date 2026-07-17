@@ -180,7 +180,7 @@ func (t *BrevoQuotaTracker) emit(status QuotaStatus) {
 		home = "/tmp"
 	}
 	logPath := filepath.Join(home, "logs", "runx", "agentrace-mcp.ndjson")
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		slog.Default().Warn("brevo quota tracker mkdir failed", "err", err)
 		return
 	}
@@ -192,7 +192,7 @@ func (t *BrevoQuotaTracker) emit(status QuotaStatus) {
 		"delta_hours": formatHours(status.Delta),
 		"oldest_use":  status.OldestUse.UTC().Format(time.RFC3339),
 	})
-	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // G304 file op with operator/cli-provided path
 	if err != nil {
 		slog.Default().Warn("brevo quota tracker open log failed", "err", err)
 		return

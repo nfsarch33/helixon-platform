@@ -48,7 +48,7 @@ func main() {
 	}
 
 	p := expandHome(*path)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil { //nolint:gosec // G301 dir perms 0750 acceptable for runtime cache dirs
 		fmt.Fprintf(os.Stderr, "mkdir %s: %v\n", filepath.Dir(p), err)
 		os.Exit(1)
 	}

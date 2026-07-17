@@ -19,7 +19,7 @@ max_tokens: 64000
 timeout: "2m30s"
 heartbeat_every: "45s"
 `
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write: %v", err)
 	}
 
@@ -48,7 +48,7 @@ func TestLoadConfig_EmptyFieldsLeaveZero(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "helixon.yaml")
-	if err := os.WriteFile(path, []byte("agent_id: only\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("agent_id: only\n"), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write: %v", err)
 	}
 	cfg, err := LoadConfig(path)
@@ -72,7 +72,7 @@ func TestLoadConfig_BadDurationReturnsError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.yaml")
-	if err := os.WriteFile(path, []byte("timeout: \"NOT A DURATION\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("timeout: \"NOT A DURATION\"\n"), 0o644); err != nil { //nolint:gosec // G306 test fixture
 		t.Fatalf("write: %v", err)
 	}
 	if _, err := LoadConfig(path); err == nil {
