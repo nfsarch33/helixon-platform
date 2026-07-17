@@ -1,5 +1,6 @@
 # Binaries
 /helixon
+/helixon-eval
 /send-end-email
 /tools/email-vendor-rotation/email-vendor-rotation
 *.exe
