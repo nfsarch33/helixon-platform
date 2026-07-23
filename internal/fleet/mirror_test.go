@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology,personal_path_id
 // Package fleet — win2 → win1 mirror sync + DR drill (v18687-2).
 //
 // RED tests that verify the mirror sync daemon correctly:

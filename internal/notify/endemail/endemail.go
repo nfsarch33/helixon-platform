@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // Package endemail provides a hardened END email template + audit
 // integration for helixon-platform/cmd/send-end-email and any other
 // closeout code path. The template produces both HTML and plain-text

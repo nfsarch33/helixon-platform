@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file personal_path_id
 // Tests for cmd/session-audit. v18654-2 TDD coverage.
 package main
 

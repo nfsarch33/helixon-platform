@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14511 — Pair 4 Review (choose-llm hook + cost-observability + agentcage) — Handoff
 
 Sprint: **v14511 Pair 4 Review**

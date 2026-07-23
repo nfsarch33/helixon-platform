@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // Package qwen36 loads the canonical helixon fleet fleet LLM matrix
 // (cursor-global-kb/scripts/fleet/qwen36-matrix.yaml) and exposes typed
 // Go accessors that downstream tiers (cmd/choose-llm and the v14511

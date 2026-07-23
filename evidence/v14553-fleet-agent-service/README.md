@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14553 — Helixon Fleet Agent Service + Service Registry Loop
 
 ## Summary

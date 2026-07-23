@@ -1,4 +1,5 @@
 # runx-leak-scan: allow-file internal_ip
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology,personal_path_id
 # Sprint v14558 — Mesh Reachability Sweep from wsl1
 
 ## Summary

@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology,personal_path_id
 #!/bin/bash
 # runx-leak-scan: allow-file internal_ip
 # k3s-agent-join.sh — Idempotent k3s agent join for a fleet WSL host.

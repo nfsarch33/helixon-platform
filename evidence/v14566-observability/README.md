@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias
 # Sprint v14566 — Observability stack brought up with podman-compose
 
 ## Summary

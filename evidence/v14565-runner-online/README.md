@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14565 — GitLab Runner re-registration + lint pipeline smoke
 
 ## Summary

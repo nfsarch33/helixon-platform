@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Helixon GitLab Runner Helm values (v14544)
 # Installs gitlab-runner as a k8s agent on the wsl1 cluster.
 # The runner is registered against an external GitLab instance

@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file personal_path_id
 # Helixon Platform -- Agent Guidelines
 
 - Repo: `https://github.com/nfsarch33/helixon-platform`

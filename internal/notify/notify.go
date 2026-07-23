@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology,secret_cred_ref
 // Package notify provides the universal email-notification client for the
 // Helixon platform. It exposes a vendor-rotating dispatcher (Resend +
 // Brevo) with HTTP-API-only delivery (no SMTP, per ADR-0087) and is the

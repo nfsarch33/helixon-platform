@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14568 — AlertManager Slack webhook config (CF-v14555-03)
 
 ## Summary

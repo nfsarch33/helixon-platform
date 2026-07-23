@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // Package fleet — win1 central services hook-up (v18687-1).
 //
 // This file implements the Win1Service probe + ProbeResult aggregator

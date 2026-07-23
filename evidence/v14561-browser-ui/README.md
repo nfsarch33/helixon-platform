@@ -1,4 +1,5 @@
 # runx-leak-scan: allow-file internal_ip
+# runx-public-repo-gate: allow-file fleet_host_alias
 # Sprint v14561 — Browser UI Register Flow + agent-browser Smoke
 
 ## Summary

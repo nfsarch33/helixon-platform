@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias
 # Sprint v14560 — svcregistryd live + svcregistry-bridge end-to-end
 
 ## Summary

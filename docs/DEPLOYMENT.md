@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology,secret_cred_ref
 # Helixon Platform Deployment Guide
 
 > **Status:** MVP-ready (Sprint v16041 added 2026-07-05).

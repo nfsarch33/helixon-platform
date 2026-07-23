@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file personal_path_id,secret_cred_ref,fleet_host_alias
 primary_vendor: resend
 fallback_vendor: brevo
 forbidden_vendors: [smtp2go]

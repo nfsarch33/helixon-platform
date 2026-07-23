@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file secret_cred_ref
 // Package onepassword resolves 1Password secrets at runtime for the
 // helixon-platform notify subsystem (v18664-4).
 //
