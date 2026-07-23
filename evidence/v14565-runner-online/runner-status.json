@@ -1,7 +1,7 @@
 === GitLab Runner Auth Token (from 1Password) ===
-token_prefix=glrt-HWa3UDzgdUutaPV...
+token_prefix=<REDACTED-GITLAB-RUNNER-TOKEN-PREFIX>
 token_len=56
-token_sha256=7d5080c1fae39841d6375b0c8aeea3f5b64fa4618633fd46530d30b5b955dffb
+token_sha256=<REDACTED-GITLAB-RUNNER-TOKEN-SHA256>
 
 === GitLab CI lint via docker (gitlabci-lint) ===
 Validating ci/sentrux.gitlab-ci.yml ...
