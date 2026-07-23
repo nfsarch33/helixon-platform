@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias
 #!/bin/bash
 # k3s-agent-join-wsl3.sh — wsl3-specific join (dev-planning role)
 # Usage:

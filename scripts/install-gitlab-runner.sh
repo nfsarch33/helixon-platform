@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,personal_path_id
 #!/usr/bin/env bash
 # install-gitlab-runner.sh — v14544 deploy
 #

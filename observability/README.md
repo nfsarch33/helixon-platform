@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file internal_service_id
 # observability/
 
 Helixon observability sidecar (Prometheus + Grafana + Alertmanager).

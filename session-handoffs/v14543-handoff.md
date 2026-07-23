@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14543 — OCI web-UI SOP + agent-browser playbook (Pair 2 Review)
 
 **Status:** ✅ Completed (CF-OP-01 partially automated, full closure pending operator)

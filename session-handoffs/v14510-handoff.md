@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias
 # v14510 Pair 4 MVP — handoff
 
 - **Sprint:** v14510 (Pair 4 MVP)

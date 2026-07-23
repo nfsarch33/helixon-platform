@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14547 — Pair 4 Review: engramd + sprintboard-api + llm-router systemd user units + observability AlertManager
 
 **Status:** COMPLETE

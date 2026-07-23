@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Helixon k3s Cluster Diagram (v14563)
 
 ```mermaid

@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14555 — win2 + win4 → wsl1 Full Mesh + Observability Rollout
 
 ## Summary

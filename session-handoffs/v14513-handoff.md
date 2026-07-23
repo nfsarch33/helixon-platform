@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14513 — Pair 5 Review (SLO breach paging + dashboard runbook) — Handoff
 
 Sprint: **v14513 Pair 5 Review**

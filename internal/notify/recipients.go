@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 // Package notify — v17607-6 recipient unification.
 //
 // Canonical recipient allowlist (per v16101 + CARRY-044):

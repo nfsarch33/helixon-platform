@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14548 — Pair 5 MVP: Systemd timers (cleanup-orphaned-wsl-procs 30m, fleet-doctor 6h, engram-prune 24h)
 
 **Status:** COMPLETE

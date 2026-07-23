@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,secret_cred_ref,network_topology
 // Package main implements the email-vendor-rotation tool for v16301.
 //
 // Strategy (per ADR-0087 + v16301 operator directive):

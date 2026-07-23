@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14559 — win4 LAN + Tailscale Verification (CF-v14529-02 follow-up)
 
 ## Summary

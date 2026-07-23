@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // Package fleet — win1 central services hook-up (v18687-1).
 //
 // RED tests that verify the 4 central services reachable on win1/wsl1:

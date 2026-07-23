@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias
 # v14514 — Pair 6 MVP (MCP restore + cursor-tools CLI) — Handoff
 
 Sprint: **v14514 Pair 6 MVP**

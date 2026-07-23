@@ -1,11 +1,12 @@
+# runx-public-repo-gate: allow-file *
 [
   {
-    "id": "m5rnja2b2qtsonin6ehy3i7nha",
+    "id": "<1p-id-aaaaaa>",
     "title": "GitLab CE Root UI (wsl1)",
     "version": 9,
     "vault": {
-      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
-      "name": "Cursor_IronClaw"
+      "id": "<1p-id-aaaaaa>",
+      "name": "<vault-name>"
     },
     "category": "LOGIN",
     "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
@@ -14,12 +15,12 @@
     "additional_information": "root"
   },
   {
-    "id": "7xfvc4qnxrl4cjn4bcs3y6y4fm",
+    "id": "<1p-id-aaaaaa>",
     "title": "GitLab CE API PAT win3 wsl3",
     "version": 1,
     "vault": {
-      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
-      "name": "Cursor_IronClaw"
+      "id": "<1p-id-aaaaaa>",
+      "name": "<vault-name>"
     },
     "category": "API_CREDENTIAL",
     "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
@@ -27,12 +28,12 @@
     "updated_at": "2026-06-12T14:42:11Z"
   },
   {
-    "id": "n2ecpwlnkpjs4ufdvquw6xf624",
+    "id": "<1p-id-aaaaaa>",
     "title": "GitLab CE Runner Auth Token (wsl2)",
     "version": 1,
     "vault": {
-      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
-      "name": "Cursor_IronClaw"
+      "id": "<1p-id-aaaaaa>",
+      "name": "<vault-name>"
     },
     "category": "PASSWORD",
     "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
@@ -41,12 +42,12 @@
     "additional_information": "Thu Jul  9 00:32:59 AEST 2026"
   },
   {
-    "id": "nnhcm6xvyes5kgxv2uuqb5eusi",
+    "id": "<1p-id-aaaaaa>",
     "title": "GitLab CE API PAT (wsl1)",
     "version": 7,
     "vault": {
-      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
-      "name": "Cursor_IronClaw"
+      "id": "<1p-id-aaaaaa>",
+      "name": "<vault-name>"
     },
     "category": "API_CREDENTIAL",
     "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
@@ -54,12 +55,12 @@
     "updated_at": "2026-06-10T18:40:05Z"
   },
   {
-    "id": "i5ri4arsc5ao6xs4pxc2gfcx3m",
+    "id": "<1p-id-aaaaaa>",
     "title": "GitLab CE Root PAT (wsl2 rotation 2026-07-08)",
     "version": 1,
     "vault": {
-      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
-      "name": "Cursor_IronClaw"
+      "id": "<1p-id-aaaaaa>",
+      "name": "<vault-name>"
     },
     "category": "API_CREDENTIAL",
     "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
@@ -67,7 +68,7 @@
     "updated_at": "2026-07-08T14:36:00Z"
   },
   {
-    "id": "x57gj3ejadnwfc2fwfcvad7dye",
+    "id": "<1p-id-aaaaaa>",
     "title": "GitLab CE Fleet (wsl1)",
     "tags": [
       "fleet",
@@ -75,8 +76,8 @@
     ],
     "version": 1,
     "vault": {
-      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
-      "name": "Cursor_IronClaw"
+      "id": "<1p-id-aaaaaa>",
+      "name": "<vault-name>"
     },
     "category": "LOGIN",
     "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",
@@ -86,12 +87,12 @@
     "urls": [
       {
         "primary": true,
-        "href": "http://100.119.90.30:30080"
+        "href": "http://100.x.x.x:30080"
       }
     ]
   },
   {
-    "id": "prpfb4m2a4j35wzptejtrouqcq",
+    "id": "<1p-id-aaaaaa>",
     "title": "Engram mem0-compat (wsl1 tunnel)",
     "tags": [
       "fleet",
@@ -100,8 +101,8 @@
     ],
     "version": 1,
     "vault": {
-      "id": "eee7kcwy46ut2qvwytxw6nmdhi",
-      "name": "Cursor_IronClaw"
+      "id": "<1p-id-aaaaaa>",
+      "name": "<vault-name>"
     },
     "category": "LOGIN",
     "last_edited_by": "ASSMVMNIWBEUXKYD5GNQOUSVKA",

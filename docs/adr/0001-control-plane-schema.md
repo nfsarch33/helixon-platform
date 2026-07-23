@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # ADR 0001: Helixon control-plane persistent schema
 
 - **Status:** Accepted (v14509 Sentrux pair-3 audit, 2026-07-15)
