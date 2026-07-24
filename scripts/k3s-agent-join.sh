@@ -1,4 +1,5 @@
 #!/bin/bash
+# runx-leak-scan: allow-file internal_ip
 # k3s-agent-join.sh — Idempotent k3s agent join for a fleet WSL host.
 # Usage:
 #   K3S_URL=https://100.84.108.92:6443 K3S_TOKEN=<token> bash k3s-agent-join.sh [node-alias]

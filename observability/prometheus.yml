@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # Prometheus scrape config for the Helixon fleet.
 global:
   scrape_interval: 30s

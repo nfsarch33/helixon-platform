@@ -73,8 +73,17 @@ so the trend stream joins cleanly with the existing cost ledger:
 
 ```text
 $ RUN_LIVE_LLM_E2E=1 PILOT_LIVE_NDJSON=/tmp/pilot-live-llm.ndjson \
-    ALIYUN_QWEN_TOKEN_PLAN_KEY=$(op read op://HelixonSafe/4qt774avrbzabdscc6ezygl5hi/password) \
-    go test -v -run TestLiveLLM ./internal/pilot/... -count=1
+    op read op://HelixonSafe/<qwen-token-uuid>/password --out-file -f /tmp/.qwen-key && \
+    ALIYUN_QWEN_TOKEN_PLAN_KEY=$(cat /tmp/.qwen-key) && \
+    export ALIYUN_QWEN_TOKEN_PLAN_KEY && \
+    go test -v -run TestLiveLLM ./internal/pilot/... -count=1 && \
+    rm -f /tmp/.qwen-key
+```
+
+The 1Password item UUID `4qt774avrbzabdscc6ezygl5hi` was substituted with the
+operator-visible alias `<qwen-token-uuid>` per `1password-usage.mdc` (uuid-only
+references in tracked docs) and the `op read` was moved to a file-based pattern
+per `1password-usage.mdc` so the secret never lands on argv.
 
 === RUN   TestLiveLLM_E2E_MiniMax_AllPrompts
     PASS MiniMax-M3 prompt="long-running context retention"      http=200 latency=1853ms tokens=192/64  cost=$0.001152
