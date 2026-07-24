@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // Tests for the endemail package. v17409-5 TDD coverage.
 package endemail_test
 

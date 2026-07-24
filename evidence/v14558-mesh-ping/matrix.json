@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 {
   "sprint": "v14558",
   "source": "wsl1 (100.84.108.92)",

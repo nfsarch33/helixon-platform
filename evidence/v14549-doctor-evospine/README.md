@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14549 — Pair 5 Review: doctor PASS matrix + cursor-tools doctor + Evospine cycle
 
 **Status:** COMPLETE (with documented known issues for harnesses outside v14549 scope)

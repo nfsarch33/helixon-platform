@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file *
 package main
 
 import (

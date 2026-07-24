@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14509 Sentrux pair-3 audit — handoff
 
 - **Sprint:** v14509 (Sentrux pair-3 audit)

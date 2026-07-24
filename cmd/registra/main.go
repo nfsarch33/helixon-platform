@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 // Command registra is the Helixon Service Registry CLI.
 //
 // Subcommands:

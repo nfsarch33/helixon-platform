@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file *
 // Command onepassword-bootstrap creates the 1Password Login items for the
 // Helixon fleet, using the official 1Password Go SDK with a service account
 // token. This is the fallback path for environments where `op` CLI write

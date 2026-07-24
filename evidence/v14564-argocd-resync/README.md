@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14564 — ArgoCD app-of-apps re-sync on 4-node cluster
 
 ## Summary

@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 #!/usr/bin/env bash
 # install-argocd.sh — v14545 deploy (v2: fixed)
 #

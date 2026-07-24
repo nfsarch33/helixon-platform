@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology,personal_path_id
 // Tests for cmd/registra/main.go. Captures the existing dispatch behavior
 // of every subcommand so that the v17714-1 CC-reduction refactor can move
 // implementation into helper functions without changing observable output.

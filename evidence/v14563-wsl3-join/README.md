@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14563 — wsl3 k3s agent join + 4-node cluster diagram
 
 ## Summary

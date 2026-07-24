@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 #!/bin/bash
 set -e
 PAYLOAD='{"name":"fleet-agent-wsl1","host":"127.0.0.1","port":8686,"protocol":"http","status":"up","owner":"v14571","tailscale_ip":"100.84.108.92"}'

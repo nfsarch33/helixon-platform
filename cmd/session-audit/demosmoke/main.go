@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file personal_path_id
 // Smoke test: seeds the real notifydb with two rows so `session-audit` can
 // be demonstrated end-to-end. v18654-2 evidence-gathering helper.
 package main

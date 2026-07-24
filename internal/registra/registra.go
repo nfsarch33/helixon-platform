@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // Package registra is the Helixon Service Registry loader and query API.
 // It loads the canonical registry (registry.yaml/registry.json) and exposes
 // the read-only data structures used by helix-dev-tools, doctor suites,

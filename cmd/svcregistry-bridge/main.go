@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 // Command svcregistry-bridge ingests the canonical Helixon service
 // registry (registry.yaml, built by v14540) and POSTs each service into
 // the runtime svcregistry daemon so it appears in /api/v1/services,

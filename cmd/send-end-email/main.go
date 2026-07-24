@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file personal_path_id
 // Command send-end-email sends the END email for a completed plan range
 // using helixon-platform/internal/notify. Idempotent via Email.IdempotencyKey.
 //

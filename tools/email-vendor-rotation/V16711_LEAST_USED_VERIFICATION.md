@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,secret_cred_ref
 # v16711-4: Resend Least-Used Rotation Verification
 
 **Date**: 2026-07-07

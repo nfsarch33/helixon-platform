@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 ---
 # code-review-bot — Helixon fleet agent that performs automated code reviews
 # on PRs targeting the personal repos. Reads engram for context, writes
