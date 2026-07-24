@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # Sprint v14554 — wsl2/wsl3 k3s Join Scripts + GitLab CI Sentrux Pipeline
 
 ## Summary

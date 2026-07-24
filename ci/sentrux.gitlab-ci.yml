@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # GitLab CI pipeline for the Helixon fleet sentrux audit.
 # Triggered on:
 #   - Push to main / feature/* branches

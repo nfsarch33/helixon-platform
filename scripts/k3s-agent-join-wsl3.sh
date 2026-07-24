@@ -1,4 +1,5 @@
 #!/bin/bash
+# runx-leak-scan: allow-file internal_ip
 # k3s-agent-join-wsl3.sh — wsl3-specific join (dev-planning role)
 # Usage:
 #   K3S_URL=https://100.84.108.92:6443 K3S_TOKEN=<token> bash k3s-agent-join-wsl3.sh

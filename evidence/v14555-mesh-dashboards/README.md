@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # Sprint v14555 — win2 + win4 → wsl1 Full Mesh + Observability Rollout
 
 ## Summary

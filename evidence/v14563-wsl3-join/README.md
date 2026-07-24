@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # Sprint v14563 — wsl3 k3s agent join + 4-node cluster diagram
 
 ## Summary
