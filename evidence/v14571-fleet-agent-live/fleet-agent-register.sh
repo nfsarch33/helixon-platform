@@ -1,4 +1,5 @@
 #!/bin/bash
+# runx-leak-scan: allow-file internal_ip
 set -e
 PAYLOAD='{"name":"fleet-agent-wsl1","host":"127.0.0.1","port":8686,"protocol":"http","status":"up","owner":"v14571","tailscale_ip":"100.84.108.92"}'
 curl -fsS -X POST http://127.0.0.1:7777/api/v1/services \

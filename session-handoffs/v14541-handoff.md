@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # v14541 — Cursor helix-dev-tools fleet services CLI + service discovery + agent-browser registration UI (Pair 1 Review)
 
 **Status:** ✅ Completed

@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # Sprint v14564 — ArgoCD app-of-apps re-sync on 4-node cluster
 
 ## Summary

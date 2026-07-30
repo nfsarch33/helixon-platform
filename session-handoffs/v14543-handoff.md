@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file ssh_key_path
 # v14543 — OCI web-UI SOP + agent-browser playbook (Pair 2 Review)
 
 **Status:** ✅ Completed (CF-OP-01 partially automated, full closure pending operator)

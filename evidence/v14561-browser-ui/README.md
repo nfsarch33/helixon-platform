@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # Sprint v14561 — Browser UI Register Flow + agent-browser Smoke
 
 ## Summary

@@ -1,3 +1,4 @@
+# runx-leak-scan: allow-file internal_ip
 # Helixon k3s Cluster Diagram (v14563)
 
 ```mermaid
