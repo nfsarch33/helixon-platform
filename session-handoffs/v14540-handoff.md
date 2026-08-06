@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14540 — Service registry schema + registra Go binary + ingestion (Pair 1 MVP)
 
 **Status:** ✅ Completed

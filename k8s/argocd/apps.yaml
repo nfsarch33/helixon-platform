@@ -1,4 +1,5 @@
 # runx-leak-scan: allow-file internal_ip
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:

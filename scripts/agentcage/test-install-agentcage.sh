@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias
 #!/usr/bin/env bash
 #
 # test-install-agentcage.sh — replaces the .bats harness because

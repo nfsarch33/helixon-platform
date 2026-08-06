@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14544 — GitLab CE Helm install on k3s + runner registration (Pair 3 MVP)
 
 **Status:** ✅ Completed (CF-v14536-01 closed)

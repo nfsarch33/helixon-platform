@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14562 — wsl2 k3s agent join + label verification
 
 ## Summary

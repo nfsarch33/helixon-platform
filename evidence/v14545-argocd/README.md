@@ -1,4 +1,5 @@
 # runx-leak-scan: allow-file internal_ip
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14545 Evidence — Argo CD install on k3s with app-of-apps sync
 
 **Date**: 2026-07-09

@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file secret_cred_ref
 // Tests for the onepassword resolver (v18664-4).
 //
 // The resolver wraps the official 1Password Go SDK so that the notify

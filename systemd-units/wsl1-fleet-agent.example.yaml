@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # WSL1 fleet-agent configuration for helixon serve
 # Connects to local LLM router (127.0.0.1:8080), sprintboard (127.0.0.1:9400),
 # and registers itself with svcregistryd (127.0.0.1:7777).

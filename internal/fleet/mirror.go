@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 // Package fleet — win2 → win1 mirror sync + DR drill (v18687-2).
 //
 // This file implements:

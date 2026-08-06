@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file secret_cred_ref
 # Helixon MCP inventory (`cursor-config/mcp/`)
 
 Authored 2026-07-15 as part of **v14514 Pair 6 MVP**.

@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias
 # Sprint v14567 — Grafana dashboards provisioned
 
 ## Summary

@@ -13,6 +13,16 @@
 // orchestrates. Storage of durable artifacts (DRL policy files, eval
 // matrix updates, failover rules) is the Promote implementation's
 // responsibility — the Evolver never writes business state directly.
+//
+// DEPRECATED (v18699-2): The canonical evolver engine is now
+// github.com/nfsarch33/helixon-evolver/internal/evolver (extracted
+// in v17404-3, formalized in ADR-076). This package remains
+// functional for backward compatibility but new code SHOULD import
+// the canonical package. Removal is scheduled for v18710 once
+// zero-callers are confirmed via
+// `rg "helixon-platform/internal/evolver" --type go`.
+//
+// See: adrs/ADR-076-evolver-component-canonicity.md
 package evolver
 
 import (

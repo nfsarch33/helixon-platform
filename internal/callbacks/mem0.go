@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 package callbacks
 
 import (

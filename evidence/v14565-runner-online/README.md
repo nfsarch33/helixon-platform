@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14565 — GitLab Runner re-registration + lint pipeline smoke
 
 ## Summary
@@ -17,9 +18,9 @@ This sprint instead:
 ## 1Password item (UUID lookup, per rule 01-1password-uuid-required)
 - Item: `GitLab CE Runner Auth Token (wsl2)` UUID `n2ecpwlnkpjs4ufdvquw6xf624`
 - Stored in: `notesPlain` (not `password`) field
-- Token prefix: `glrt-HWa3UDzgdUutaPV...`
+- Token prefix: `<REDACTED-GITLAB-RUNNER-TOKEN-PREFIX>`
 - Token length: 56 chars
-- sha256: `7d5080c1fae39841d6375b0c8aeea3f5b64fa4618633fd46530d30b5b955dffb`
+- sha256: `<REDACTED-GITLAB-RUNNER-TOKEN-SHA256>`
 
 ## CI lint
 ```

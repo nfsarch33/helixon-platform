@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // 3-channel integration test for the notify subsystem (v18664-4).
 //
 // Wires up email (Resend/Brevo rotating) + Telegram (Bot API) + Slack

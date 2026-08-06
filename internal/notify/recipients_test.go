@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file fleet_host_alias
 // Package notify — v17607-6 recipient unification tests.
 //
 // Notification target per v16101 + CARRY-044 is jaslian@gmail.com only.

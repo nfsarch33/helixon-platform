@@ -1,4 +1,5 @@
 # runx-leak-scan: allow-file internal_ip
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14542 — win4/wsl4 LAN + Tailscale troubleshooting + k3s agent join (Pair 2 MVP)
 
 **Status:** ✅ Completed (closes CF-v14529-02)

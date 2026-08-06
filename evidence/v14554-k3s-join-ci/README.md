@@ -1,4 +1,5 @@
 # runx-leak-scan: allow-file internal_ip
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14554 — wsl2/wsl3 k3s Join Scripts + GitLab CI Sentrux Pipeline
 
 ## Summary

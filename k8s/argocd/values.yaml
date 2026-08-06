@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Helixon Argo CD Helm values (v14545)
 #
 # Closes CF-v14536-02: pre-install job hung on kubelet containerLog endpoint

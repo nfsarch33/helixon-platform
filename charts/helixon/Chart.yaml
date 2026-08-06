@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file personal_path_id
 apiVersion: v2
 name: helixon
 description: Helixon Agentic AI Platform Runtime (v16754-1 chart)

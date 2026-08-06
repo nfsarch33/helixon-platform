@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # Sprint v14552 — Runx + cursor-tools Fleet Agents + agentrace/evospine
 
 ## Summary

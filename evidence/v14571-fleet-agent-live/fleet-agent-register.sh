@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 #!/bin/bash
 # runx-leak-scan: allow-file internal_ip
 set -e

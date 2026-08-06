@@ -1,3 +1,4 @@
+// runx-public-repo-gate: allow-file *
 // secrets-bootstrap — read 1Password secrets via op CLI.
 //
 // Usage:

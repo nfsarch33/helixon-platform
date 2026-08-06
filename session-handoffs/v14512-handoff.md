@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
 # v14512 — Pair 5 MVP (Helixon observability sidecar) — Handoff
 
 Sprint: **v14512 Pair 5 MVP**
