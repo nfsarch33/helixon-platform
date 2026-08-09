@@ -1,0 +1,101 @@
+// runx-public-repo-gate: allow-file fleet_host_alias,network_topology
+// Control.proto — v0.6.0 (deferred from v0.5.0).
+//
+// v0.5.0 ships an HTTP control plane in internal/fleetagent/serve.go.
+// v0.6.0 will switch to connect-go over HTTP/2 (or h2c for plaintext
+// in-fleet) — same peer allowlist, same ed25519 signatures, same RPC
+// names so on-call tooling can swap transport without changing probes.
+//
+// Why deferred: protoc + protoc-gen-go + protoc-gen-connect-go are not
+// installed in the WSL dev environment and would add ~30 min of bootstrap
+// time to this sprint. The HTTP MVP is functionally complete (allowlist,
+// signing hook stubs, heartbeat) so the gRPC work does not unblock
+// anything else.
+
+syntax = "proto3";
+
+package helixon.fleetagent.v1;
+
+option go_package = "github.com/nfsarch33/helixon-platform/internal/grpc;grpc";
+
+// ControlService is the long-lived RPC surface for fleet-agent.
+//
+// RPC names match the HTTP control plane stubs in internal/fleetagent/serve.go.
+service ControlService {
+  // Heartbeat (used by the peer registry, not the registry that this
+  // service itself uses; the agent publishes its own heartbeats to
+  // svcregistryd on a separate transport).
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Exec runs a one-shot command on this node. The peer must be in the
+  // allowlist and the request must be ed25519-signed.
+  rpc Exec(ExecRequest) returns (ExecResponse);
+
+  // Upload streams a file from the caller to this node.
+  rpc Upload(UploadRequest) returns (UploadResponse);
+
+  // Download streams a file from this node to the caller.
+  rpc Download(DownloadRequest) returns (stream DownloadChunk);
+
+  // SysConfig reads/writes a single node configuration key.
+  rpc SysConfig(SysConfigRequest) returns (SysConfigResponse);
+}
+
+message HeartbeatRequest {
+  string node_id = 1;
+  string version = 2;
+  string http_addr = 3;
+  int64  ts_unix_nano = 4;
+}
+
+message HeartbeatResponse {
+  string node_id = 1;
+  int64  ts_unix_nano = 2;
+}
+
+message ExecRequest {
+  string peer = 1;          // caller's node_id
+  bytes  signature = 2;     // ed25519(priv_peer, body)
+  bytes  body = 3;          // CBOR/JSON { argv: [...], env: {...} }
+}
+
+message ExecResponse {
+  int32  exit_code = 1;
+  string stdout = 2;
+  string stderr = 3;
+}
+
+message UploadRequest {
+  string peer = 1;
+  bytes  signature = 2;
+  string remote_path = 3;
+  uint64 mode = 4;
+  bytes  data = 5;
+}
+
+message UploadResponse {
+  string remote_path = 1;
+  uint64 bytes_written = 2;
+}
+
+message DownloadRequest {
+  string peer = 1;
+  bytes  signature = 2;
+  string remote_path = 3;
+}
+
+message DownloadChunk {
+  bytes data = 1;
+}
+
+message SysConfigRequest {
+  string peer = 1;
+  bytes  signature = 2;
+  string key = 3;
+  bytes  value = 4;  // empty for read
+}
+
+message SysConfigResponse {
+  string key = 1;
+  bytes  value = 2;
+}

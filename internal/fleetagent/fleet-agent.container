@@ -1,0 +1,62 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
+# Quadlet for helixon-fleet-agent v0.5.0.
+#
+# Install path (operator, one-shot per node):
+#   mkdir -p ~/.config/containers/systemd
+#   cp fleet-agent.container ~/.config/containers/systemd/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now helixon-fleet-agent.service
+#
+# Why a container (Quadlet) instead of a host binary:
+#   - The fleet-agent is a long-lived daemon that touches /etc/helixon and
+#     registers itself with svcregistryd. Running it inside a rootless
+#     Podman container gives us OCI isolation + automatic restart without
+#     requiring elevated host systemd unit installation.
+#   - Image is built once on wsl1 via scripts/fleet/installer/build-agent.sh
+#     (which calls `podman build -f Dockerfile.fleet-agent`).
+#   - The container's host_ed25519 key + agent.toml are bind-mounted from
+#     the host so the same key is reused across container restarts.
+
+[Unit]
+Description=Helixon Fleet Agent (v0.5.0) — long-lived control plane
+After=network-online.target svcregistryd.service
+Wants=network-online.target
+
+[Container]
+Image=localhost/helixon-fleet-agent:v0.5.0-dev
+ContainerName=helixon-fleet-agent
+
+# Mount host state dir (config + ed25519 key + env file).
+Volume=%h/.local/state/helixon/agent:/etc/helixon:rw,Z
+
+# Pull registry endpoint + http listen addr from host env so the same
+# container works across nodes with different tailscale IPs.
+Environment=HELIXON_REGISTRY=http://127.0.0.1:7777
+Environment=HELIXON_HTTP_ADDR=:8686
+
+# Exec form: run the daemon. The binary expects the config dir mounted.
+Exec=fleet-agent serve --config /etc/helixon/agent.toml --http-addr :8686 --registry http://127.0.0.1:7777
+
+# Auto-restart on crash; backoff capped at 60s.
+Restart=always
+RestartSec=2s
+StartLimitBurst=10
+StartLimitIntervalSec=300s
+
+# Cap memory at 256 MiB — the agent is tiny.
+MemoryMax=256M
+
+# Healthcheck via /healthz on the control HTTP port.
+HealthCmd=curl -fsS http://127.0.0.1:8686/healthz
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=20s
+
+[Service]
+# Run as the host user (Quadlet default), not root.
+# Podman user namespace mapping is automatic.
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target
