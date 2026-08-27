@@ -29,9 +29,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// engramStub is a thread-safe httptest-backed Engram server. Each method
-// (POST /memories, GET /memories/{id}, POST /memories/search) is recorded
-// so the integration test can assert on the request shape.
+// engramStub is a thread-safe httptest-backed Engram server speaking the
+// canonical daemon dialect (messages as strings, text/workspace_id fields,
+// array add response). Each method (POST /memories, GET /memories/{id},
+// POST /search) is recorded so the integration test can assert on the
+// request shape; a client regression to the old mem0-style dialect fails
+// decoding here with 400, mirroring the live daemon.
 type engramStub struct {
 	mu        sync.Mutex
 	memories  map[string]Memory
@@ -76,32 +79,32 @@ func (s *engramStub) handler() http.Handler {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/memories":
 			var req struct {
-				Messages []struct {
-					Role    string `json:"role"`
-					Content string `json:"content"`
-				} `json:"messages"`
-				AppID  string `json:"app_id"`
-				UserID string `json:"user_id"`
+				Messages    []string `json:"messages"`
+				AppID       string   `json:"app_id"`
+				UserID      string   `json:"user_id"`
+				WorkspaceID string   `json:"workspace_id"`
 			}
 			if err := json.Unmarshal([]byte(body), &req); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+				return
+			}
+			if len(req.Messages) == 0 {
+				http.Error(w, `{"error":"messages must not be empty"}`, http.StatusBadRequest)
 				return
 			}
 			id := "mem-stub-" + time.Now().Format("150405.000000")
-			content := ""
-			if len(req.Messages) > 0 {
-				content = req.Messages[0].Content
-			}
 			m := Memory{
 				ID:        id,
-				Content:   content,
+				Content:   req.Messages[0],
 				AppID:     req.AppID,
 				UserID:    req.UserID,
+				TenantID:  req.WorkspaceID,
 				CreatedAt: time.Now().UTC(),
 			}
 			s.memories[id] = m
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(m)
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode([]map[string]any{stubWireRecord(m)})
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/memories/"):
 			id := strings.TrimPrefix(r.URL.Path, "/memories/")
 			m, ok := s.memories[id]
@@ -110,14 +113,27 @@ func (s *engramStub) handler() http.Handler {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(m)
-		case r.Method == http.MethodPost && r.URL.Path == "/memories/search":
+			_ = json.NewEncoder(w).Encode(stubWireRecord(m))
+		case r.Method == http.MethodPost && r.URL.Path == "/search":
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode([]Memory{})
+			_ = json.NewEncoder(w).Encode([]map[string]any{})
 		default:
 			http.Error(w, "not implemented in stub", http.StatusNotImplemented)
 		}
 	})
+}
+
+// stubWireRecord encodes a Memory in the canonical daemon record shape
+// (text / workspace_id), matching engram's httpapi MemoryRecord JSON.
+func stubWireRecord(m Memory) map[string]any {
+	return map[string]any{
+		"id":           m.ID,
+		"text":         m.Content,
+		"app_id":       m.AppID,
+		"user_id":      m.UserID,
+		"workspace_id": m.TenantID,
+		"created_at":   m.CreatedAt,
+	}
 }
 
 func openTempSQLite(t *testing.T) *sql.DB {

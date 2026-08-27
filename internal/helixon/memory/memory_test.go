@@ -21,12 +21,28 @@ func TestEngramClientAdd(t *testing.T) {
 		assert.Equal(t, "/memories", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 
+		// The canonical daemon expects messages as plain strings; a
+		// mem0-style {role,content} object would fail this decode with
+		// 400, exactly like the live daemon.
+		var req struct {
+			Messages    []string `json:"messages"`
+			AppID       string   `json:"app_id"`
+			WorkspaceID string   `json:"workspace_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+			return
+		}
+		assert.Equal(t, []string{"test memory"}, req.Messages)
+		assert.Equal(t, "helixon", req.AppID)
+
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(Memory{
-			ID:      "mem-001",
-			Content: "test memory",
-			AppID:   "helixon",
-		})
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode([]engramRecord{{
+			ID:    "mem-001",
+			Text:  "test memory",
+			AppID: "helixon",
+		}})
 	}))
 	defer func() { srv.Close() }()
 
@@ -40,14 +56,19 @@ func TestEngramClientAdd(t *testing.T) {
 func TestEngramClientSearch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/search", r.URL.Path)
+
+		var req struct {
+			Query string `json:"query"`
+			TopK  int    `json:"top_k"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		assert.Equal(t, "k8s", req.Query)
+		assert.Equal(t, 10, req.TopK, "daemon reads top_k, not limit")
+
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(struct {
-			Results []SearchResult `json:"results"`
-		}{
-			Results: []SearchResult{
-				{Memory: Memory{ID: "m1", Content: "kubernetes deployment"}, Score: 0.95},
-				{Memory: Memory{ID: "m2", Content: "docker container"}, Score: 0.80},
-			},
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"record": engramRecord{ID: "m1", Text: "kubernetes deployment"}, "score": 0.95},
+			{"record": engramRecord{ID: "m2", Text: "docker container"}, "score": 0.80},
 		})
 	}))
 	defer func() { srv.Close() }()
@@ -61,9 +82,10 @@ func TestEngramClientSearch(t *testing.T) {
 }
 
 func TestEngramClientHealth(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/healthz", r.URL.Path, "daemon serves /healthz, not /health")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	defer func() { srv.Close() }()
 
@@ -81,7 +103,8 @@ func TestEngramClientRetry(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(Memory{ID: "retry-ok"})
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode([]engramRecord{{ID: "retry-ok"}})
 	}))
 	defer func() { srv.Close() }()
 
@@ -170,13 +193,9 @@ func TestHybridSearcherFTSOnly(t *testing.T) {
 func TestHybridSearcherVectorOnly(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(struct {
-			Results []SearchResult `json:"results"`
-		}{
-			Results: []SearchResult{
-				{Memory: Memory{ID: "v1", Content: "vector result alpha"}, Score: 0.9},
-				{Memory: Memory{ID: "v2", Content: "vector result beta"}, Score: 0.7},
-			},
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"record": engramRecord{ID: "v1", Text: "vector result alpha"}, "score": 0.9},
+			{"record": engramRecord{ID: "v2", Text: "vector result beta"}, "score": 0.7},
 		})
 	}))
 	defer func() { srv.Close() }()
@@ -193,13 +212,9 @@ func TestHybridSearcherVectorOnly(t *testing.T) {
 func TestHybridSearcherMerge(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(struct {
-			Results []SearchResult `json:"results"`
-		}{
-			Results: []SearchResult{
-				{Memory: Memory{ID: "v1", Content: "shared content"}, Score: 0.8},
-				{Memory: Memory{ID: "v2", Content: "vector-only content"}, Score: 0.6},
-			},
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"record": engramRecord{ID: "v1", Text: "shared content"}, "score": 0.8},
+			{"record": engramRecord{ID: "v2", Text: "vector-only content"}, "score": 0.6},
 		})
 	}))
 	defer func() { srv.Close() }()
@@ -247,22 +262,19 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&posted)
 			contentStr := ""
 			if msgs, ok := posted["messages"].([]interface{}); ok && len(msgs) > 0 {
-				if m, ok2 := msgs[0].(map[string]interface{}); ok2 {
-					contentStr, _ = m["content"].(string)
-				}
+				contentStr, _ = msgs[0].(string)
 			}
 			appID, _ := posted["app_id"].(string)
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(Memory{
-				ID:      "mem-write-001",
-				Content: contentStr,
-				AppID:   appID,
-			})
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode([]engramRecord{{
+				ID:    "mem-write-001",
+				Text:  contentStr,
+				AppID: appID,
+			}})
 		case "/search":
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(struct {
-				Results []SearchResult `json:"results"`
-			}{Results: nil})
+			_ = json.NewEncoder(w).Encode([]map[string]any{})
 		default:
 			http.NotFound(w, r)
 		}
@@ -284,8 +296,8 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 	assert.Equal(t, "mem-write-001", mem.ID)
 	assert.Equal(t, "v8000-overnight memory", mem.Content)
 	msgs, _ := posted["messages"].([]interface{})
-	firstMsg, _ := msgs[0].(map[string]interface{})
-	assert.Equal(t, "v8000-overnight memory", firstMsg["content"])
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "v8000-overnight memory", msgs[0], "messages must be plain strings on the wire")
 	assert.Equal(t, "claude-code", posted["app_id"])
 
 	// FTS mirror landed locally.
@@ -331,7 +343,7 @@ func TestHybridSearcherRead_GreenPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/memories/mem-read-001", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(Memory{ID: "mem-read-001", Content: "fetched"})
+		_ = json.NewEncoder(w).Encode(engramRecord{ID: "mem-read-001", Text: "fetched"})
 	}))
 	defer func() { srv.Close() }()
 

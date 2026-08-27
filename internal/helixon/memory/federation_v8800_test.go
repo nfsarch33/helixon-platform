@@ -62,26 +62,21 @@ func newEngramServerEcho(t *testing.T) (*httptest.Server, *EngramClient) {
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			contentStr := ""
 			if msgs, ok := body["messages"].([]interface{}); ok && len(msgs) > 0 {
-				if m, ok2 := msgs[0].(map[string]interface{}); ok2 {
-					contentStr, _ = m["content"].(string)
-				}
+				contentStr, _ = msgs[0].(string)
 			}
 			appID, _ := body["app_id"].(string)
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(Memory{
-				ID:      "engram-001",
-				Content: contentStr,
-				AppID:   appID,
-			})
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode([]engramRecord{{
+				ID:    "engram-001",
+				Text:  contentStr,
+				AppID: appID,
+			}})
 		case "/search":
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(struct {
-				Results []SearchResult `json:"results"`
-			}{
-				Results: []SearchResult{
-					{Memory: Memory{ID: "v1", Content: "shared content"}, Score: 0.8},
-					{Memory: Memory{ID: "v2", Content: "engram-only result"}, Score: 0.6},
-				},
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"record": engramRecord{ID: "v1", Text: "shared content"}, "score": 0.8},
+				{"record": engramRecord{ID: "v2", Text: "engram-only result"}, "score": 0.6},
 			})
 		default:
 			http.NotFound(w, r)

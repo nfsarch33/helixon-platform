@@ -83,18 +83,40 @@ func NewEngramClient(cfg EngramConfig, logger *slog.Logger) *EngramClient {
 	}
 }
 
-// Add stores a new memory entry. tenantID stamps the entry with the
-// tenant scope; pass "" for legacy / pre-migration callers.
-func (c *EngramClient) Add(ctx context.Context, content, appID, userID, tenantID string) (*Memory, error) {
-	type engramMsg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
+// engramRecord is the wire shape of a memory record in the canonical
+// Engram daemon API (v2 httpapi): text instead of content, and tenant
+// scope carried as workspace_id. Responses are mapped back to Memory.
+type engramRecord struct {
+	ID          string    `json:"id"`
+	Text        string    `json:"text"`
+	UserID      string    `json:"user_id"`
+	AppID       string    `json:"app_id"`
+	WorkspaceID string    `json:"workspace_id"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (r engramRecord) toMemory() Memory {
+	return Memory{
+		ID:        r.ID,
+		Content:   r.Text,
+		AppID:     r.AppID,
+		UserID:    r.UserID,
+		TenantID:  r.WorkspaceID,
+		CreatedAt: r.CreatedAt,
 	}
+}
+
+// Add stores a new memory entry. tenantID stamps the entry with the
+// tenant scope (sent as workspace_id on the wire); pass "" for legacy /
+// pre-migration callers. The daemon expects messages as plain strings
+// and returns the created records as a JSON array.
+func (c *EngramClient) Add(ctx context.Context, content, appID, userID, tenantID string) (*Memory, error) {
 	body := map[string]any{
-		"messages":  []engramMsg{{Role: "user", Content: content}},
-		"app_id":    appID,
-		"user_id":   userID,
-		"tenant_id": tenantID,
+		"messages":     []string{content},
+		"app_id":       appID,
+		"user_id":      userID,
+		"workspace_id": tenantID,
+		"infer":        false,
 	}
 	data, _ := json.Marshal(body)
 
@@ -103,26 +125,31 @@ func (c *EngramClient) Add(ctx context.Context, content, appID, userID, tenantID
 		return nil, err
 	}
 
-	var mem Memory
-	if err := json.Unmarshal(resp, &mem); err != nil {
+	var recs []engramRecord
+	if err := json.Unmarshal(resp, &recs); err != nil {
 		return nil, fmt.Errorf("decode add response: %w", err)
 	}
+	if len(recs) == 0 {
+		return nil, fmt.Errorf("engram add returned no records")
+	}
+	mem := recs[0].toMemory()
 	return &mem, nil
 }
 
 // Search queries memories by semantic similarity. tenantID filters
-// results by tenant per v18684-4 multi-tenancy hardening; an empty
-// tenantID matches all tenants.
+// results by tenant per v18684-4 multi-tenancy hardening (sent as
+// workspace_id on the wire); an empty tenantID matches all tenants.
+// The daemon expects top_k and returns a JSON array of {record, score}.
 func (c *EngramClient) Search(ctx context.Context, query, appID, userID, tenantID string, limit int) ([]SearchResult, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 	body := map[string]any{
-		"query":     query,
-		"app_id":    appID,
-		"user_id":   userID,
-		"tenant_id": tenantID,
-		"limit":     limit,
+		"query":        query,
+		"app_id":       appID,
+		"user_id":      userID,
+		"workspace_id": tenantID,
+		"top_k":        limit,
 	}
 	data, _ := json.Marshal(body)
 
@@ -131,17 +158,18 @@ func (c *EngramClient) Search(ctx context.Context, query, appID, userID, tenantI
 		return nil, err
 	}
 
-	var wrapper struct {
-		Results []SearchResult `json:"results"`
+	var wire []struct {
+		Record engramRecord `json:"record"`
+		Score  float64      `json:"score"`
 	}
-	if err := json.Unmarshal(resp, &wrapper); err != nil {
-		var results []SearchResult
-		if err2 := json.Unmarshal(resp, &results); err2 != nil {
-			return nil, fmt.Errorf("decode search response: %w", err)
-		}
-		return results, nil
+	if err := json.Unmarshal(resp, &wire); err != nil {
+		return nil, fmt.Errorf("decode search response: %w", err)
 	}
-	return wrapper.Results, nil
+	results := make([]SearchResult, 0, len(wire))
+	for _, hit := range wire {
+		results = append(results, SearchResult{Memory: hit.Record.toMemory(), Score: hit.Score})
+	}
+	return results, nil
 }
 
 // Get retrieves a specific memory by ID.
@@ -150,16 +178,44 @@ func (c *EngramClient) Get(ctx context.Context, id string) (*Memory, error) {
 	if err != nil {
 		return nil, err
 	}
-	var mem Memory
-	if err := json.Unmarshal(resp, &mem); err != nil {
+	var rec engramRecord
+	if err := json.Unmarshal(resp, &rec); err != nil {
 		return nil, fmt.Errorf("decode get response: %w", err)
 	}
+	mem := rec.toMemory()
 	return &mem, nil
+}
+
+// Delete removes a memory by ID.
+func (c *EngramClient) Delete(ctx context.Context, id string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+"/memories/"+id, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrEngramUnavailable, err)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+	_ = resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrMemoryNotFound
+	}
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("engram error: %d %s", resp.StatusCode, string(data))
+	}
+	return nil
 }
 
 // Health checks the Engram server status.
 func (c *EngramClient) Health(ctx context.Context) error {
-	_, err := c.doGet(ctx, "/health")
+	_, err := c.doGet(ctx, "/healthz")
 	return err
 }
 
