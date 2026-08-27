@@ -1,0 +1,25 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
+[Unit]
+Description=Run the Helixon alert notifier every 5 minutes
+Documentation=https://github.com/nfsarch33/helixon-platform/tree/main/cmd/alert-notifier
+
+[Timer]
+# Every 5 minutes on the wall clock. The notifier is a poller by design:
+# a missed tick costs at most one interval of latency and never a lost
+# alert, because the state file is only advanced after a delivered digest.
+OnCalendar=*:0/5
+
+# Catch up after a suspend or a reboot rather than waiting for the next
+# aligned tick — a fleet that broke while the box was asleep still needs
+# to be reported.
+Persistent=true
+
+# Spread the poll off the exact minute boundary so it does not contend
+# with every other :00/:05 job on the host.
+RandomizedDelaySec=20
+AccuracySec=15s
+
+Unit=alert-notifier.service
+
+[Install]
+WantedBy=timers.target
