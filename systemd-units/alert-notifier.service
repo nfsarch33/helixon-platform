@@ -1,0 +1,57 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology,secret_cred_ref
+[Unit]
+Description=Helixon alert notifier (Alertmanager -> email digest)
+Documentation=https://github.com/nfsarch33/helixon-platform/tree/main/cmd/alert-notifier
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# --- Credential handling -------------------------------------------------
+# RESEND_API_KEY is supplied ONLY through this env file, which is rendered
+# out-of-band by secrets-bootstrap (see cmd/secrets-bootstrap) into the
+# per-user runtime directory. It is never passed on the command line,
+# because argv is world-readable via /proc.
+#
+# There is deliberately NO op:// reference and no `op` invocation anywhere
+# on this unit's startup path: running the 1Password CLI from a service
+# start puts it in a background process group, where its terminal read
+# raises SIGTTIN and hangs the unit forever with no diagnostic. The secret
+# must already be on disk before this unit runs.
+#
+# /run/user/%U is tmpfs and vanishes on reboot, so the bootstrap that
+# writes this file must run before (or alongside) the timer after boot.
+EnvironmentFile=/run/user/%U/alert-notifier-env
+
+# Fail fast and loudly when the env file exists but is empty: a notifier
+# that silently runs without a delivery path recreates the exact black
+# hole this component was written to end.
+ExecStartPre=/bin/sh -c 'test -s /run/user/%U/alert-notifier-env || { echo "alert-notifier: /run/user/%U/alert-notifier-env is missing or empty; refusing to run" >&2; exit 1; }'
+
+ExecStart=%h/local/bin/alert-notifier \
+  --alertmanager-url http://127.0.0.1:9093 \
+  --state %h/.local/state/hlxn/alert-notifier-state.json \
+  --textfile %h/.local/share/node-exporter-textfile/alert-notifier.prom \
+  --renotify 6h \
+  --timeout 10s
+
+# The audit NDJSON goes to stdout and lands in the journal; the human
+# summary and any error go to stderr.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=alert-notifier
+
+# One cycle is one poll plus one bounded send; 120s is generous headroom
+# over the process's own 60s internal deadline.
+TimeoutStartSec=120
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=default.target

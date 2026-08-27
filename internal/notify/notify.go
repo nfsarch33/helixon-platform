@@ -797,11 +797,25 @@ func backoff(attempt int) {
 // negative value, causing backoff() to sleep for a negative duration
 // (i.e. zero). Mask off the sign bit so the result is always non-negative
 // when consumed as a signed integer or time.Duration downstream.
-var jitterSeed = uint64(time.Now().UnixNano())
+// The seed is atomic because backoff() runs on every retrying Send, and
+// Send is called concurrently (the dispatcher, and any caller with more
+// than one in-flight email). A plain read-modify-write of a package var
+// from several goroutines is a data race that -race reports on any
+// concurrent retry.
+var jitterSeed atomic.Uint64
+
+func init() {
+	jitterSeed.Store(uint64(time.Now().UnixNano())) //nolint:gosec // G115: intentional wrap of a monotonic seed
+}
 
 func hashJitter() uint64 {
-	jitterSeed = jitterSeed*6364136223846793005 + 1442695040888963407
-	return jitterSeed & 0x7FFFFFFFFFFFFFFF
+	for {
+		old := jitterSeed.Load()
+		next := old*6364136223846793005 + 1442695040888963407
+		if jitterSeed.CompareAndSwap(old, next) {
+			return next & 0x7FFFFFFFFFFFFFFF
+		}
+	}
 }
 
 // sanitizeBody returns a short redacted view of a vendor error body that
