@@ -1,0 +1,39 @@
+# .rebrand-allowlist.yaml -- helixon-platform rebrand-gate baseline (v18774)
+#
+# WHY THIS FILE EXISTS
+# The pre-push rebrand gate scans the WHOLE tracked tree, so pre-existing
+# legacy-term debt blocks every push -- including pushes that fix outages
+# and touch none of it. This baseline acknowledges the debt so the gate
+# can do its real job: catching NEW legacy terms in NEW work.
+#
+# THE DEBT BEING BASELINED (measured 2026-08-27 with the repaired
+# scanner -- see helix-dev-tools fix/v18774-rebrand-tautology; before
+# that repair the gate reported 2,129 findings of which 1,941 were the
+# scanner flagging the CURRENT brand against itself):
+#
+#   117  cursor-global-kb   references to the KB repo by its REAL,
+#                           current name; the rename to helixon-kb is
+#                           planned but has not happened, so these are
+#                           correct today and rewriting them would break
+#                           the tooling they configure
+#    37  IronClaw           ]  HELIXON-004 "Iron Reference Replacement"
+#     6  ironclaw           ]  backlog, Phase B -- genuine legacy debt
+#    27  cylrl              ]  awaiting its scheduled sweep
+#     1  github.com/nfsarch33/cursor-global-kb
+#
+# REMOVAL CONTRACT: delete the corresponding entries in the same PR that
+# executes HELIXON-004 / the KB rename, so the gate immediately enforces
+# the finished state. Do NOT add new entries here to get a push through;
+# fix the finding or take it to the operator.
+
+entries:
+  - file: "*"
+    term: "cursor-global-kb"
+  - file: "*"
+    term: "github.com/nfsarch33/cursor-global-kb"
+  - file: "*"
+    term: "IronClaw"
+  - file: "*"
+    term: "ironclaw"
+  - file: "*"
+    term: "cylrl"

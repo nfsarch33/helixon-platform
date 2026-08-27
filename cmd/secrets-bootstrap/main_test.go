@@ -127,19 +127,58 @@ func TestServiceMap_KnownServices(t *testing.T) {
 	}
 }
 
-func TestServiceMap_FleetAgentExtract(t *testing.T) {
+// TestServiceMap_FleetAgentUsesRouterToken replaces the v14571-era
+// _extract pin. The old entries regex-extracted OPENAI_* from a secure
+// note; the note drifted, extraction silently yielded nothing, and the
+// fleet agent crash-looped 300+ times with secrets-bootstrap reporting
+// success. The new wiring is a direct field read of the same item the
+// llm-router service uses -- no regex, nothing to drift.
+func TestServiceMap_FleetAgentUsesRouterToken(t *testing.T) {
 	entries, ok := serviceMap["fleet-agent"]
-	if !ok || len(entries) < 2 {
-		t.Fatalf("fleet-agent entries missing or wrong count")
+	if !ok || len(entries) != 1 {
+		t.Fatalf("fleet-agent entries = %d, want exactly 1 (LLM_ROUTER_TOKEN)", len(entries))
 	}
-	// Verify the entries have _extract field set
-	for _, e := range entries {
-		if e.Field != "_extract" {
-			t.Errorf("expected _extract field, got %q", e.Field)
+	e := entries[0]
+	if e.EnvVar != "LLM_ROUTER_TOKEN" {
+		t.Errorf("EnvVar = %q, want LLM_ROUTER_TOKEN", e.EnvVar)
+	}
+	if e.Field == "_extract" || e.Extract != "" {
+		t.Errorf("fleet-agent must use a direct field read, not _extract (Field=%q Extract=%q)", e.Field, e.Extract)
+	}
+	// Same credential the llm-router service reads: the agent
+	// authenticates TO the router, so the two must never diverge.
+	var routerTokenItem string
+	for _, re := range serviceMap["llm-router"] {
+		if re.EnvVar == "LLM_ROUTER_TOKEN" {
+			routerTokenItem = re.Item
 		}
-		if e.Extract == "" {
-			t.Errorf("expected non-empty Extract regex")
+	}
+	if routerTokenItem == "" || e.Item != routerTokenItem {
+		t.Errorf("fleet-agent token item %q must match llm-router's LLM_ROUTER_TOKEN item %q", e.Item, routerTokenItem)
+	}
+}
+
+// TestServiceMap_LLMRouterCarriesGatewayToken pins the v18774 addition:
+// the router's minimax-m3 node authenticates to the HelixChannel edge,
+// and the router refuses to boot when an auth_header node's key expands
+// empty -- so this entry going missing is a router outage, not a
+// degraded feature.
+func TestServiceMap_LLMRouterCarriesGatewayToken(t *testing.T) {
+	var found bool
+	for _, e := range serviceMap["llm-router"] {
+		if e.EnvVar != "HELIXCHANNEL_GATEWAY_TOKEN" {
+			continue
 		}
+		found = true
+		if e.Field == "_extract" || e.Extract != "" {
+			t.Errorf("gateway token must be a direct field read, got Field=%q Extract=%q", e.Field, e.Extract)
+		}
+		if e.Vault != "HelixonSafe" {
+			t.Errorf("gateway token vault = %q, want HelixonSafe", e.Vault)
+		}
+	}
+	if !found {
+		t.Fatal("llm-router serviceMap lacks HELIXCHANNEL_GATEWAY_TOKEN")
 	}
 }
 
