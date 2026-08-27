@@ -99,6 +99,15 @@ func (c *Client) Send(ctx context.Context, text string) error {
 // the webhook's default channel is in use). Used for diagnostics + tests.
 func (c *Client) Channel() string { return c.channelOverride }
 
+// WithChannel sets the channel override on an existing client and returns
+// it, so a webhook client built by NewFromURL can be retargeted without
+// reaching into package internals. Passing "" keeps the webhook's own
+// default channel.
+func (c *Client) WithChannel(channel string) *Client {
+	c.channelOverride = strings.TrimSpace(channel)
+	return c
+}
+
 // send is the orchestrator. Mirrors telegram.SendMessageTo's helper split
 // (validate / build / execute / classify / record) for low-CC tests.
 //
@@ -136,12 +145,16 @@ func (c *Client) send(ctx context.Context, m Message) error {
 
 // validateSendInput returns an error if the webhook URL is empty or
 // malformed (must contain hooks.slack.com/services/.../.../...).
+//
+// The rejected value is reported as scheme://host only (safeURLLabel): a
+// misconfigured webhook still carries a secret path segment, and an error
+// string is a log line.
 func validateSendInput(webhook string) error {
 	if webhook == "" {
 		return fmt.Errorf("slack: webhook URL required")
 	}
 	if !strings.HasPrefix(webhook, "https://hooks.slack.com/services/") {
-		return fmt.Errorf("slack: webhook must start with https://hooks.slack.com/services/ (got %q)", webhook)
+		return fmt.Errorf("slack: webhook must start with https://hooks.slack.com/services/ (got %s)", safeURLLabel(webhook))
 	}
 	return nil
 }
@@ -164,7 +177,10 @@ func executeSendRequest(ctx context.Context, httpc *http.Client, url string, bod
 //	4xx (HTTP status code in [400, 500)) -> StatusBadRequest
 //	5xx + network errors              -> StatusDeadLetter
 func classifyResponse(ctx context.Context, resp *http.Response) (metrics.Status, error) { //nolint:revive // unused-parameter required by interface
-	body, _ := io.ReadAll(resp.Body)
+	// Bounded read: an incoming-webhook reply is "ok" or a short error
+	// string, so anything larger is a broken or hostile upstream and must
+	// not be buffered into memory unbounded.
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxAPIBodyBytes))
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return metrics.StatusSuccess, nil
 	}
