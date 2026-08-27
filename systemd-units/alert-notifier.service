@@ -20,14 +20,32 @@ Type=oneshot
 # raises SIGTTIN and hangs the unit forever with no diagnostic. The secret
 # must already be on disk before this unit runs.
 #
-# /run/user/%U is tmpfs and vanishes on reboot, so the bootstrap that
-# writes this file must run before (or alongside) the timer after boot.
-EnvironmentFile=/run/user/%U/alert-notifier-env
+# /run/user/%U is tmpfs and vanishes on reboot, so this unit renders its own
+# env file rather than depending on something else having run first. An
+# alerting component that stops alerting at the next reboot is not alerting.
+#
+# The dash prefix is STRUCTURALLY REQUIRED, not laziness: systemd loads
+# EnvironmentFile= BEFORE it spawns ExecStartPre, so a non-optional reference
+# to the file that ExecStartPre generates can never be satisfied on a cold
+# start -- the unit dies with "Failed to load environment files" before the
+# generator ever runs. Verified the hard way on 2026-08-28.
+EnvironmentFile=-/run/user/%U/alert-notifier-env
 
-# Fail fast and loudly when the env file exists but is empty: a notifier
-# that silently runs without a delivery path recreates the exact black
-# hole this component was written to end.
-ExecStartPre=/bin/sh -c 'test -s /run/user/%U/alert-notifier-env || { echo "alert-notifier: /run/user/%U/alert-notifier-env is missing or empty; refusing to run" >&2; exit 1; }'
+# Render the credential, then refuse to continue if it did not land.
+#
+# --strict is the load-bearing flag: without it secrets-bootstrap exits 0 even
+# when it resolved nothing, writing a file of "# KEY=<unavailable>" comments.
+# ExecStartPre would then be satisfied and the notifier would run with no
+# delivery path -- recreating the exact black hole this component exists to end.
+# The second check covers the case where the file exists but carries no
+# assignment.
+#
+# secrets-bootstrap invokes `op` with a service-account token, which keeps it
+# non-interactive. That is what makes it safe here: a bare `op` on a unit's
+# start path can raise SIGTTIN from its background process group and hang the
+# unit forever with no diagnostic.
+ExecStartPre=/bin/sh -c 'export OP_SERVICE_ACCOUNT_TOKEN=$(cat %h/.config/op/service-account-token) && %h/local/bin/secrets-bootstrap --service alert-notifier --strict --out /run/user/%U/alert-notifier-env'
+ExecStartPre=/bin/sh -c 'grep -q "^RESEND_API_KEY=" /run/user/%U/alert-notifier-env || { echo "alert-notifier: no delivery credential rendered; refusing to run" >&2; exit 1; }'
 
 ExecStart=%h/local/bin/alert-notifier \
   --alertmanager-url http://127.0.0.1:9093 \
