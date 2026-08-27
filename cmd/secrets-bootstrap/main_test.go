@@ -119,11 +119,158 @@ func TestOpRead_MissingToken(t *testing.T) {
 }
 
 func TestServiceMap_KnownServices(t *testing.T) {
-	want := []string{"engramd", "sprintboard-api", "llm-router", "svcregistryd", "fleet-agent"}
+	want := []string{"engramd", "sprintboard-api", "llm-router", "svcregistryd", "fleet-agent", "minimax-quota", "alert-notifier"}
 	for _, name := range want {
 		if _, ok := serviceMap[name]; !ok {
 			t.Errorf("serviceMap missing %q", name)
 		}
+	}
+}
+
+// TestServiceMap_MinimaxQuotaHasThreeOrdinalKeys pins the shape the quota
+// collector depends on: exactly three keys, named by ORDINAL only. The
+// collector labels its metrics key_ordinal="1|2|3", so a fourth entry or a
+// renamed env var silently drops a plan from the dashboard rather than
+// failing loudly.
+func TestServiceMap_MinimaxQuotaHasThreeOrdinalKeys(t *testing.T) {
+	entries, ok := serviceMap["minimax-quota"]
+	if !ok || len(entries) != 3 {
+		t.Fatalf("minimax-quota entries = %d, want exactly 3", len(entries))
+	}
+	seenItems := map[string]bool{}
+	for i, e := range entries {
+		wantVar := fmt.Sprintf("MINIMAX_API_KEY_%d", i+1)
+		if e.EnvVar != wantVar {
+			t.Errorf("entry %d EnvVar = %q, want %q", i, e.EnvVar, wantVar)
+		}
+		if e.Field != "api-key" {
+			t.Errorf("entry %d Field = %q, want api-key", i, e.Field)
+		}
+		if e.Extract != "" {
+			t.Errorf("entry %d must be a direct field read, got Extract=%q", i, e.Extract)
+		}
+		if seenItems[e.Item] {
+			t.Errorf("entry %d reuses item %q; the three plans must be distinct", i, e.Item)
+		}
+		seenItems[e.Item] = true
+	}
+}
+
+// TestServiceMap_MinimaxQuotaKeyOneMatchesEngramFallback records a real
+// coupling rather than a coincidence: engramd's PAID embedding fallback reads
+// the same plan as quota key 1. That is why key 1 drains faster than the other
+// two, and anyone re-pointing either entry needs to see the other move.
+func TestServiceMap_MinimaxQuotaKeyOneMatchesEngramFallback(t *testing.T) {
+	quota, ok := serviceMap["minimax-quota"]
+	if !ok || len(quota) == 0 {
+		t.Fatal("minimax-quota missing")
+	}
+	engram, ok := serviceMap["engramd"]
+	if !ok || len(engram) == 0 {
+		t.Fatal("engramd missing")
+	}
+	if quota[0].Item != engram[0].Item {
+		t.Errorf("quota key 1 item %q != engramd embed-fallback item %q; if this is now intentional, update the comment in serviceMap",
+			quota[0].Item, engram[0].Item)
+	}
+}
+
+// TestBootstrapServiceEnv_StrictFailsWhenNothingResolves covers the failure
+// mode this estate has already paid for: secrets-bootstrap exits 0 after
+// resolving NOTHING, the unit's ExecStartPre is satisfied, and the service
+// then crash-loops on a missing credential with no alert. Exiting 0 proves
+// nothing, so --strict makes an unresolved entry a hard failure.
+//
+// Strict is opt-in precisely so this change cannot alter the startup
+// behavior of the five services already wired to the permissive path.
+func TestBootstrapServiceEnv_StrictFailsWhenNothingResolves(t *testing.T) {
+	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "") // every opRead now fails fast
+	out := t.TempDir() + "/strict.env"
+
+	err := bootstrapServiceEnv("fleet-agent", out, 2, true)
+	if err == nil {
+		t.Fatal("strict mode returned nil after resolving no entries")
+	}
+	if !strings.Contains(err.Error(), "unresolved") {
+		t.Errorf("error %q should name the unresolved entries", err)
+	}
+	// A half-written env file is worse than none: it looks plausible to
+	// the next reader and to the unit that sources it.
+	if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
+		t.Errorf("strict failure must not leave an env file behind at %s", out)
+	}
+}
+
+// TestBootstrapServiceEnv_NonStrictPreservesLegacyBehaviour pins that the
+// default path is unchanged, so existing units keep starting exactly as they
+// do today.
+func TestBootstrapServiceEnv_NonStrictPreservesLegacyBehaviour(t *testing.T) {
+	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	out := t.TempDir() + "/legacy.env"
+
+	if err := bootstrapServiceEnv("fleet-agent", out, 2, false); err != nil {
+		t.Fatalf("non-strict mode must not fail on unresolved entries, got %v", err)
+	}
+	b, readErr := os.ReadFile(out) //nolint:gosec // test-controlled temp path
+	if readErr != nil {
+		t.Fatalf("non-strict mode must still write the file: %v", readErr)
+	}
+	if !strings.Contains(string(b), "# LLM_ROUTER_TOKEN=<unavailable") {
+		t.Errorf("expected an <unavailable> comment line, got:\n%s", b)
+	}
+}
+
+// TestBootstrapServiceEnv_UnknownServiceIsRejected: a typo in a unit file must
+// fail loudly rather than render an empty env file.
+func TestBootstrapServiceEnv_UnknownServiceIsRejected(t *testing.T) {
+	out := t.TempDir() + "/unknown.env"
+	err := bootstrapServiceEnv("no-such-service", out, 2, false)
+	if err == nil {
+		t.Fatal("unknown service returned nil")
+	}
+	if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
+		t.Error("unknown service must not create an env file")
+	}
+}
+
+// TestBootstrapServiceEnv_OutputIsOwnerOnly: the rendered file holds live
+// credentials and must never be group- or world-readable.
+func TestBootstrapServiceEnv_OutputIsOwnerOnly(t *testing.T) {
+	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	out := t.TempDir() + "/perm.env"
+	if err := bootstrapServiceEnv("fleet-agent", out, 2, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fi, err := os.Stat(out)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Errorf("env file mode = %o, want 600", perm)
+	}
+	if _, err := os.Stat(out + ".tmp"); !os.IsNotExist(err) {
+		t.Error("temp file left behind after a successful render")
+	}
+}
+
+// TestServiceMap_AlertNotifierResolvesFieldByID guards the exact trap that
+// cost time on 2026-08-28: the Resend item's field is LABELED "api key" with
+// a space, and `op read op://vault/item/api key` fails on the space. The
+// stable field ID is the only reference that resolves.
+func TestServiceMap_AlertNotifierResolvesFieldByID(t *testing.T) {
+	entries, ok := serviceMap["alert-notifier"]
+	if !ok || len(entries) != 1 {
+		t.Fatalf("alert-notifier entries = %d, want exactly 1 (RESEND_API_KEY)", len(entries))
+	}
+	e := entries[0]
+	if e.EnvVar != "RESEND_API_KEY" {
+		t.Errorf("EnvVar = %q, want RESEND_API_KEY", e.EnvVar)
+	}
+	if strings.Contains(e.Field, " ") {
+		t.Errorf("Field %q contains a space; op read cannot resolve a spaced field label, use the field ID", e.Field)
+	}
+	if e.Extract != "" {
+		t.Errorf("alert-notifier must be a direct field read, got Extract=%q", e.Extract)
 	}
 }
 
@@ -292,6 +439,38 @@ func TestPrintValueAndExport_WithExport(t *testing.T) {
 	}
 }
 
+// TestDispatch_StrictServiceFailsLoudly proves the flag is actually wired
+// through the CLI, not merely present on the function: a unit that adds
+// --strict must get a non-zero exit when a credential cannot be resolved.
+// Without this, ExecStartPre would keep reporting success and the whole point
+// of strict mode would be lost at the boundary that matters.
+func TestDispatch_StrictServiceFailsLoudly(t *testing.T) {
+	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	out := t.TempDir() + "/dispatch-strict.env"
+
+	rc := dispatch(cliArgs{ServiceName: "minimax-quota", OutPath: out, TimeoutSec: 2, Strict: true})
+	if rc == 0 {
+		t.Error("dispatch returned 0 for a strict run that resolved nothing")
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Error("strict dispatch must not leave an env file behind")
+	}
+}
+
+// TestDispatch_NonStrictServiceStillSucceeds is the paired guard: the default
+// path must keep its current exit code so no existing unit changes behavior.
+func TestDispatch_NonStrictServiceStillSucceeds(t *testing.T) {
+	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	out := t.TempDir() + "/dispatch-legacy.env"
+
+	if rc := dispatch(cliArgs{ServiceName: "minimax-quota", OutPath: out, TimeoutSec: 2}); rc != 0 {
+		t.Errorf("dispatch rc = %d, want 0 for the permissive default", rc)
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Errorf("permissive dispatch should still write the file: %v", err)
+	}
+}
+
 func TestDispatch_ShowVersion(t *testing.T) {
 	r, w, _ := os.Pipe()
 	old := os.Stdout
@@ -434,7 +613,7 @@ func TestBootstrapServiceEnv_UnknownService(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 	defer func() { os.Stderr = old }()
-	err := bootstrapServiceEnv("totally-fake-svc", "/tmp/nope.env", 5)
+	err := bootstrapServiceEnv("totally-fake-svc", "/tmp/nope.env", 5, false)
 	_ = w.Close()
 	_, _ = io.ReadAll(r)
 	if err == nil {
@@ -448,7 +627,7 @@ func TestBootstrapServiceEnv_BadOutPath(t *testing.T) {
 	os.Stderr = w
 	defer func() { os.Stderr = old }()
 	// Use a path that should fail to open (e.g. /proc/cannot-create)
-	err := bootstrapServiceEnv("engramd", "/proc/cannot-create/secrets.env", 5)
+	err := bootstrapServiceEnv("engramd", "/proc/cannot-create/secrets.env", 5, false)
 	_ = w.Close()
 	_, _ = io.ReadAll(r)
 	if err == nil {
@@ -530,7 +709,7 @@ func TestBootstrapServiceEnv_Success(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 	defer func() { os.Stderr = old }()
-	err := bootstrapServiceEnv("_test_svc", outPath, 5)
+	err := bootstrapServiceEnv("_test_svc", outPath, 5, false)
 	_ = w.Close()
 	_, _ = io.ReadAll(r)
 	if err != nil {
