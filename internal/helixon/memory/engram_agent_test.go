@@ -20,11 +20,9 @@ func TestAgentMemory_RetrieveContext_NoSearcher(t *testing.T) {
 
 func TestAgentMemory_RetrieveContext_WithResults(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
-		resp := map[string]any{
-			"results": []map[string]any{
-				{"id": "m1", "content": "Go uses goroutines for concurrency", "score": 0.9},
-				{"id": "m2", "content": "Channels are typed conduits", "score": 0.7},
-			},
+		resp := []map[string]any{
+			{"record": engramRecord{ID: "m1", Text: "Go uses goroutines for concurrency"}, "score": 0.9},
+			{"record": engramRecord{ID: "m2", Text: "Channels are typed conduits"}, "score": 0.7},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -49,12 +47,11 @@ func TestAgentMemory_StoreConversationSummary(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&body)
 		msgs, ok := body["messages"].([]interface{})
 		if ok && len(msgs) > 0 {
-			if m, ok2 := msgs[0].(map[string]interface{}); ok2 {
-				stored, _ = m["content"].(string)
-			}
+			stored, _ = msgs[0].(string)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"id": "new-1", "content": stored})
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode([]engramRecord{{ID: "new-1", Text: stored}})
 	}))
 	defer func() { srv.Close() }()
 
