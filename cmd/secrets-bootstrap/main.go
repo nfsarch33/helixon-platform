@@ -40,13 +40,30 @@ var serviceMap = map[string][]EnvEntry{
 	},
 	"llm-router": {
 		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
+		// v18774: the router's minimax-m3 node now goes through the
+		// HelixChannel edge (auth_header: X-HLXN-Token in the router
+		// config) instead of straight to the provider. The config
+		// expands api_key: "${HELIXCHANNEL_GATEWAY_TOKEN}", and the
+		// router REFUSES TO BOOT when an auth_header node's key
+		// expands empty -- this entry is load-bearing for llm-router
+		// startup, not an optional extra.
+		{EnvVar: "HELIXCHANNEL_GATEWAY_TOKEN", Vault: "HelixonSafe", Item: "w4lshnyh2yfzhvcyf6ezspyhv4", Field: "token"},
 	},
 	"svcregistryd": {
 		{EnvVar: "SVCREGISTRY_TOKEN", Vault: "HelixonSafe", Item: "62ruxw2zud5fp7jpxgi2cgjb64", Field: "password"},
 	},
+	// v18774: the fleet agent's provider is the local llm-cluster-router
+	// (openai-compat, base_url http://127.0.0.1:8787/v1), so the only
+	// credential it needs is the router's own bearer token -- the same
+	// item the llm-router service reads. The previous two entries
+	// extracted OPENAI_BASE_URL / OPENAI_API_KEY from a secure note via
+	// `^export OPENAI_API_KEY=(.+)$` regexes; the note's content had
+	// drifted, extraction silently yielded nothing (secrets-bootstrap
+	// still exited 0), and `helixon serve` then crash-looped 300+ times
+	// on "api_key env var OPENAI_API_KEY is not set" without a single
+	// alert. A direct field read cannot drift the same way.
 	"fleet-agent": {
-		{EnvVar: "OPENAI_BASE_URL", Vault: "HelixonSafe", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_BASE_URL=(.+)$`},
-		{EnvVar: "OPENAI_API_KEY", Vault: "HelixonSafe", Item: "kocor3kayl7lsteqecmxpsue2u", Field: "_extract", Extract: `^export OPENAI_API_KEY=(.+)$`},
+		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
 	},
 }
 
