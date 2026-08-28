@@ -56,7 +56,14 @@ func runTaskPipeline(ctx context.Context, args taskArgs, _ taskDeps, out io.Writ
 	taskPrompt := claimAndBuildPrompt(args.ticketID, args.prompt)
 	fmt.Fprintf(out, "helixon task: agent_id=%q tools=%d\n", cfg.AgentID, rt.RegisteredToolCount())
 	fmt.Fprintf(out, "helixon task: prompt=%q\n", truncate(taskPrompt, 120))
-	resp, err := executeAndReport(ctx, rt, taskPrompt, args.ticketID, sbClient, out)
+	// Assigned through an explicit nil check: a nil *SprintboardClient placed
+	// straight into the interface would produce a non-nil interface holding a
+	// nil pointer, and every `board != nil` guard downstream would pass.
+	var board ticketReporter
+	if sbClient != nil {
+		board = sbClient
+	}
+	resp, err := executeAndReport(ctx, rt, taskPrompt, args.ticketID, cfg.AgentID, board, out)
 	if err != nil {
 		return err
 	}
@@ -122,41 +129,74 @@ func buildSprintboardClient(sprintboardURL, agentID string) *controlplane.Sprint
 	}, slog.Default())
 }
 
-// executeAndReport runs the agent on the task prompt and, when a ticket
-// was claimed, attempts to mark the ticket complete with the response
-// (truncated) as evidence. Failures to mark complete are non-fatal.
-func executeAndReport(ctx context.Context, rt *helixon.Runtime, taskPrompt, ticketID string, sbClient *controlplane.SprintboardClient, out io.Writer) (string, error) {
+// ticketReporter is the slice of the board API task mode writes to. It is an
+// interface so a test can observe what was reported without a live board, and
+// so the two write verbs sit next to each other where the choice between them
+// is made.
+type ticketReporter interface {
+	CompleteTicket(ctx context.Context, ticketID, evidence string) error
+	AddComment(ctx context.Context, ticketID, author, body string) error
+}
+
+// executeAndReport runs the agent on the task prompt and reports the outcome
+// to the board.
+//
+// There are exactly two outcomes and they are not interchangeable:
+//
+//   - the run succeeded — CompleteTicket with the response as evidence.
+//   - the run failed, for ANY reason — escalate: post a comment carrying the
+//     failure, and leave the ticket claimed and un-completed.
+//
+// Until v18783 the second case was split in two. A verifier escalation was
+// handled correctly, but a generic run error fell through to
+// CompleteTicket("error: ..."), which marks the ticket DONE on a durable
+// board because the work failed. A human reading that board sees a completed
+// ticket; the string "error:" is buried in an evidence field nobody re-reads.
+// That is the same false-green the poller's escalate() exists to refuse, so
+// both paths now go through the same helper and there is no arrangement of
+// arguments in which a failure reaches CompleteTicket.
+func executeAndReport(ctx context.Context, rt *helixon.Runtime, taskPrompt, ticketID, agentName string, board ticketReporter, out io.Writer) (string, error) {
 	resp, err := rt.HandleMessage(ctx, helixon.IncomingMessage{
 		Channel: "task",
 		Content: taskPrompt,
 	})
 	if err != nil {
-		// An escalation is NOT a completion. Reporting "complete" with the
-		// escalation text as evidence is exactly the outcome the gate
-		// exists to prevent, so the ticket is left claimed and a human is
-		// told why.
 		if errors.Is(err, agent.ErrNeedsHumanApproval) || errors.Is(err, agent.ErrNoVerifierEvidence) {
 			fmt.Fprintf(out, "\nhelixon task: STOPPED FOR HUMAN APPROVAL: %v\n", err)
-			if ticketID != "" {
-				fmt.Fprintf(out, "helixon task: ticket %s left claimed and NOT completed\n", ticketID)
-			}
-			return "", fmt.Errorf("agent run: %w", err)
+		} else {
+			fmt.Fprintf(out, "\nhelixon task: RUN FAILED: %v\n", err)
 		}
-		if ticketID != "" && sbClient != nil {
-			_ = sbClient.CompleteTicket(ctx, ticketID, fmt.Sprintf("error: %v", err))
-		}
+		escalateTicket(ctx, ticketID, agentName, err, board, out)
 		return "", fmt.Errorf("agent run: %w", err)
 	}
 	fmt.Fprintf(out, "\n--- Result ---\n%s\n", resp)
-	if ticketID != "" && sbClient != nil {
+	if ticketID != "" && board != nil {
 		evidence := truncate(resp, 500)
-		if err := sbClient.CompleteTicket(ctx, ticketID, evidence); err != nil {
+		if err := board.CompleteTicket(ctx, ticketID, evidence); err != nil {
 			fmt.Fprintf(out, "warning: could not complete ticket %s: %v\n", ticketID, err)
 		} else {
 			fmt.Fprintf(out, "helixon task: ticket %s completed\n", ticketID)
 		}
 	}
 	return resp, nil
+}
+
+// escalateTicket is task mode's half of the poller's escalate(): the comment
+// text comes from helixon.EscalationComment so the two entry points describe
+// a failure identically, and CompleteTicket is never reachable from here.
+//
+// A ticket with no board, or no ticket ID, still gets the stdout banner the
+// caller printed — the run failed either way, and the exit code carries it.
+func escalateTicket(ctx context.Context, ticketID, agentName string, cause error, board ticketReporter, out io.Writer) {
+	if ticketID == "" || board == nil {
+		return
+	}
+	fmt.Fprintf(out, "helixon task: ticket %s left claimed and NOT completed\n", ticketID)
+	if cerr := board.AddComment(ctx, ticketID, agentName, helixon.EscalationComment(agentName, cause, "")); cerr != nil {
+		fmt.Fprintf(out, "warning: escalation comment failed for ticket %s: %v\n", ticketID, cerr)
+		return
+	}
+	fmt.Fprintf(out, "helixon task: ticket %s escalated to a human\n", ticketID)
 }
 
 func newTaskCmd() *cobra.Command {

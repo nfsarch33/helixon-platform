@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/builtins"
@@ -38,15 +39,41 @@ func newGuardrails(cfg helixon.RuntimeConfig) (guardrails, error) {
 	return guardrails{runner: runner, cfg: cfg}, nil
 }
 
+// workspace returns the directory this agent is allowed to work in.
+//
+// With the sandbox on it is the runner's validated workspace. With the
+// sandbox OFF there is no runner to ask, and that is precisely the
+// configuration that needs an answer: allow_unsandboxed_host_execution
+// installs no gate, so the workspace is the only boundary left. The
+// unnormalized config value is used when the operator set one, and the
+// process working directory otherwise — the same fallback Config.Normalize
+// applies, without normalizing a config the sandbox is not going to use.
+//
+//nolint:gocritic // hugeParam: see newGuardrails
+func (g guardrails) workspace() string {
+	if g.runner != nil {
+		return g.runner.Config().Workspace
+	}
+	if ws := strings.TrimSpace(g.cfg.Sandbox.Workspace); ws != "" {
+		return ws
+	}
+	return sandbox.WorkingDir()
+}
+
 // toolOptions returns the builtin registration options for this runtime.
 // file_read/file_write are pinned to the sandbox workspace so their own
 // containment check has a root to check against, rather than relying solely
 // on the executor gate.
 //
+// The shell tool's WorkDir is set on EVERY path, sandbox or not. With the
+// gate installed the host handler is unreachable and the setting is inert;
+// without it, this is the cwd jail — and the config that skips the gate is
+// exactly the config that must not also skip the jail.
+//
 //nolint:gocritic // hugeParam: see newGuardrails
 func (g guardrails) toolOptions(withWebFetch bool) builtins.Options {
 	opts := builtins.Options{
-		Shell:     &builtins.ShellConfig{},
+		Shell:     &builtins.ShellConfig{WorkDir: g.workspace()},
 		FileRead:  &builtins.FileReadConfig{},
 		FileWrite: &builtins.FileWriteConfig{},
 	}

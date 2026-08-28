@@ -53,6 +53,25 @@ type ShellConfig struct {
 	AllowedCommands []string
 	Timeout         time.Duration
 	MaxOutputBytes  int
+	// WorkDir is the cwd jail for HOST execution.
+	//
+	// When the sandbox gate is installed this handler is never reached — the
+	// gate intercepts "shell" and runs the payload in the container. The path
+	// that matters here is the other one: sandbox.allow_unsandboxed_host_execution,
+	// which installs no gate at all and used to leave the command running in
+	// whatever directory the parent process happened to be in. A mutation test
+	// once ran `find . -delete` for real through exactly that gap.
+	//
+	// Set, WorkDir does two things: it pins cmd.Dir, so "." means the
+	// workspace and not the agent's cwd; and it containment-checks every
+	// path-shaped argument against the workspace via sandbox.ContainArgv, so
+	// an absolute path or a "../" cannot address anything outside it.
+	//
+	// Empty means unjailed, which is the pre-existing behavior and is kept
+	// only so that direct callers of ShellTool (tests, embedders) are not
+	// forced to invent a workspace. Every command path in this repository sets
+	// it; see guardrails.toolOptions.
+	WorkDir string
 }
 
 func (c ShellConfig) withDefaults() ShellConfig {
@@ -112,7 +131,15 @@ func ShellTool(cfg ShellConfig) tooldispatch.ToolDef {
 			if err := sandbox.ValidateArgv(cmdName, argv); err != nil {
 				return "", err
 			}
+			// v18783: the cwd jail for the host execution path. See
+			// ShellConfig.WorkDir.
+			if cfg.WorkDir != "" {
+				if err := sandbox.ContainArgv(cfg.WorkDir, argv); err != nil {
+					return "", err
+				}
+			}
 			cmd := exec.CommandContext(ctx, cmdName, argv...) //nolint:gosec // G204 subprocess executes an allow-listed bare command name with a validated argv
+			cmd.Dir = cfg.WorkDir
 			out, err := cmd.CombinedOutput()
 			result := truncateBytes(string(out), cfg.MaxOutputBytes)
 			if err != nil {

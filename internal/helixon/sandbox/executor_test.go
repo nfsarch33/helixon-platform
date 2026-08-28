@@ -131,7 +131,10 @@ func TestDefaultPolicy_ClassifiesBuiltins(t *testing.T) {
 		"file_read":    DispositionPathGuard,
 		"file_write":   DispositionPathGuard,
 		"verifier_run": DispositionAllow,
-		"anything_new": DispositionPathGuard, // the default
+		// v18783: the fallback for an unclassified tool was path_guard,
+		// which meant HOST execution for anything nobody had thought
+		// about. It is deny now.
+		"anything_new": DispositionDeny, // the default
 	}
 	for tool, d := range want {
 		if got := p.For(tool); got != d {

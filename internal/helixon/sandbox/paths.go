@@ -93,6 +93,83 @@ func resolveExisting(p string) string {
 	}
 }
 
+// ContainArgv confines the path-shaped entries of argv to root. It is the
+// argument-vector counterpart of Contains and delegates every decision to it,
+// so there is exactly one containment rule in this package and no second
+// implementation to drift (in particular: no strings.HasPrefix, which "../"
+// walks straight out of).
+//
+// It exists for the host execution path. Inside the container the workspace
+// is the only thing mounted, so the mount IS the jail; on the host there is
+// no jail at all unless one is written, and `find . -delete` with the parent
+// process's working directory is a real deletion of whatever that directory
+// happened to be.
+//
+// Which entries count as path-shaped — see pathCandidate for the rules.
+//
+// A caller that does not also pin the working directory to root gets a much
+// weaker guarantee, which is why the shell tool does both.
+func ContainArgv(root string, argv []string) error {
+	for i, a := range argv {
+		candidate, shaped := pathCandidate(a)
+		if !shaped {
+			continue
+		}
+		if _, err := Contains(root, candidate); err != nil {
+			return fmt.Errorf("sandbox: argument %d (%q) is outside the workspace: %w", i, a, err)
+		}
+	}
+	return nil
+}
+
+// pathCandidate returns the portion of an argv entry that must be contained,
+// and whether there is one at all.
+//
+// The rules, and why each is drawn where it is:
+//
+//   - A bare word with no separator is not a path. With the working directory
+//     pinned to root by the caller, such a word can only name an entry of root
+//     itself, and treating `grep "func main" file` as two paths would reject
+//     ordinary work.
+//   - "." and ".." exactly, and anything containing a separator, ARE checked.
+//     That is the whole escape surface a positional argument has: the absolute
+//     path, the traversal, and the symlink (Contains resolves all three).
+//   - A flag's NAME is never a path, but a long flag's VALUE can be. Skipping
+//     "-"-prefixed entries wholesale left a real hole: `sort
+//     --files0-from=/etc/passwd` is an allow-listed command reading an
+//     arbitrary host file, and it is not in ValidateArgv's deniedFlags table
+//     because it grants neither execution nor a write. So for a flag, only the
+//     text after the first "=" is considered — which still admits
+//     `grep --color=auto` (no separator) and `--include=*/testdata/*`
+//     (relative, resolves inside root).
+//
+// The remaining flag forms are covered elsewhere: a separated value
+// (`--file X`) arrives as its own argv entry and is checked as a positional,
+// and the flags that re-grant execution or redirect output are refused
+// outright by ValidateArgv.
+func pathCandidate(a string) (string, bool) {
+	if a == "" {
+		return "", false
+	}
+	if strings.HasPrefix(a, "-") {
+		eq := strings.IndexByte(a, '=')
+		if eq < 0 {
+			return "", false
+		}
+		a = a[eq+1:]
+		if a == "" {
+			return "", false
+		}
+	}
+	if a == "." || a == ".." {
+		return a, true
+	}
+	if strings.ContainsRune(a, '/') || strings.ContainsRune(a, filepath.Separator) {
+		return a, true
+	}
+	return "", false
+}
+
 // CanonicalDir resolves dir to an existing, canonical absolute directory.
 // It is the constructor-time counterpart of Contains: bind-mount sources and
 // the workspace root must exist before a container can be started, so a
