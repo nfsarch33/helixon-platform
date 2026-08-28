@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -71,7 +73,7 @@ func TestEngineArgs_HardeningFlags(t *testing.T) {
 		{"--read-only", "read-only root filesystem"},
 		{"--cap-drop=ALL", "no Linux capabilities"},
 		{"--security-opt=no-new-privileges", "no setuid escalation"},
-		{"--user=" + DefaultUser, "non-root user"},
+		{"--userns=" + UserNSKeepID, "the container runs as the invoking non-root user, and can therefore write the workspace it was given"},
 		{"--memory=" + DefaultMemoryLimit, "memory ceiling"},
 		{"--pids-limit=256", "pid ceiling (fork-bomb bound)"},
 		{"--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=" + DefaultTmpfsSize, "scratch tmpfs, non-executable"},
@@ -93,6 +95,168 @@ func TestEngineArgs_HardeningFlags(t *testing.T) {
 	}
 	if got := args[len(args)-1]; got != "hi" {
 		t.Fatalf("argument must be last; got %q", got)
+	}
+	// keep-id and --user are alternatives. Emitting both would re-create the
+	// v18779 uid mismatch even with the userns flag present.
+	if strings.Contains(joined, "--user=") {
+		t.Fatalf("--user must not accompany --userns=keep-id; argv: %s", joined)
+	}
+}
+
+// TestEngineArgs_UserNSDisabledFallsBackToUser proves the rootful escape
+// hatch still emits the non-root user, and only then.
+func TestEngineArgs_UserNSDisabledFallsBackToUser(t *testing.T) {
+	t.Parallel()
+	r, _ := newTestRunner(t, func(c Config) Config {
+		c.UserNS = UserNSDisabled
+		c.User = DefaultUser
+		return c
+	})
+	joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}), " ")
+	if !strings.Contains(joined, "--user="+DefaultUser) {
+		t.Fatalf("userns disabled must fall back to --user; argv: %s", joined)
+	}
+	if strings.Contains(joined, "--userns=") {
+		t.Fatalf("userns disabled must emit no --userns flag; argv: %s", joined)
+	}
+}
+
+// TestEngineArgs_ToolchainEnvReachesTheContainer: the env defaults are only
+// worth anything if they are actually passed. Every hardening flag has a
+// test that fails when it is deleted, and so must every usability default.
+func TestEngineArgs_ToolchainEnvReachesTheContainer(t *testing.T) {
+	t.Parallel()
+	r, _ := newTestRunner(t, nil)
+	joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}), " ")
+	for _, want := range []string{
+		"--env=HOME=/tmp",
+		"--env=GOCACHE=/tmp/go-build",
+		"--env=GOPATH=/tmp/go",
+		"--env=GOTOOLCHAIN=local",
+		"--env=GOTMPDIR=" + DefaultWorkspaceMount + "/" + WorkspaceScratchDir,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("missing %s; without it the Go toolchain cannot run inside the sandbox. argv: %s", want, joined)
+		}
+	}
+}
+
+// TestEnsureWorkspaceScratch_CreatesGOTMPDIRInAFreshWorkspace: the go tool
+// does not create GOTMPDIR, it only writes inside it, so a workspace that has
+// never been used must still work on its FIRST run.
+//
+// MUTATION: delete the EnsureWorkspaceScratch call from Run and this fails.
+func TestEnsureWorkspaceScratch_CreatesGOTMPDIRInAFreshWorkspace(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir() // fresh and empty, exactly like a new agent workspace
+	r, _ := newTestRunner(t, func(c Config) Config { c.Workspace = ws; return c })
+
+	scratch := filepath.Join(ws, WorkspaceScratchDir)
+	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
+		t.Fatalf("precondition: %q should not exist yet (%v)", scratch, err)
+	}
+	if _, err := r.Run(context.Background(), Spec{Command: "echo"}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	info, err := os.Stat(scratch)
+	if err != nil {
+		t.Fatalf("GOTMPDIR host directory was not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("%q is not a directory", scratch)
+	}
+	// It has to be hidden from `./...`, or it becomes a phantom package in
+	// the builds it exists to support.
+	if !strings.HasPrefix(WorkspaceScratchDir, ".") {
+		t.Fatal("the scratch directory name must start with a dot so the go tool skips it")
+	}
+}
+
+// TestEnsureWorkspaceScratch_LeavesPathsOutsideTheWorkspaceAlone: an operator
+// who redirects GOTMPDIR through sandbox.env owns that path. Creating host
+// directories outside the declared workspace is what this package refuses to
+// do everywhere else.
+func TestEnsureWorkspaceScratch_LeavesPathsOutsideTheWorkspaceAlone(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		gotmpdir string
+		access   WorkspaceAccess
+	}{
+		{name: "redirected to the tmpfs", gotmpdir: "/tmp/gotmp", access: WorkspaceRW},
+		{name: "traversal out of the mount", gotmpdir: DefaultWorkspaceMount + "/../etc/x", access: WorkspaceRW},
+		{name: "sibling with a shared prefix", gotmpdir: DefaultWorkspaceMount + "-other/x", access: WorkspaceRW},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ws := t.TempDir()
+			r, _ := newTestRunner(t, func(c Config) Config {
+				c.Workspace = ws
+				c.WorkspaceAccess = tt.access
+				c.Env = map[string]string{"GOTMPDIR": tt.gotmpdir}
+				return c.Normalize(ws)
+			})
+			if err := r.EnsureWorkspaceScratch(); err != nil {
+				t.Fatalf("EnsureWorkspaceScratch: %v", err)
+			}
+			entries, err := os.ReadDir(ws)
+			if err != nil {
+				t.Fatalf("ReadDir: %v", err)
+			}
+			if len(entries) != 0 {
+				t.Fatalf("nothing may be created in the workspace for GOTMPDIR=%q; found %v", tt.gotmpdir, entries)
+			}
+		})
+	}
+}
+
+// TestEnsureWorkspaceScratch_NoWritableWorkspaceIsANoop: with a read-only or
+// absent workspace there is no GOTMPDIR default and nothing to create.
+func TestEnsureWorkspaceScratch_NoWritableWorkspaceIsANoop(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	r, _ := newTestRunner(t, func(c Config) Config {
+		c.Workspace = ws
+		c.WorkspaceAccess = WorkspaceRO
+		return c.Normalize(ws)
+	})
+	if err := r.EnsureWorkspaceScratch(); err != nil {
+		t.Fatalf("EnsureWorkspaceScratch: %v", err)
+	}
+	entries, err := os.ReadDir(ws)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("a read-only workspace must stay untouched; found %v", entries)
+	}
+}
+
+func TestContainerPathWithin(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		mount, target, wantRel string
+		wantOK                 bool
+	}{
+		{"/workspace", "/workspace/.gotmp", ".gotmp", true},
+		{"/workspace", "/workspace/a/b", "a/b", true},
+		{"/workspace", "/workspace", ".", true},
+		{"/workspace/", "/workspace/.gotmp/", ".gotmp", true},
+		{"/workspace", "/workspace-other/x", "", false},
+		{"/workspace", "/workspace/../etc", "", false},
+		{"/workspace", "/tmp/gotmp", "", false},
+		{"/workspace", "/", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.mount+"|"+tt.target, func(t *testing.T) {
+			t.Parallel()
+			rel, ok := containerPathWithin(tt.mount, tt.target)
+			if ok != tt.wantOK || rel != tt.wantRel {
+				t.Fatalf("containerPathWithin(%q, %q) = (%q, %v), want (%q, %v)",
+					tt.mount, tt.target, rel, ok, tt.wantRel, tt.wantOK)
+			}
+		})
 	}
 }
 

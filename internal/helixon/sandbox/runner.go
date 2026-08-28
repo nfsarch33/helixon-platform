@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -140,11 +143,22 @@ func (r *Runner) EngineArgs(spec Spec) []string {
 		"--read-only",
 		"--cap-drop=ALL",
 		"--security-opt=no-new-privileges",
-		"--user=" + r.cfg.User,
-		"--memory=" + r.cfg.MemoryLimit,
-		"--pids-limit=" + strconv.Itoa(r.cfg.PidsLimit),
-		"--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=" + r.cfg.TmpfsSize,
 	}
+	// keep-id and --user are alternatives, never both: podman under keep-id
+	// already runs the container as the invoking (non-root) user, and pinning
+	// an unrelated uid on top is what left the sandbox unable to write its own
+	// bind-mounted workspace. Config.Validate rejects a config that asks for
+	// both, so this branch never has to guess.
+	if r.cfg.UserNS == UserNSKeepID {
+		args = append(args, "--userns="+UserNSKeepID)
+	} else {
+		args = append(args, "--user="+r.cfg.User)
+	}
+	args = append(args,
+		"--memory="+r.cfg.MemoryLimit,
+		"--pids-limit="+strconv.Itoa(r.cfg.PidsLimit),
+		"--tmpfs=/tmp:rw,noexec,nosuid,nodev,size="+r.cfg.TmpfsSize,
+	)
 	if r.cfg.WorkspaceAccess != WorkspaceNone {
 		mode := "ro"
 		if r.cfg.WorkspaceAccess == WorkspaceRW {
@@ -198,6 +212,61 @@ func (r *Runner) Preflight(ctx context.Context) error {
 		ErrImageMissing, r.cfg.Image, r.cfg.Engine, r.cfg.Image)
 }
 
+// EnsureWorkspaceScratch creates the host directory that backs an
+// in-container GOTMPDIR living inside the workspace mount.
+//
+// The Go toolchain does NOT create GOTMPDIR; it calls MkdirTemp inside it and
+// fails if the parent is missing. A freshly cloned or freshly created
+// workspace has no .gotmp, so without this every first run in a new workspace
+// would fail — which is the same class of "hardened into uselessness" bug this
+// change exists to remove, just deferred to the first run instead of every
+// run.
+//
+// It is deliberately driven by the EFFECTIVE environment rather than by a
+// constant: an operator who redirects GOTMPDIR through sandbox.env gets no
+// surprise directory created in their workspace, and an operator who redirects
+// it to a different workspace-relative path still gets it created.
+//
+// A GOTMPDIR outside the workspace mount is left alone: it belongs to whatever
+// bind mount or tmpfs the operator pointed it at, and creating paths on the
+// host outside the declared workspace is precisely what this package refuses
+// to do elsewhere.
+func (r *Runner) EnsureWorkspaceScratch() error {
+	if r.cfg.WorkspaceAccess != WorkspaceRW {
+		return nil
+	}
+	target := r.cfg.Env["GOTMPDIR"]
+	if target == "" {
+		return nil
+	}
+	rel, ok := containerPathWithin(r.cfg.WorkspaceMount, target)
+	if !ok {
+		return nil
+	}
+	hostPath := filepath.Join(r.cfg.Workspace, filepath.FromSlash(rel))
+	if err := os.MkdirAll(hostPath, 0o750); err != nil {
+		return fmt.Errorf("sandbox: create workspace scratch directory %q for GOTMPDIR=%q: %w", hostPath, target, err)
+	}
+	return nil
+}
+
+// containerPathWithin reports whether target (an in-container, always
+// slash-separated path) lives at or under mount, and returns its path relative
+// to mount. Cleaning first is what makes "/workspace/../etc" answer false
+// instead of passing a prefix test.
+func containerPathWithin(mount, target string) (string, bool) {
+	mount = path.Clean(mount)
+	target = path.Clean(target)
+	if target == mount {
+		return ".", true
+	}
+	rel, found := strings.CutPrefix(target, mount+"/")
+	if !found || rel == "" {
+		return "", false
+	}
+	return rel, true
+}
+
 // Run executes spec inside the sandbox and returns a bounded, structured
 // result. A non-zero exit is reported as a Result, not an error; only a
 // failure to run the sandbox at all (missing engine, missing image, rejected
@@ -212,6 +281,9 @@ func (r *Runner) Run(ctx context.Context, spec Spec) (Result, error) {
 		}
 	}
 	if err := r.Preflight(ctx); err != nil {
+		return Result{Outcome: OutcomeError, ExitCode: -1}, err
+	}
+	if err := r.EnsureWorkspaceScratch(); err != nil {
 		return Result{Outcome: OutcomeError, ExitCode: -1}, err
 	}
 
