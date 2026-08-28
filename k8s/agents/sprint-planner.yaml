@@ -116,34 +116,27 @@ metadata:
   name: sprint-planner-config
   namespace: helixon-agents
 data:
+  # v18779: `helixon serve` decodes this document STRICTLY, so every key
+  # here must exist in helixon.FileConfig. The previous payload used
+  # `channels:` and `tools:` blocks that the loader has never had fields
+  # for — non-strict decoding discarded them silently, so this ConfigMap
+  # configured nothing but looked like it configured everything. The intent
+  # is preserved below as a comment until those blocks are implemented.
+  #
+  #   channels: cron(0 */4 * * *) -> scan_carry_forward
+  #             engram read (127.0.0.1:8280; sprint-history, agent-capabilities)
+  #             mcp write -> sprintboard_create_ticket
+  #   tools:    file_read, shell(allowlist: gh, jq), mcp_call
   sprint-planner.yaml: |
     agent_id: sprint-planner-v13923
-    channels:
-      - name: carry-forward-tick
-        type: cron
-        config:
-          schedule: "0 */4 * * *"
-          action: scan_carry_forward
-      - name: engram-read
-        type: engram
-        config:
-          addr: 127.0.0.1:8280
-          collections: [sprint-history, agent-capabilities]
-      - name: sprintboard-write
-        type: mcp
-        config:
-          url: http://sprintboard-api.helixon:8080
-          tool: sprintboard_create_ticket
-    tools:
-      - name: read_file
-        builtin: file_read
-      - name: shell
-        builtin: shell_exec
-        config:
-          allowlist: [gh, jq]
-      - name: create_sprintboard_ticket
-        builtin: mcp_call
     heartbeat_every: 60s
+    sprintboard:
+      url: http://sprintboard-api.helixon:8080
+      capabilities: "sprint-planning"
+    sandbox:
+      workspace: /var/lib/engram
+      workspace_access: ro
+      network: none
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

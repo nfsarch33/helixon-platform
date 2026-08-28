@@ -32,6 +32,12 @@ type Config struct {
 	Timeout       time.Duration
 	SystemPrompt  string
 	Logger        *slog.Logger
+	// Completion gates "the model stopped calling tools" behind verifier
+	// evidence. The zero value is filled from DefaultCompletionPolicy
+	// except for Enabled, which stays as supplied so a library caller that
+	// never heard of the gate keeps its existing behavior; the CLI turns
+	// it on explicitly.
+	Completion CompletionPolicy
 }
 
 func (c Config) withDefaults() Config {
@@ -47,6 +53,7 @@ func (c Config) withDefaults() Config {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
 	}
+	c.Completion = c.Completion.withDefaults()
 	return c
 }
 
@@ -78,7 +85,20 @@ type RunResult struct {
 	Iterations   int    `json:"iterations"`
 	TokensIn     int    `json:"tokens_in"`
 	TokensOut    int    `json:"tokens_out"`
-	Err          error  `json:"-"`
+	// Mutated records that the run used a state-changing tool, which is
+	// what makes it subject to the verifier evidence requirement.
+	Mutated bool `json:"mutated"`
+	// VerifierPassed records that at least one verifier check passed and
+	// that no verifier check has failed since.
+	VerifierPassed bool `json:"verifier_passed"`
+	// VerifierFailures counts CONSECUTIVE verifier failures; it resets on a
+	// pass, because the escalation policy is about a stuck loop, not about
+	// a run that had one red check and then fixed it.
+	VerifierFailures int `json:"verifier_failures"`
+	// NeedsHumanApproval marks a run that stopped for a human rather than
+	// finishing or retrying.
+	NeedsHumanApproval bool  `json:"needs_human_approval"`
+	Err                error `json:"-"`
 }
 
 // Run executes the agent loop: send user message, handle tool calls in a loop
@@ -156,32 +176,71 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 		slog.Int("tokens_in", resp.Usage.PromptTokens),
 		slog.Int("tokens_out", resp.Usage.CompletionTokens),
 	)
-	if err := a.recordAssistantTurn(ctx, sessionID, &choice); err != nil {
+	if err := a.recordAssistantTurn(ctx, sessionID, &choice, resp.Usage); err != nil {
 		return false, err
 	}
 	done, err := finalizeRun(result, choice.Message.Content, len(choice.Message.ToolCalls))
-	if err != nil || done {
+	if err != nil {
 		return done, err
 	}
-	if err := a.executeToolCalls(ctx, sessionID, choice.Message.ToolCalls); err != nil {
+	if done {
+		return true, a.gateCompletion(result)
+	}
+	if err := a.executeToolCalls(ctx, sessionID, choice.Message.ToolCalls, result); err != nil {
 		return false, err
 	}
 	return false, nil
 }
 
 // executeToolCalls runs each tool call sequentially and persists a tool turn
-// per call. Returns a wrapped error if the store rejects any append.
-func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []llm.ToolCall) error {
+// per call. It also maintains the completion-gate bookkeeping: which tools
+// changed state, and whether the verifier has passed or failed consecutively.
+//
+// Returns a wrapped error if the store rejects any append, or
+// ErrNeedsHumanApproval once the verifier has failed MaxConsecutiveFailures
+// times in a row — the loop stops there rather than retrying forever.
+func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []llm.ToolCall, result *RunResult) error {
 	for _, tc := range calls {
-		toolResult, toolErr := a.tools.Execute(ctx, tc.Function.Name, tc.Function.Arguments)
+		name := tc.Function.Name
+		toolResult, toolErr := a.tools.Execute(ctx, name, tc.Function.Arguments)
+		if a.cfg.Completion.isMutating(name) {
+			result.Mutated = true
+		}
+		escalate := a.recordVerifierOutcome(name, toolResult, toolErr, result)
 		if toolErr != nil {
 			toolResult = fmt.Sprintf("error: %s", toolErr.Error())
 		}
 		if _, err := a.store.AppendTurn(ctx, sessionID, RoleTool, toolResult, nil, tc.ID, 0, 0); err != nil {
 			return fmt.Errorf("append tool turn: %w", err)
 		}
+		if escalate {
+			result.NeedsHumanApproval = true
+			result.Err = ErrNeedsHumanApproval
+			a.logger.Warn("verifier failed repeatedly; escalating for human approval",
+				slog.String("session_id", sessionID),
+				slog.String("tool", name),
+				slog.Int("consecutive_failures", result.VerifierFailures),
+			)
+			return ErrNeedsHumanApproval
+		}
 	}
 	return nil
+}
+
+// recordVerifierOutcome updates the verifier bookkeeping for one tool call
+// and reports whether the escalation threshold has just been crossed.
+func (a *Agent) recordVerifierOutcome(name, payload string, toolErr error, result *RunResult) bool {
+	if !a.gateActive() || name != a.cfg.Completion.VerifierTool {
+		return false
+	}
+	if parseVerifierVerdict(payload, toolErr) {
+		result.VerifierPassed = true
+		result.VerifierFailures = 0
+		return false
+	}
+	result.VerifierPassed = false
+	result.VerifierFailures++
+	return result.VerifierFailures >= a.cfg.Completion.MaxConsecutiveFailures
 }
 
 // checkRunTermination returns ErrTimeout when ctx is done and ErrBudgetExhaust
@@ -230,14 +289,19 @@ func (a *Agent) invokeModel(ctx context.Context, sessionID string, messages []ll
 }
 
 // recordAssistantTurn persists the assistant turn with optional tool-call
-// payload. Returns a wrapped error if the store rejects the append.
-func (a *Agent) recordAssistantTurn(ctx context.Context, sessionID string, choice *llm.Choice) error {
+// payload and the REAL token usage for the iteration that produced it.
+//
+// v18779: these two columns were hard-coded to 0 at every call site, so
+// SessionTokenUsage summed to zero for every session ever recorded and the
+// per-turn cost of a run was unrecoverable after the fact. The provider
+// already returns Usage on each response; it just was not being written down.
+func (a *Agent) recordAssistantTurn(ctx context.Context, sessionID string, choice *llm.Choice, usage llm.Usage) error {
 	var toolCallsJSON json.RawMessage
 	if len(choice.Message.ToolCalls) > 0 {
 		toolCallsJSON, _ = json.Marshal(choice.Message.ToolCalls)
 	}
 	_, err := a.store.AppendTurn(ctx, sessionID, RoleAssistant, choice.Message.Content,
-		toolCallsJSON, "", 0, 0)
+		toolCallsJSON, "", usage.PromptTokens, usage.CompletionTokens)
 	return err
 }
 

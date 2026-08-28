@@ -23,3 +23,22 @@ provider:
 sprintboard:
   url: http://127.0.0.1:9400
   capabilities: "code,test,review,deploy"
+
+# Serve-mode ticket polling. DEFAULT OFF, and left off here.
+#
+# Turning this on changes what the process is: instead of answering when
+# spoken to, the agent searches the board for ready work, claims a ticket,
+# executes it through the agent loop, and either completes it with verifier
+# evidence or posts an escalation comment and leaves it for a human. Enable
+# it only where you have decided that is what you want running unattended.
+#
+# ticket_timeout must be >= the `timeout` above; the runtime refuses to start
+# otherwise, because an agent that is cut off mid-run on every ticket just
+# fills the board with abandoned claims.
+tickets:
+  enabled: false
+  interval: 30s
+  max_backoff: 5m
+  max_concurrent: 1
+  ticket_timeout: 15m
+  status: ready

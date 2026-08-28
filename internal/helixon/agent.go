@@ -2,6 +2,7 @@ package helixon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -10,8 +11,10 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agent"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/memory"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/sandbox"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/tooldispatch"
 	"github.com/nfsarch33/helixon-platform/internal/llm"
+	"github.com/nfsarch33/helixon-platform/internal/loopguard"
 )
 
 // Phase represents the current lifecycle stage of the runtime.
@@ -39,6 +42,30 @@ type RuntimeConfig struct {
 	SprintboardURL          string
 	SprintboardCapabilities string
 	Logger                  *slog.Logger
+	// Sandbox describes the execution boundary for tool calls.
+	Sandbox sandbox.Config
+	// Completion gates run completion behind verifier evidence.
+	Completion agent.CompletionPolicy
+	// LoopGuard bounds identical repeated tool calls.
+	LoopGuard LoopGuardConfig
+	// Agentrace records one NDJSON event per tool call.
+	Agentrace AgentraceConfig
+	// Tickets configures the serve-mode ticket poller. Default OFF.
+	Tickets TicketPollerConfig
+}
+
+// LoopGuardConfig configures the loop detector wired in front of the tool
+// executor.
+type LoopGuardConfig struct {
+	Enabled   bool
+	Threshold int
+	Window    time.Duration
+}
+
+// AgentraceConfig configures the NDJSON tool-call trace.
+type AgentraceConfig struct {
+	Enabled bool
+	LogPath string
 }
 
 func (c RuntimeConfig) withDefaults() RuntimeConfig {
@@ -79,10 +106,12 @@ type Runtime struct {
 	registry   *tooldispatch.Registry
 	executor   agent.ToolExecutor
 	traced     *tooldispatch.TracedExecutor
+	sandboxRun *sandbox.Runner
 	store      *agent.SessionStore
 	agent      *agent.Agent
 	memory     *memory.HybridSearcher
 	sprintCtl  *controlplane.SprintboardClient
+	poller     *TicketPoller
 	channels   []Channel
 	cancelFunc context.CancelFunc
 }
@@ -156,7 +185,12 @@ func (r *Runtime) Configure(ctx context.Context, opts ...ConfigOption) error { /
 		Timeout:       r.cfg.Timeout,
 		SystemPrompt:  r.cfg.SystemPrompt,
 		Logger:        r.logger,
+		Completion:    r.cfg.Completion,
 	})
+
+	if err := r.buildTicketPoller(); err != nil {
+		return err
+	}
 
 	r.phase = PhaseConfigured
 	r.logger.Info("runtime configured",
@@ -194,6 +228,26 @@ func (r *Runtime) Run(ctx context.Context) error {
 		go func() {
 			defer wg.Done()
 			r.heartbeatLoop(ctx)
+		}()
+	}
+
+	if r.poller != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := r.poller.Run(ctx); err != nil {
+				r.logger.Error("ticket poller stopped", slog.String("error", err.Error()))
+			}
+			stats := r.poller.Stats()
+			r.logger.Info("ticket poller finished",
+				slog.Int("polls", stats.Polls),
+				slog.Int("claimed", stats.Claimed),
+				slog.Int("conflicts", stats.Conflicts),
+				slog.Int("completed", stats.Completed),
+				slog.Int("escalated", stats.Escalated),
+				slog.Int("abandoned", stats.Abandoned),
+				slog.Int("errors", stats.Errors),
+			)
 		}()
 	}
 
@@ -264,6 +318,17 @@ func (r *Runtime) Registry() *tooldispatch.Registry {
 	return r.registry
 }
 
+// Executor returns the fully decorated tool executor the agent loop uses:
+// the registry wrapped by whichever of the sandbox gate, loop guard, and
+// agentrace recorder were configured. Exposed so the decorator chain can be
+// exercised directly, without driving a whole model conversation to find out
+// whether a guardrail is actually in the path.
+func (r *Runtime) Executor() agent.ToolExecutor {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.executor
+}
+
 // HandleMessage processes an incoming message through the agent loop.
 // It creates a session if none is specified and runs the full tool-augmented
 // conversation loop.
@@ -284,6 +349,58 @@ func (r *Runtime) HandleMessage(ctx context.Context, msg IncomingMessage) (strin
 		return "", err
 	}
 	return result.FinalContent, nil
+}
+
+// buildTicketPoller constructs the serve-mode poller when the feature flag is
+// on. It runs during Configure, not Run, so a misconfiguration (no board, a
+// per-ticket budget shorter than the agent's own timeout) fails at start-up
+// with a named reason instead of at 3am with a board full of stuck claims.
+func (r *Runtime) buildTicketPoller() error {
+	if !r.cfg.Tickets.Enabled {
+		return nil
+	}
+	if r.sprintCtl == nil {
+		return errors.New("helixon: tickets.enabled is set but no sprintboard client is wired; " +
+			"pass WithSprintboard (set sprintboard.url in the config)")
+	}
+	p, err := NewTicketPoller(r.cfg.Tickets, r.sprintCtl, r.runTicketWork, r.cfg.AgentID, r.cfg.Timeout, r.logger)
+	if err != nil {
+		return fmt.Errorf("helixon: ticket poller: %w", err)
+	}
+	r.poller = p
+	return nil
+}
+
+// TicketPoller returns the configured poller, or nil when ticket polling is
+// off. Exposed so a test can assert the flag actually decided something.
+func (r *Runtime) TicketPoller() *TicketPoller {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.poller
+}
+
+// runTicketWork is the TicketWorker the poller drives: one fresh session per
+// ticket, then the same agent loop (and the same verifier gate) that every
+// other entry point uses.
+//
+// It returns the partial final content ALONGSIDE the error, because the
+// escalation comment is only useful if it carries what the agent actually
+// said before it gave up.
+//
+//nolint:gocritic // hugeParam: the TicketWorker contract takes the ticket by value
+func (r *Runtime) runTicketWork(ctx context.Context, ticket controlplane.Ticket) (string, error) {
+	sess, err := r.store.CreateSession(ctx, r.cfg.AgentID, map[string]string{
+		"channel":   "ticket",
+		"ticket_id": ticket.ID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("create ticket session: %w", err)
+	}
+	result, runErr := r.agent.Run(ctx, sess.ID, TicketPrompt(ticket))
+	if result != nil {
+		return result.FinalContent, runErr
+	}
+	return "", runErr
 }
 
 func (r *Runtime) heartbeatLoop(ctx context.Context) {
@@ -346,6 +463,103 @@ func WithAgentrace(cfg tooldispatch.AgentraceConfig) ConfigOption {
 		}
 		r.executor = traced
 		r.traced = traced
+		return nil
+	}
+}
+
+// WithSandbox wraps the current tool executor in the sandbox gate, so one
+// decorator covers shell, file_write, and every tool registered after it.
+// Modeled on WithAgentrace and applied during Configure, before agent.New
+// consumes the executor.
+//
+// Three outcomes, all of them loud:
+//
+//   - sandbox disabled and host execution NOT explicitly permitted: an error.
+//     A config that switches the boundary off without saying so is the case
+//     this whole change exists to remove.
+//   - sandbox disabled and allow_unsandboxed_host_execution set: no gate is
+//     installed, and a warning names the risk on every start.
+//   - sandbox enabled: the gate is installed.
+//
+//nolint:gocritic // hugeParam: sandbox.Config is passed by value by design
+func WithSandbox(cfg sandbox.Config) ConfigOption {
+	return func(r *Runtime) error {
+		runner, err := sandbox.NewRunner(cfg)
+		if err != nil {
+			return fmt.Errorf("helixon: sandbox: %w", err)
+		}
+		return applySandbox(r, runner, cfg.AllowUnsandboxedHostExecution)
+	}
+}
+
+// WithSandboxRunner is WithSandbox for callers that already built the runner,
+// which the CLI does because the verifier tool must be registered against the
+// same runner before Configure runs.
+func WithSandboxRunner(runner *sandbox.Runner, allowHostExecution bool) ConfigOption {
+	return func(r *Runtime) error {
+		return applySandbox(r, runner, allowHostExecution)
+	}
+}
+
+func applySandbox(r *Runtime, runner *sandbox.Runner, allowHostExecution bool) error {
+	if r.executor == nil {
+		return errors.New("helixon: WithSandbox requires Init to have run")
+	}
+	if runner == nil {
+		if !allowHostExecution {
+			return errors.New("helixon: sandbox is disabled but sandbox.allow_unsandboxed_host_execution is not set; " +
+				"either enable the sandbox or state explicitly that agent tools may execute on this host with no boundary")
+		}
+		r.logger.Warn("SANDBOX DISABLED: agent tool commands will execute directly on this host with no container boundary, no network isolation, and this process's full ambient authority (sandbox.allow_unsandboxed_host_execution is set)")
+		return nil
+	}
+	cfg := runner.Config()
+	policy := sandbox.PolicyFor(cfg)
+	exec, err := sandbox.NewExecutor(r.executor, runner, policy, r.logger)
+	if err != nil {
+		return fmt.Errorf("helixon: sandbox executor: %w", err)
+	}
+	r.executor = exec
+	r.sandboxRun = runner
+	r.logger.Info("sandbox gate installed",
+		slog.String("engine", cfg.Engine),
+		slog.String("image", cfg.Image),
+		slog.String("network", cfg.Network),
+		slog.String("workspace", cfg.Workspace),
+		slog.String("workspace_access", string(cfg.WorkspaceAccess)),
+		slog.String("unlisted_tools", policy.Default.String()),
+	)
+	return nil
+}
+
+// SandboxRunner returns the installed sandbox runner, or nil.
+func (r *Runtime) SandboxRunner() *sandbox.Runner {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.sandboxRun
+}
+
+// WithLoopGuard wraps the current tool executor in the existing
+// tooldispatch.LoopGuardExecutor. The machinery has been in the tree since
+// v17003 and was wired into nothing; a repeated identical tool call now
+// fails fast instead of burning the token budget.
+func WithLoopGuard(cfg LoopGuardConfig) ConfigOption {
+	return func(r *Runtime) error {
+		if !cfg.Enabled {
+			return nil
+		}
+		if r.executor == nil {
+			return errors.New("helixon: WithLoopGuard requires Init to have run")
+		}
+		guard := loopguard.New(cfg.Threshold, cfg.Window)
+		logger := r.logger
+		r.executor = tooldispatch.NewLoopGuardExecutor(r.executor, guard).
+			WithOnDetect(func(toolName, hash string) {
+				logger.Warn("loop guard tripped",
+					slog.String("tool", toolName),
+					slog.String("hash", hash),
+				)
+			})
 		return nil
 	}
 }

@@ -37,3 +37,50 @@ registra:
   registry_path: /home/jaslian/Code/cursor-global-kb/inventory/services/registry.yaml
   bridge_url: http://127.0.0.1:7777
   node_alias: wsl1
+
+# v18779 guardrails. Every block below is OPTIONAL and defaults to ON — an
+# absent block is not a disabled guardrail. The values shown are the defaults.
+#
+# NOTE: since v18779 this file is decoded STRICTLY. An unknown key is now a
+# startup error naming the key and line, instead of being silently discarded
+# (which is what happened to the `registra:` block above for months).
+#
+# sandbox:
+#   enabled: true
+#   engine: podman                                  # the only permitted engine
+#   image: docker.io/library/golang:1.26-bookworm   # pinned; must be present
+#   network: none                                   # none | bridge
+#   user: "65534:65534"                             # non-root
+#   memory_limit: 512m
+#   pids_limit: 256
+#   tmpfs_size: 64m
+#   workspace: <process working directory>          # host dir the agent works in
+#   workspace_access: rw                            # none | ro | rw
+#   workspace_mount: /workspace                     # where it appears inside
+#   timeout: 2m
+#   max_output_bytes: 65536
+#   binds:                                          # extra mounts, ro by default
+#     - {host: /opt/toolchain, container: /opt/toolchain, mode: ro}
+#   env: {}                                         # the ONLY env the container sees
+#
+#   # DANGER. Setting this true runs agent tool commands directly on this
+#   # host: no container, no network isolation, no filesystem isolation, the
+#   # service's full ambient authority. There is no middle setting — if the
+#   # sandbox is off and this is not set, the agent refuses to start rather
+#   # than pretending a boundary exists.
+#   allow_unsandboxed_host_execution: false
+#
+# loop_guard:      # identical repeated tool calls fail fast
+#   enabled: true
+#   threshold: 3
+#   window: 60s
+#
+# agentrace:       # one NDJSON event per tool call
+#   enabled: true
+#   log_path: ~/.local/state/helixon/agentrace-<agent_id>.ndjson
+#
+# completion:      # a state-changing run must prove itself before it reports done
+#   enabled: true
+#   verifier_tool: verifier_run
+#   mutating_tools: [shell, file_write, verifier_run]
+#   max_consecutive_failures: 2   # then STOP and escalate to a human

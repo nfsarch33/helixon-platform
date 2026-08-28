@@ -33,17 +33,20 @@ import (
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/memory"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/sandbox"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/tooldispatch"
 )
 
-// ShellAllowedCommands is the default allow-list. The shell tool is
-// deliberately restrictive: anything that mutates the working tree, the
-// filesystem, or the user environment lives outside this surface.
-var ShellAllowedCommands = []string{
-	"echo", "ls", "pwd", "uname", "whoami", "date", "hostname",
-	"cat", "head", "tail", "wc", "grep", "find",
-	"git", "go", "make",
-}
+// ShellAllowedCommands is the default allow-list.
+//
+// v18779: git, go and make were removed. Allow-listing them by NAME
+// allow-listed everything they can run — `git -c core.pager=<cmd> log`,
+// `go run`/`go generate`, and any make target are all arbitrary code
+// execution, so the "deliberately restrictive" list was in fact a general
+// execution primitive on the fleet host. Those three now route through the
+// sandbox (and through the sandboxed verifier for build/test/vet), where the
+// worst case is a network-less, read-only, capability-less container.
+var ShellAllowedCommands = append([]string(nil), sandbox.DefaultAllowedCommands...)
 
 // ShellConfig configures the shell tool.
 type ShellConfig struct {
@@ -102,7 +105,14 @@ func ShellTool(cfg ShellConfig) tooldispatch.ToolDef {
 					argv = append(argv, s)
 				}
 			}
-			cmd := exec.CommandContext(ctx, cmdName, argv...) //nolint:gosec // G204 subprocess executes pinned tool path
+			// v18779: the arguments used to be handed to exec entirely
+			// unvalidated. ValidateArgv bounds the vector and rejects the
+			// per-command flags that turn a read-only tool back into
+			// execution (find -exec, grep -f, ...).
+			if err := sandbox.ValidateArgv(cmdName, argv); err != nil {
+				return "", err
+			}
+			cmd := exec.CommandContext(ctx, cmdName, argv...) //nolint:gosec // G204 subprocess executes an allow-listed bare command name with a validated argv
 			out, err := cmd.CombinedOutput()
 			result := truncateBytes(string(out), cfg.MaxOutputBytes)
 			if err != nil {
@@ -399,19 +409,35 @@ func (c FileReadConfig) withDefaults() FileReadConfig {
 	return c
 }
 
-// validateAllowedPath checks that path is within one of the allowed prefixes.
-// Returns nil if no allowed paths are configured, or if path matches a prefix.
-// Extracted from FileReadTool + FileWriteTool in v17206 (CC reduction).
-func validateAllowedPath(path string, allowedPaths []string) error {
+// resolveAllowedPath returns the canonical form of path when it is contained
+// by one of allowedPaths, and an error otherwise.
+//
+// v18779: this replaces a strings.HasPrefix test that three separate escapes
+// walked straight through — "/allowed/../etc/passwd" (never cleaned),
+// "/allowed-evil" against the root "/allowed" (no separator boundary), and a
+// symlink inside the root pointing out of it. sandbox.Contains does
+// Clean + EvalSymlinks + a Rel-based containment check instead, and returns
+// the canonical path so the caller opens what the check approved.
+//
+// An empty allowedPaths still means "unrestricted": the call sites that leave
+// it empty are covered by the sandbox executor's path guard, and changing the
+// meaning of the empty value here would silently break library callers.
+func resolveAllowedPath(path string, allowedPaths []string) (string, error) {
 	if len(allowedPaths) == 0 {
-		return nil
+		return path, nil
 	}
-	for _, prefix := range allowedPaths {
-		if strings.HasPrefix(path, prefix) {
-			return nil
+	for _, root := range allowedPaths {
+		if canon, err := sandbox.Contains(root, path); err == nil {
+			return canon, nil
 		}
 	}
-	return fmt.Errorf("path %q is not within allowed directories", path)
+	return "", fmt.Errorf("path %q is not within allowed directories", path)
+}
+
+// validateAllowedPath is the boolean form of resolveAllowedPath.
+func validateAllowedPath(path string, allowedPaths []string) error {
+	_, err := resolveAllowedPath(path, allowedPaths)
+	return err
 }
 
 // FileReadTool returns a tool that reads file contents with size bounds.
@@ -433,10 +459,11 @@ func FileReadTool(cfg FileReadConfig) tooldispatch.ToolDef {
 			if path == "" {
 				return "", errors.New("path is required")
 			}
-			if err := validateAllowedPath(path, cfg.AllowedPaths); err != nil {
+			path, err := resolveAllowedPath(path, cfg.AllowedPaths)
+			if err != nil {
 				return "", err
 			}
-			data, err := os.ReadFile(path) //nolint:gosec // G304 file op with operator/cli-provided path
+			data, err := os.ReadFile(path) //nolint:gosec // G304 path is canonicalised and containment-checked by resolveAllowedPath
 			if err != nil {
 				return "", fmt.Errorf("file_read: %w", err)
 			}
@@ -486,7 +513,8 @@ func FileWriteTool(cfg FileWriteConfig) tooldispatch.ToolDef {
 			if path == "" {
 				return "", errors.New("path is required")
 			}
-			if err := validateAllowedPath(path, cfg.AllowedPaths); err != nil {
+			path, err := resolveAllowedPath(path, cfg.AllowedPaths)
+			if err != nil {
 				return "", err
 			}
 			if int64(len(content)) > cfg.MaxBytes {
@@ -531,6 +559,11 @@ type Options struct {
 	MemoryTenantID string // v18684-4 multi-tenancy: propagated to HybridSearcher
 	Sprintboard    *controlplane.SprintboardClient
 	Autoresearch   *AutoresearchConfig
+	// Verifier registers the sandboxed verifier_run tool. It is skipped
+	// when nil or when no sandbox Runner is configured, because a verifier
+	// that runs on the host proves nothing about a sandboxed change and
+	// would hand the agent a second unsandboxed execution primitive.
+	Verifier *VerifierConfig
 }
 
 // Defs returns the slice of ToolDefs that Options describes, in stable
@@ -557,6 +590,9 @@ func (o Options) Defs() []tooldispatch.ToolDef {
 	}
 	if o.Autoresearch != nil {
 		defs = append(defs, AutoresearchTool(*o.Autoresearch))
+	}
+	if o.Verifier != nil && o.Verifier.Runner != nil {
+		defs = append(defs, VerifierTool(*o.Verifier))
 	}
 	sort.Slice(defs, func(i, j int) bool { return defs[i].Name < defs[j].Name })
 	return defs

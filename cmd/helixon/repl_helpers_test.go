@@ -40,17 +40,45 @@ func TestReplEchoMode_BlankLinesIgnored(t *testing.T) {
 	}
 }
 
+// replTestConfig is the config the config-less repl path actually builds.
+// v18779: the tests used to hand setupReplRuntime a bare RuntimeConfig, which
+// no production path can produce — loadConfig("") fills the guardrail
+// defaults. A bare struct means "sandbox disabled", which the runtime now
+// (correctly) refuses to configure silently.
+func replTestConfig(t *testing.T) helixon.RuntimeConfig {
+	t.Helper()
+	cfg, err := loadConfig("")
+	if err != nil {
+		t.Fatalf("loadConfig(\"\"): %v", err)
+	}
+	return cfg
+}
+
 // TestReplSetupRuntime_RegistersBuiltins confirms the extracted setup helper
-// registers the 3 builtin tools (Shell + FileRead + FileWrite) so dispatch mode
-// can find them via rt.RegisteredToolCount().
+// registers the builtin tools so dispatch mode can find them via
+// rt.RegisteredToolCount(). v18779 adds verifier_run to the set whenever a
+// sandbox is configured, so the expected count is 4.
 func TestReplSetupRuntime_RegistersBuiltins(t *testing.T) {
 	t.Parallel()
-	rt, err := setupReplRuntime(helixon.RuntimeConfig{Logger: nil}, nil)
+	rt, err := setupReplRuntime(replTestConfig(t), nil)
 	if err != nil {
 		t.Fatalf("setupReplRuntime: %v", err)
 	}
-	if got := rt.RegisteredToolCount(); got != 3 {
-		t.Errorf("expected 3 registered builtin tools, got %d", got)
+	want := map[string]bool{"shell": false, "file_read": false, "file_write": false, "verifier_run": false}
+	for _, name := range rt.Registry().Names() {
+		if _, ok := want[name]; !ok {
+			t.Errorf("unexpected tool registered: %q", name)
+			continue
+		}
+		want[name] = true
+	}
+	for name, seen := range want {
+		if !seen {
+			t.Errorf("expected builtin %q to be registered", name)
+		}
+	}
+	if got := rt.RegisteredToolCount(); got != len(want) {
+		t.Errorf("expected %d registered builtin tools, got %d", len(want), got)
 	}
 }
 
@@ -60,7 +88,7 @@ func TestReplSetupRuntime_RegistersBuiltins(t *testing.T) {
 // dispatch branch.
 func TestReplDispatchMode_EchoesProviderResponse(t *testing.T) {
 	t.Parallel()
-	rt, err := setupReplRuntime(helixon.RuntimeConfig{Logger: nil}, llm.NewMockProvider())
+	rt, err := setupReplRuntime(replTestConfig(t), llm.NewMockProvider())
 	if err != nil {
 		t.Fatalf("setupReplRuntime: %v", err)
 	}
