@@ -19,7 +19,14 @@ provider:
   kind: openai-compat
   base_url: http://127.0.0.1:8080/v1
   model: Qwen3.6-27B-MTP
-  api_key: "${OPENAI_API_KEY}"
+  # v18778: fleet-agent.service in this directory runs
+  # `secrets-bootstrap --service fleet-agent`, which exports the router's
+  # bearer as LLM_ROUTER_TOKEN -- it does NOT export OPENAI_API_KEY. This
+  # example named the wrong variable, so a reader following it verbatim got
+  # `api_key env var "OPENAI_API_KEY" is not set` at startup, which is the
+  # same crash loop that ran 300+ times in v14571. The router is the
+  # provider, so the router's own token is the credential.
+  api_key: "${LLM_ROUTER_TOKEN}"
   timeout: 60s
 
 sprintboard:
