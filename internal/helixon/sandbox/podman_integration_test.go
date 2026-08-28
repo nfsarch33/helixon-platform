@@ -31,6 +31,17 @@ import (
 // flaky security test — and a timeout that reads as "the write was blocked"
 // is exactly the false pass these tests exist to avoid, which is why every
 // assertion below checks the OUTCOME and not merely "did not pass".
+//
+// RUN THEM SEPARATELY on a vfs-backed host. `go test ./...` runs packages
+// concurrently, and the I/O these containers generate starves the rest of the
+// suite badly enough to push time-boxed tests in OTHER packages over their
+// ceilings (internal/helixon/agent and internal/helixon/memory both have
+// tests with 10-30s budgets). Measured on win1/wsl1: this file alone is
+// green, and the rest of the suite is green under -short; run together they
+// produce load-induced failures that say nothing about either change. So:
+//
+//	go test -short ./...                        # everything else
+//	go test ./internal/helixon/sandbox/ -run IT # these, on their own
 
 const (
 	integrationCommandTimeout = 5 * time.Minute
