@@ -30,28 +30,68 @@ func TestShellAllowList_NoExecutionPrimitives(t *testing.T) {
 }
 
 // TestShellTool_ArgvIsValidated: the arguments used to reach exec entirely
-// unvalidated, so an allow-listed `find` could carry -exec and run anything.
+// unvalidated, so an allow-listed `find` could carry -exec or -delete and do
+// whatever it liked.
+//
+// SAFETY: every destructive case below is aimed at a scratch directory this
+// test owns, never at "." — the shell tool has no working-directory jail, so
+// it inherits the test binary's cwd, which is the PACKAGE directory. The
+// first version of this test used "." and, the moment the mutation harness
+// removed ValidateArgv to check that the guard was load-bearing, `find .
+// -delete` ran for real and deleted the package's source files. The guard is
+// evidently real; the test must not depend on it to avoid damage.
 func TestShellTool_ArgvIsValidated(t *testing.T) {
 	t.Parallel()
 	def := ShellTool(ShellConfig{AllowedCommands: []string{"find", "echo", "grep"}, Timeout: 5 * time.Second})
 	tests := []struct {
 		name    string
 		command string
-		args    []any
+		args    func(scratch string) []any
 		wantErr string
 	}{
-		{name: "find -exec", command: "find", args: []any{".", "-exec", "id", ";"}, wantErr: "not permitted"},
-		{name: "find -delete", command: "find", args: []any{".", "-delete"}, wantErr: "not permitted"},
-		{name: "grep -f", command: "grep", args: []any{"-f", "/etc/shadow", "."}, wantErr: "not permitted"},
-		{name: "NUL byte", command: "echo", args: []any{"a\x00b"}, wantErr: "NUL byte"},
-		{name: "non-string arg", command: "echo", args: []any{1}, wantErr: "must be strings"},
+		{
+			name: "find -exec", command: "find", wantErr: "not permitted",
+			args: func(s string) []any { return []any{s, "-exec", "id", ";"} },
+		},
+		{
+			name: "find -execdir", command: "find", wantErr: "not permitted",
+			args: func(s string) []any { return []any{s, "-execdir", "id", ";"} },
+		},
+		{
+			name: "find -delete", command: "find", wantErr: "not permitted",
+			args: func(s string) []any { return []any{s, "-delete"} },
+		},
+		{
+			name: "grep -f", command: "grep", wantErr: "not permitted",
+			args: func(s string) []any { return []any{"-f", "/etc/shadow", s} },
+		},
+		{
+			name: "NUL byte", command: "echo", wantErr: "NUL byte",
+			args: func(string) []any { return []any{"a\x00b"} },
+		},
+		{
+			name: "non-string arg", command: "echo", wantErr: "must be strings",
+			args: func(string) []any { return []any{1} },
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := def.Handler(context.Background(), map[string]any{"command": tt.command, "args": tt.args})
+			scratch := t.TempDir()
+			canary := filepath.Join(scratch, "canary.txt")
+			if err := os.WriteFile(canary, []byte("x"), 0o600); err != nil {
+				t.Fatalf("write canary: %v", err)
+			}
+			_, err := def.Handler(context.Background(), map[string]any{
+				"command": tt.command,
+				"args":    tt.args(scratch),
+			})
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("Handler() = %v, want an error containing %q", err, tt.wantErr)
+			}
+			// Nothing may have executed: the guard runs before exec.
+			if _, statErr := os.Stat(canary); statErr != nil {
+				t.Fatalf("the command executed despite being rejected: %v", statErr)
 			}
 		})
 	}
