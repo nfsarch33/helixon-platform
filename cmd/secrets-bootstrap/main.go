@@ -65,6 +65,33 @@ var serviceMap = map[string][]EnvEntry{
 	"fleet-agent": {
 		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
 	},
+	// v18778: evospined (the EvoSpine DRL runtime) is the THIRD caller of
+	// the local llm-cluster-router, and the only one secrets-bootstrap did
+	// not know about. Its config -- cursor-global-kb/configs/
+	// helixon-control-plane/serve.yaml -- sets provider.base_url
+	// http://127.0.0.1:8787/v1 and provider.api_key: "${OPENAI_API_KEY}",
+	// so OPENAI_API_KEY is the name the runtime expands (helixon's
+	// expandEnv resolves exactly one ${VAR}); the VALUE it needs is the
+	// router's own bearer -- the same item llm-router and fleet-agent read.
+	// The agent authenticates TO the router, so the three must never
+	// diverge.
+	//
+	// This entry is LOAD-BEARING for switching the router's client auth on,
+	// not an optional extra. Until now `--service evospined` was an unknown
+	// service, secrets-bootstrap exited non-zero, evospined.service's
+	// trailing `; touch` swallowed that, and the runtime started on the
+	// literal placeholder sk-noop-replaced-at-runtime-by-secrets-bootstrap.
+	// That is invisible today only because the router's auth_token expands
+	// empty and proxy.BearerAuthFunc short-circuits without reading the
+	// Authorization header; the moment client auth is switched on, every
+	// evospined completion 401s.
+	//
+	// It stays silent at STARTUP either way: expandEnv uses os.LookupEnv,
+	// so a set-but-wrong key passes config validation and fails only
+	// per-request. Startup success proves nothing here.
+	"evospined": {
+		{EnvVar: "OPENAI_API_KEY", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
+	},
 	// v18776: per-key MiniMax coding-plan quota polling. The collector
 	// (`helix-dev-tools minimax-quota`) labels its metrics by ORDINAL
 	// only -- key_ordinal="1|2|3" -- so a key value never reaches a

@@ -119,7 +119,7 @@ func TestOpRead_MissingToken(t *testing.T) {
 }
 
 func TestServiceMap_KnownServices(t *testing.T) {
-	want := []string{"engramd", "sprintboard-api", "llm-router", "svcregistryd", "fleet-agent", "minimax-quota", "alert-notifier"}
+	want := []string{"engramd", "sprintboard-api", "llm-router", "svcregistryd", "fleet-agent", "evospined", "minimax-quota", "alert-notifier"}
 	for _, name := range want {
 		if _, ok := serviceMap[name]; !ok {
 			t.Errorf("serviceMap missing %q", name)
@@ -302,6 +302,95 @@ func TestServiceMap_FleetAgentUsesRouterToken(t *testing.T) {
 	}
 	if routerTokenItem == "" || e.Item != routerTokenItem {
 		t.Errorf("fleet-agent token item %q must match llm-router's LLM_ROUTER_TOKEN item %q", e.Item, routerTokenItem)
+	}
+}
+
+// routerTokenItem returns the 1Password item the llm-router service reads
+// for its own client-auth bearer. Every service that CALLS the router must
+// read the same item; a helper keeps the tests from re-deriving it.
+func routerTokenItem(t *testing.T) string {
+	t.Helper()
+	for _, e := range serviceMap["llm-router"] {
+		if e.EnvVar == "LLM_ROUTER_TOKEN" {
+			return e.Item
+		}
+	}
+	t.Fatal("llm-router serviceMap lacks LLM_ROUTER_TOKEN; every router caller pins to it")
+	return ""
+}
+
+// TestServiceMap_RouterCallersShareOneToken is the guard for switching the
+// router's client auth ON. Three services now speak to the router at
+// 127.0.0.1:8787: the router itself (which holds the token), the fleet
+// agent, and evospined. They authenticate with the SAME credential, so
+// re-pointing one entry without the others must fail the build rather than
+// produce a fleet where some callers 401 and nobody notices.
+//
+// The env var NAMES deliberately differ: each consumer's YAML decides what
+// it expands, and evospined's serve.yaml expands ${OPENAI_API_KEY}. Pinning
+// the name here is the point -- an entry under any other name renders an
+// env file the runtime never reads, which is indistinguishable from no
+// entry at all.
+func TestServiceMap_RouterCallersShareOneToken(t *testing.T) {
+	want := routerTokenItem(t)
+	cases := []struct {
+		service string
+		envVar  string
+		why     string
+	}{
+		{"fleet-agent", "LLM_ROUTER_TOKEN", "wsl1-fleet-agent.yaml expands ${LLM_ROUTER_TOKEN} once router auth is on"},
+		{"evospined", "OPENAI_API_KEY", "helixon-control-plane/serve.yaml expands provider.api_key: \"${OPENAI_API_KEY}\""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.service, func(t *testing.T) {
+			entries, ok := serviceMap[tc.service]
+			if !ok || len(entries) != 1 {
+				t.Fatalf("%s entries = %d, want exactly 1 (%s)", tc.service, len(entries), tc.envVar)
+			}
+			e := entries[0]
+			if e.EnvVar != tc.envVar {
+				t.Errorf("%s EnvVar = %q, want %q (%s)", tc.service, e.EnvVar, tc.envVar, tc.why)
+			}
+			if e.Item != want {
+				t.Errorf("%s item %q != llm-router's LLM_ROUTER_TOKEN item %q; router callers must not diverge from the router",
+					tc.service, e.Item, want)
+			}
+			if e.Vault != "HelixonSafe" {
+				t.Errorf("%s vault = %q, want HelixonSafe", tc.service, e.Vault)
+			}
+			// _extract is the drift mechanism that once crash-looped the
+			// fleet agent 300+ times while secrets-bootstrap exited 0: the
+			// secure note's text changed, the regex stopped matching, and
+			// nothing said so. A direct field read cannot drift that way.
+			if e.Field == "_extract" || e.Extract != "" {
+				t.Errorf("%s must be a direct field read, got Field=%q Extract=%q", tc.service, e.Field, e.Extract)
+			}
+			if strings.Contains(e.Field, " ") {
+				t.Errorf("%s Field %q contains a space; op read cannot resolve a spaced field label", tc.service, e.Field)
+			}
+		})
+	}
+}
+
+// TestBootstrapServiceEnv_EvospinedIsAKnownService pins the boundary that
+// actually failed: evospined.service already runs
+// `secrets-bootstrap --service evospined` and hides the exit code behind a
+// trailing `; touch`. While the service was unregistered that call returned
+// "unknown service" forever and the unit started on a placeholder key.
+// Reaching the render path at all is what this asserts.
+func TestBootstrapServiceEnv_EvospinedIsAKnownService(t *testing.T) {
+	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "") // no op CLI needed; every read fails fast
+	out := t.TempDir() + "/evospined.env"
+
+	if err := bootstrapServiceEnv("evospined", out, 2, false); err != nil {
+		t.Fatalf("evospined must be a known service, got %v", err)
+	}
+	b, err := os.ReadFile(out) //nolint:gosec // test-controlled temp path
+	if err != nil {
+		t.Fatalf("expected an env file: %v", err)
+	}
+	if !strings.Contains(string(b), "OPENAI_API_KEY") {
+		t.Errorf("rendered file must mention OPENAI_API_KEY, got:\n%s", b)
 	}
 }
 
