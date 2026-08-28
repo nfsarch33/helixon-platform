@@ -171,6 +171,20 @@ func printServeBanner(out io.Writer, agentID string, rt *helixon.Runtime, httpAd
 	if httpAddr != "" {
 		fmt.Fprintf(out, "helixon: HTTP channel on %s (POST /api/v1/chat, GET /api/v1/health)\n", httpAddr)
 	}
+	_, _ = fmt.Fprint(out, ticketPollerBanner(rt.TicketPoller()))
+}
+
+// ticketPollerBanner renders the autonomy line. An agent that pulls its own
+// work must say so on every start; silence is how "it only answers when
+// spoken to" and "it claims and executes tickets unattended" become
+// indistinguishable from the console.
+func ticketPollerBanner(p *helixon.TicketPoller) string {
+	if p == nil {
+		return "helixon: ticket polling DISABLED (set tickets.enabled to let this agent pull its own work)\n"
+	}
+	c := p.Config()
+	return fmt.Sprintf("helixon: ticket polling ENABLED status=%q interval=%s max_concurrent=%d ticket_timeout=%s\n",
+		c.Status, c.Interval, c.MaxConcurrent, c.TicketTimeout)
 }
 
 func loadServeConfig(configPath, heartbeat string) (helixon.RuntimeConfig, error) {

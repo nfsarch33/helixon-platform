@@ -53,6 +53,40 @@ type FileConfig struct {
 	LoopGuard  LoopGuardFileConfig  `yaml:"loop_guard"`
 	Agentrace  AgentraceFileConfig  `yaml:"agentrace"`
 	Completion CompletionFileConfig `yaml:"completion"`
+	Tickets    TicketsFileConfig    `yaml:"tickets"`
+}
+
+// TicketsFileConfig is the YAML shape for the serve-mode ticket poller.
+//
+// It is the one guardrail block in this file whose default is OFF. Every
+// other block defaults on because leaving a boundary off is the dangerous
+// choice; here the dangerous choice is the opposite. An agent that pulls its
+// own work off a board and executes it unattended is a qualitatively
+// different thing from an agent that answers when spoken to, and nobody
+// should acquire one by upgrading a binary.
+//
+//	tickets:
+//	  enabled: false            # default; set true to let the agent pull work
+//	  interval: 30s
+//	  max_backoff: 5m
+//	  max_concurrent: 1
+//	  ticket_timeout: 15m       # must be >= the agent `timeout`
+//	  status: ready
+//	  sprint_id: ""
+//	  priority_min: 0
+//	  labels: []
+//	  limit: 0                  # 0 = max_concurrent * 5
+type TicketsFileConfig struct {
+	Enabled       *bool    `yaml:"enabled"`
+	Interval      string   `yaml:"interval"`
+	MaxBackoff    string   `yaml:"max_backoff"`
+	MaxConcurrent int      `yaml:"max_concurrent"`
+	TicketTimeout string   `yaml:"ticket_timeout"`
+	Status        string   `yaml:"status"`
+	SprintID      string   `yaml:"sprint_id"`
+	Labels        []string `yaml:"labels"`
+	PriorityMin   int      `yaml:"priority_min"`
+	Limit         int      `yaml:"limit"`
 }
 
 // SprintboardFileConfig is the YAML shape for sprintboard integration.
@@ -216,6 +250,49 @@ func (fc FileConfig) ToRuntimeConfig() (RuntimeConfig, error) {
 	cfg.LoopGuard = lg
 	cfg.Agentrace = fc.Agentrace.toConfig()
 	cfg.Completion = fc.Completion.toPolicy()
+	tk, err := fc.Tickets.toConfig()
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
+	cfg.Tickets = tk
+	if cfg.Tickets.Enabled && cfg.SprintboardURL == "" {
+		return RuntimeConfig{}, errors.New("helixon: tickets.enabled is true but sprintboard.url is empty; " +
+			"an autonomous poller with no board to poll would start, log nothing, and do nothing")
+	}
+	return cfg, nil
+}
+
+//nolint:gocritic // hugeParam: value semantics, see ToRuntimeConfig
+func (t TicketsFileConfig) toConfig() (TicketPollerConfig, error) {
+	cfg := TicketPollerConfig{
+		// Note the default: FALSE. boolOr is not used here on purpose —
+		// "absent" and "false" mean the same thing for autonomy.
+		Enabled:       t.Enabled != nil && *t.Enabled,
+		MaxConcurrent: t.MaxConcurrent,
+		Status:        t.Status,
+		SprintID:      t.SprintID,
+		Labels:        t.Labels,
+		PriorityMin:   t.PriorityMin,
+		Limit:         t.Limit,
+	}
+	for _, d := range []struct {
+		key   string
+		raw   string
+		field *time.Duration
+	}{
+		{"tickets.interval", t.Interval, &cfg.Interval},
+		{"tickets.max_backoff", t.MaxBackoff, &cfg.MaxBackoff},
+		{"tickets.ticket_timeout", t.TicketTimeout, &cfg.TicketTimeout},
+	} {
+		if d.raw == "" {
+			continue
+		}
+		parsed, err := time.ParseDuration(d.raw)
+		if err != nil {
+			return TicketPollerConfig{}, fmt.Errorf("helixon: parse %s %q: %w", d.key, d.raw, err)
+		}
+		*d.field = parsed
+	}
 	return cfg, nil
 }
 

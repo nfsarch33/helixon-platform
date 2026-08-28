@@ -50,6 +50,8 @@ type RuntimeConfig struct {
 	LoopGuard LoopGuardConfig
 	// Agentrace records one NDJSON event per tool call.
 	Agentrace AgentraceConfig
+	// Tickets configures the serve-mode ticket poller. Default OFF.
+	Tickets TicketPollerConfig
 }
 
 // LoopGuardConfig configures the loop detector wired in front of the tool
@@ -109,6 +111,7 @@ type Runtime struct {
 	agent      *agent.Agent
 	memory     *memory.HybridSearcher
 	sprintCtl  *controlplane.SprintboardClient
+	poller     *TicketPoller
 	channels   []Channel
 	cancelFunc context.CancelFunc
 }
@@ -185,6 +188,10 @@ func (r *Runtime) Configure(ctx context.Context, opts ...ConfigOption) error { /
 		Completion:    r.cfg.Completion,
 	})
 
+	if err := r.buildTicketPoller(); err != nil {
+		return err
+	}
+
 	r.phase = PhaseConfigured
 	r.logger.Info("runtime configured",
 		slog.Int("channels", len(r.channels)),
@@ -221,6 +228,26 @@ func (r *Runtime) Run(ctx context.Context) error {
 		go func() {
 			defer wg.Done()
 			r.heartbeatLoop(ctx)
+		}()
+	}
+
+	if r.poller != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := r.poller.Run(ctx); err != nil {
+				r.logger.Error("ticket poller stopped", slog.String("error", err.Error()))
+			}
+			stats := r.poller.Stats()
+			r.logger.Info("ticket poller finished",
+				slog.Int("polls", stats.Polls),
+				slog.Int("claimed", stats.Claimed),
+				slog.Int("conflicts", stats.Conflicts),
+				slog.Int("completed", stats.Completed),
+				slog.Int("escalated", stats.Escalated),
+				slog.Int("abandoned", stats.Abandoned),
+				slog.Int("errors", stats.Errors),
+			)
 		}()
 	}
 
@@ -322,6 +349,58 @@ func (r *Runtime) HandleMessage(ctx context.Context, msg IncomingMessage) (strin
 		return "", err
 	}
 	return result.FinalContent, nil
+}
+
+// buildTicketPoller constructs the serve-mode poller when the feature flag is
+// on. It runs during Configure, not Run, so a misconfiguration (no board, a
+// per-ticket budget shorter than the agent's own timeout) fails at start-up
+// with a named reason instead of at 3am with a board full of stuck claims.
+func (r *Runtime) buildTicketPoller() error {
+	if !r.cfg.Tickets.Enabled {
+		return nil
+	}
+	if r.sprintCtl == nil {
+		return errors.New("helixon: tickets.enabled is set but no sprintboard client is wired; " +
+			"pass WithSprintboard (set sprintboard.url in the config)")
+	}
+	p, err := NewTicketPoller(r.cfg.Tickets, r.sprintCtl, r.runTicketWork, r.cfg.AgentID, r.cfg.Timeout, r.logger)
+	if err != nil {
+		return fmt.Errorf("helixon: ticket poller: %w", err)
+	}
+	r.poller = p
+	return nil
+}
+
+// TicketPoller returns the configured poller, or nil when ticket polling is
+// off. Exposed so a test can assert the flag actually decided something.
+func (r *Runtime) TicketPoller() *TicketPoller {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.poller
+}
+
+// runTicketWork is the TicketWorker the poller drives: one fresh session per
+// ticket, then the same agent loop (and the same verifier gate) that every
+// other entry point uses.
+//
+// It returns the partial final content ALONGSIDE the error, because the
+// escalation comment is only useful if it carries what the agent actually
+// said before it gave up.
+//
+//nolint:gocritic // hugeParam: the TicketWorker contract takes the ticket by value
+func (r *Runtime) runTicketWork(ctx context.Context, ticket controlplane.Ticket) (string, error) {
+	sess, err := r.store.CreateSession(ctx, r.cfg.AgentID, map[string]string{
+		"channel":   "ticket",
+		"ticket_id": ticket.ID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("create ticket session: %w", err)
+	}
+	result, runErr := r.agent.Run(ctx, sess.ID, TicketPrompt(ticket))
+	if result != nil {
+		return result.FinalContent, runErr
+	}
+	return "", runErr
 }
 
 func (r *Runtime) heartbeatLoop(ctx context.Context) {
