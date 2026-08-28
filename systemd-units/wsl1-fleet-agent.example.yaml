@@ -50,10 +50,10 @@ registra:
 #   engine: podman                                  # the only permitted engine
 #   image: docker.io/library/golang:1.26-bookworm   # pinned; must be present
 #   network: none                                   # none | bridge
-#   user: "65534:65534"                             # non-root
-#   memory_limit: 512m
+#   userns: keep-id                                 # keep-id | disabled
+#   memory_limit: 2g
 #   pids_limit: 256
-#   tmpfs_size: 64m
+#   tmpfs_size: 256m
 #   workspace: <process working directory>          # host dir the agent works in
 #   workspace_access: rw                            # none | ro | rw
 #   workspace_mount: /workspace                     # where it appears inside
@@ -61,7 +61,35 @@ registra:
 #   max_output_bytes: 65536
 #   binds:                                          # extra mounts, ro by default
 #     - {host: /opt/toolchain, container: /opt/toolchain, mode: ro}
-#   env: {}                                         # the ONLY env the container sees
+#   env: {}                                         # merged OVER the toolchain defaults
+#
+#   # WHY keep-id, and why there is no `user:` line above any more.
+#   #
+#   # v18779 set `user: "65534:65534"`. Under ROOTLESS podman that uid is
+#   # mapped to a subordinate uid on the host — a different uid from the one
+#   # that owns the bind-mounted workspace — so the container could not write
+#   # to its own workspace. Combined with a HOME of /nonexistent on a
+#   # read-only root, and a scratch tmpfs that is (correctly) noexec, EVERY
+#   # `go` check the agent ran failed, and the failures read as the agent
+#   # writing broken code. keep-id maps the container back to the invoking
+#   # user, which is both non-root and the workspace owner. Every hardening
+#   # flag is unchanged.
+#   #
+#   # Set `userns: disabled` ONLY for a rootful engine, which rejects keep-id;
+#   # then `user:` becomes required again. Setting `user:` together with
+#   # keep-id is REJECTED at startup rather than reconciled — the two say
+#   # different things about who the container is.
+#   #
+#   # `env:` is merged OVER these defaults, which exist so the toolchain works
+#   # at all: HOME=/tmp, GOCACHE=/tmp/go-build, GOPATH=/tmp/go,
+#   # GOTOOLCHAIN=local (nothing can be downloaded with network: none), and
+#   # GOTMPDIR=/workspace/.gotmp. GOTMPDIR must NOT be moved to /tmp: `go
+#   # test` executes the test binary it links there, and the tmpfs is noexec.
+#   # The agent creates /workspace/.gotmp itself before each run.
+#   #
+#   # memory_limit and tmpfs_size are coupled: /tmp holds the build and module
+#   # caches and is charged against the container's memory cgroup. Shrink one
+#   # without the other and builds turn into OOM kills.
 #
 #   # DANGER. Setting this true runs agent tool commands directly on this
 #   # host: no container, no network isolation, no filesystem isolation, the

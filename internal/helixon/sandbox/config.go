@@ -20,6 +20,18 @@
 //     operator believes a boundary exists that does not.
 //   - Command output is ALWAYS bounded, and the bound never reaches the child
 //     as EPIPE (see BoundedBuffer).
+//   - The sandbox is USABLE. A boundary that also blocks the toolchain it
+//     exists to host is not a stricter sandbox, it is a broken one, and it
+//     fails in the most expensive way available: as a stream of tool errors
+//     that look like the agent wrote bad code. v18779 shipped exactly that —
+//     every `go` check inside the container failed on the build cache, the
+//     noexec tmpfs and the uid-shifted bind mount — and a 28-mutation suite
+//     did not notice, because all eight containment tests asserted that
+//     something was BLOCKED and not one asserted that legitimate work
+//     SUCCEEDS. The missing test class was the positive control; see
+//     podman_toolchain_test.go, which is now as load-bearing as the
+//     containment tests next to it. Any change that tightens a control here
+//     must keep those green or say out loud what it is giving up.
 //
 // Podman is the only supported engine.
 package sandbox
@@ -28,6 +40,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -46,14 +59,28 @@ const (
 	DefaultImage = "docker.io/library/golang:1.26-bookworm"
 	// DefaultNetwork disables networking entirely.
 	DefaultNetwork = "none"
-	// DefaultUser is nobody:nogroup — non-root inside the container.
+	// DefaultUser is nobody:nogroup — non-root inside the container. It is
+	// only used when user-namespace remapping is DISABLED; see UserNSKeepID
+	// for why the default path does not set --user at all.
 	DefaultUser = "65534:65534"
 	// DefaultMemoryLimit caps container memory.
-	DefaultMemoryLimit = "512m"
+	//
+	// It is deliberately larger than a "hello world" needs. The scratch tmpfs
+	// is accounted against this same cgroup, and the whole point of the image
+	// is to host a Go toolchain whose linker peaks in the hundreds of MiB, so
+	// a ceiling that cannot fit GOCACHE plus a link step is not a security
+	// control — it is the read-only-cache bug wearing a different hat, and it
+	// fails the same way: as an unexplained tool error the agent gets blamed
+	// for. Lower it per agent when the workload is known to be smaller.
+	DefaultMemoryLimit = "2g"
 	// DefaultPidsLimit caps the process count (fork-bomb ceiling).
 	DefaultPidsLimit = 256
 	// DefaultTmpfsSize bounds the scratch tmpfs mounted at /tmp.
-	DefaultTmpfsSize = "64m"
+	//
+	// /tmp holds HOME, GOCACHE and GOPATH (see DefaultToolchainEnv), so this
+	// has to be big enough for a build cache and a module cache. It is charged
+	// against DefaultMemoryLimit; raise both together or neither.
+	DefaultTmpfsSize = "256m"
 	// DefaultWorkspaceMount is where the workspace appears inside the container.
 	DefaultWorkspaceMount = "/workspace"
 	// DefaultTimeout is the hard wall-clock ceiling for one sandboxed command.
@@ -65,6 +92,52 @@ const (
 	// MaxArgLen bounds a single argument.
 	MaxArgLen = 4096
 )
+
+// User-namespace modes. See Config.UserNS.
+const (
+	// UserNSKeepID runs the container in a user namespace where the invoking
+	// (rootless) host user keeps its own uid/gid inside the container.
+	//
+	// This is the default, and it is a USABILITY control that the v18779
+	// hardening was missing. With `--user=65534:65534` and rootless podman,
+	// the container process is uid 65534, which rootless podman maps to a
+	// SUBORDINATE uid on the host — a different uid from the one that owns the
+	// bind-mounted workspace. The result is a sandbox that cannot write to its
+	// own workspace: every `go test` inside it failed with a permission error
+	// that looked exactly like the agent had written broken code. keep-id maps
+	// the container process back to the workspace owner, so the workspace is
+	// writable by the process that is supposed to write to it, and nothing
+	// else changes: --network=none, --read-only, --cap-drop=ALL,
+	// no-new-privileges, the memory/pids ceilings and the noexec tmpfs all
+	// still apply.
+	//
+	// keep-id also makes --user redundant AND non-root by construction: podman
+	// refuses keep-id for a container created by root, and otherwise runs as
+	// the invoking user's own (non-root) uid. The same mechanism is used by
+	// this fleet's node-exporter quadlet for the same reason.
+	UserNSKeepID = "keep-id"
+	// UserNSDisabled emits no --userns flag and falls back to --user. It
+	// exists for a ROOTFUL engine, where podman rejects keep-id outright. A
+	// rootful engine has no uid-shifting problem to solve, so the classic
+	// nobody:nogroup user is the right answer there.
+	UserNSDisabled = "disabled"
+	// DefaultUserNS is the mode a config gets when it does not choose one.
+	DefaultUserNS = UserNSKeepID
+)
+
+// WorkspaceScratchDir is the workspace-relative directory the sandbox exports
+// as GOTMPDIR and creates before every run.
+//
+// It has to live in the WORKSPACE, not on /tmp: `go test` links a test binary
+// into TMPDIR and then EXECUTES it, and the scratch tmpfs is mounted noexec —
+// correctly, and we are not giving that up. The workspace bind mount is the
+// only writable, exec-capable location inside the container, so that is where
+// the test binary goes.
+//
+// The leading dot is load-bearing: the go tool skips directories beginning
+// with "." when it expands `./...`, so the scratch directory cannot turn into
+// a phantom package in the very builds it exists to support.
+const WorkspaceScratchDir = ".gotmp"
 
 // WorkspaceAccess describes how the workspace directory is mounted.
 type WorkspaceAccess string
@@ -107,7 +180,17 @@ type Config struct {
 	Image string
 	// Network is "none" (default) or "bridge".
 	Network string
+	// UserNS selects the user-namespace mode: UserNSKeepID (default) or
+	// UserNSDisabled. See those constants for the reasoning.
+	UserNS string
 	// User is the uid:gid the container process runs as. Must not be root.
+	//
+	// It applies ONLY when UserNS is UserNSDisabled. Under keep-id podman
+	// already runs the container as the invoking user, and pinning a second,
+	// unrelated uid on top is what made the workspace unwritable in v18779 —
+	// so setting both is REJECTED at validation rather than silently
+	// reconciled. A config that says two incompatible things about identity
+	// should be corrected by the operator, not guessed at by the sandbox.
 	User string
 	// MemoryLimit / PidsLimit / TmpfsSize are podman resource limits.
 	MemoryLimit string
@@ -125,6 +208,10 @@ type Config struct {
 	// Env is the ONLY environment the container receives. The host
 	// environment is never forwarded: a fleet host's environment holds
 	// router bearers and 1Password service tokens.
+	//
+	// Normalize merges DefaultToolchainEnv underneath whatever is set here, so
+	// an operator entry always wins and the toolchain still works when nobody
+	// has configured anything.
 	Env map[string]string
 	// AllowedCommands is the shell allow-list enforced before a command is
 	// handed to the engine.
@@ -163,7 +250,13 @@ func (c Config) Normalize(workingDir string) Config {
 	if c.Network == "" {
 		c.Network = DefaultNetwork
 	}
-	if c.User == "" {
+	if c.UserNS == "" {
+		c.UserNS = DefaultUserNS
+	}
+	// User is only meaningful without keep-id. Defaulting it under keep-id
+	// would manufacture the exact conflict Validate rejects, out of a config
+	// the operator never wrote.
+	if c.UserNS == UserNSDisabled && c.User == "" {
 		c.User = DefaultUser
 	}
 	if c.MemoryLimit == "" {
@@ -193,7 +286,90 @@ func (c Config) Normalize(workingDir string) Config {
 	if len(c.AllowedCommands) == 0 {
 		c.AllowedCommands = append([]string(nil), DefaultAllowedCommands...)
 	}
+	c.Env = c.withToolchainEnv()
 	return c
+}
+
+// DefaultToolchainEnv is the environment the workspace toolchain needs in
+// order to work at all inside the hardened container. Every entry here exists
+// because its absence produced a hard failure that read as agent incompetence:
+//
+//	HOME=/tmp        The container user's passwd HOME is /nonexistent, and the
+//	                 root filesystem is read-only, so anything that writes
+//	                 under HOME dies with "mkdir /nonexistent: read-only file
+//	                 system" before it does any work.
+//	GOCACHE=/tmp/... The Go build cache. It only needs to be WRITTEN and read,
+//	                 never executed, so the noexec scratch tmpfs is the right
+//	                 home for it.
+//	GOPATH=/tmp/go   Module cache and friends, same reasoning as GOCACHE.
+//	GOTOOLCHAIN=…    "local" whenever the network is off, because a toolchain
+//	                 download cannot succeed in a container with no network
+//	                 and the attempt buries the real version mismatch.
+//	GOTMPDIR=<ws>/…  The one thing that CANNOT live on the tmpfs: `go test`
+//	                 links a test binary into TMPDIR and executes it, and the
+//	                 tmpfs is noexec. See WorkspaceScratchDir. Only set when
+//	                 the workspace is writable — with a read-only workspace
+//	                 there is nowhere exec-capable to put a test binary, and
+//	                 pointing GOTMPDIR at an unwritable path would trade a
+//	                 clear failure for a confusing one.
+//
+// MEASURED under keep-id, so nobody has to re-derive it. Podman synthesizes a
+// passwd entry for the mapped user, and the Go toolchain then resolves its own
+// defaults to GOCACHE=/workspace/.cache/go-build and GOPATH=/go. Both are
+// wrong in ways that are quiet rather than loud:
+//
+//   - GOCACHE would land INSIDE the agent's repository. It never breaks a
+//     build, it just leaves a build cache in the working tree the agent is
+//     reasoning about and committing from.
+//   - GOPATH=/go is on the READ-ONLY root, so the first dependency that has to
+//     be materialized fails. A module with no dependencies never notices.
+//
+// Because of that, HOME and the GOCACHE/GOPATH pair are REDUNDANT WITH EACH
+// OTHER for a self-contained module: removing HOME alone changes nothing, and
+// removing GOCACHE and GOPATH alone changes nothing. Mutation testing
+// confirmed both. Removing all three is caught by the workspace-pollution
+// positive control, not by a build failure — which is exactly why that control
+// exists. GOTOOLCHAIN is defensive in the same way: it changes which ERROR you
+// get, never whether a correct workspace builds, so its assertion lives at
+// config level only.
+//
+// The values are returned fresh on every call so a caller cannot mutate the
+// defaults for everyone else.
+//
+//nolint:gocritic // hugeParam: value semantics are deliberate, see Normalize
+func (c Config) DefaultToolchainEnv() map[string]string {
+	mount := c.WorkspaceMount
+	if mount == "" {
+		mount = DefaultWorkspaceMount
+	}
+	env := map[string]string{
+		"HOME":    "/tmp",
+		"GOCACHE": "/tmp/go-build",
+		"GOPATH":  "/tmp/go",
+	}
+	if c.Network == "none" || c.Network == "" {
+		// A container with no network cannot download a toolchain, so
+		// GOTOOLCHAIN=auto can only ever fail here — and it fails as an
+		// obscure network error instead of "go.mod requires go >= X". Say
+		// local so the real problem is the one that gets reported.
+		env["GOTOOLCHAIN"] = "local"
+	}
+	if c.WorkspaceAccess == WorkspaceRW {
+		env["GOTMPDIR"] = path.Join(mount, WorkspaceScratchDir)
+	}
+	return env
+}
+
+// withToolchainEnv returns Env with the toolchain defaults filled in
+// UNDERNEATH the configured values, so sandbox.env always wins.
+//
+//nolint:gocritic // hugeParam: value semantics are deliberate, see Normalize
+func (c Config) withToolchainEnv() map[string]string {
+	env := c.DefaultToolchainEnv()
+	for k, v := range c.Env {
+		env[k] = v
+	}
+	return env
 }
 
 var rootUserRE = regexp.MustCompile(`^(0|root)(:|$)`)
@@ -214,6 +390,24 @@ func (c Config) Validate() (Config, error) {
 	case "none", "bridge":
 	default:
 		return c, fmt.Errorf("sandbox: network %q is not supported (use \"none\" or \"bridge\")", c.Network)
+	}
+	switch c.UserNS {
+	case UserNSKeepID, UserNSDisabled:
+	default:
+		return c, fmt.Errorf("sandbox: userns %q is not supported (use %q or %q). Modes that share the host's user namespace are not offered: they would undo the isolation this container exists to provide",
+			c.UserNS, UserNSKeepID, UserNSDisabled)
+	}
+	// REJECT rather than reconcile. Under keep-id podman already runs the
+	// container as the invoking user; an explicit --user on top of that is how
+	// the sandbox ended up unable to write its own workspace. Guessing which
+	// of the two the operator meant would re-introduce exactly the silent
+	// mismatch that made this failure so expensive to diagnose.
+	if c.UserNS == UserNSKeepID && strings.TrimSpace(c.User) != "" {
+		return c, fmt.Errorf("sandbox: user %q is set together with userns %q, and they mean different things about who the container is. keep-id already runs the container as the invoking (non-root) user; either drop sandbox.user, or set sandbox.userns: %q to run a rootful engine as an explicit uid",
+			c.User, c.UserNS, UserNSDisabled)
+	}
+	if c.UserNS == UserNSDisabled && strings.TrimSpace(c.User) == "" {
+		return c, fmt.Errorf("sandbox: userns %q requires an explicit non-root sandbox.user; without a user namespace the image's own default user is root", c.UserNS)
 	}
 	if rootUserRE.MatchString(strings.TrimSpace(c.User)) {
 		return c, fmt.Errorf("sandbox: user %q is root; the sandbox requires a non-root user", c.User)

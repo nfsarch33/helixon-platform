@@ -25,7 +25,11 @@ func TestNormalize_AppliesHardenedDefaults(t *testing.T) {
 		{"engine", got.Engine, DefaultEngine},
 		{"image", got.Image, DefaultImage},
 		{"network", got.Network, "none"},
-		{"user", got.User, DefaultUser},
+		{"userns", got.UserNS, UserNSKeepID},
+		// User is intentionally EMPTY under keep-id: podman already runs the
+		// container as the invoking user, and defaulting a second uid here is
+		// what left v18779 unable to write its own workspace.
+		{"user", got.User, ""},
 		{"memory limit", got.MemoryLimit, DefaultMemoryLimit},
 		{"pids limit", got.PidsLimit, DefaultPidsLimit},
 		{"tmpfs size", got.TmpfsSize, DefaultTmpfsSize},
@@ -88,13 +92,34 @@ func TestValidate_TableDriven(t *testing.T) {
 		},
 		{
 			name:    "root user by uid",
-			mutate:  func(c Config) Config { c.User = "0:0"; return c },
+			mutate:  func(c Config) Config { c.UserNS = UserNSDisabled; c.User = "0:0"; return c },
 			wantErr: "requires a non-root user",
 		},
 		{
 			name:    "root user by name",
-			mutate:  func(c Config) Config { c.User = "root"; return c },
+			mutate:  func(c Config) Config { c.UserNS = UserNSDisabled; c.User = "root"; return c },
 			wantErr: "requires a non-root user",
+		},
+		{
+			// REJECT, not reconcile. Two different answers to "who is this
+			// container" is exactly the ambiguity that hid the v18779 defect.
+			name:    "keep-id plus an explicit user is refused rather than reconciled",
+			mutate:  func(c Config) Config { c.User = "1000:1000"; return c },
+			wantErr: "they mean different things about who the container is",
+		},
+		{
+			name:   "userns disabled with an explicit non-root user is valid",
+			mutate: func(c Config) Config { c.UserNS = UserNSDisabled; c.User = DefaultUser; return c },
+		},
+		{
+			name:    "userns disabled with no user would run as the image's root",
+			mutate:  func(c Config) Config { c.UserNS = UserNSDisabled; c.User = ""; return c },
+			wantErr: "requires an explicit non-root sandbox.user",
+		},
+		{
+			name:    "unknown userns mode",
+			mutate:  func(c Config) Config { c.UserNS = "host"; return c },
+			wantErr: "userns \"host\" is not supported",
 		},
 		{
 			// Anthropic sandbox-runtime rule: filesystem isolation without
@@ -265,12 +290,83 @@ func TestNormalize_PreservesExplicitValues(t *testing.T) {
 	t.Parallel()
 	in := Config{
 		Enabled: true, Engine: "podman", Image: "img:1", Network: "bridge",
-		User: "1000:1000", MemoryLimit: "1g", PidsLimit: 8, TmpfsSize: "1m",
+		UserNS: UserNSDisabled, User: "1000:1000", MemoryLimit: "1g", PidsLimit: 8, TmpfsSize: "1m",
 		Workspace: "/tmp", WorkspaceAccess: WorkspaceRO, WorkspaceMount: "/w",
 		Timeout: time.Second, MaxOutputBytes: 10, AllowedCommands: []string{"echo"},
+		// Every toolchain default, spelled out, so DeepEqual still means
+		// "Normalize changed nothing" now that Env is populated.
+		Env: map[string]string{"HOME": "/x", "GOCACHE": "/x/c", "GOPATH": "/x/p", "GOTOOLCHAIN": "auto"},
 	}
 	got := in.Normalize("/ignored")
 	if !reflect.DeepEqual(got, in) {
 		t.Fatalf("Normalize altered an explicitly set config:\n got %+v\nwant %+v", got, in)
+	}
+}
+
+// TestNormalize_ToolchainEnvDefaults is the counterpart to the containment
+// tests: these four variables are the difference between a sandbox that hosts
+// a Go toolchain and one that returns "mkdir /nonexistent: read-only file
+// system" for every check the agent runs.
+//
+// MUTATION: delete any entry from Config.DefaultToolchainEnv and the matching
+// subtest here fails, along with the podman positive control that needs it.
+func TestNormalize_ToolchainEnvDefaults(t *testing.T) {
+	t.Parallel()
+	got := Config{Enabled: true}.Normalize(t.TempDir())
+	want := map[string]string{
+		"HOME":        "/tmp",
+		"GOCACHE":     "/tmp/go-build",
+		"GOPATH":      "/tmp/go",
+		"GOTOOLCHAIN": "local",
+		"GOTMPDIR":    DefaultWorkspaceMount + "/" + WorkspaceScratchDir,
+	}
+	for k, v := range want {
+		t.Run(k, func(t *testing.T) {
+			t.Parallel()
+			if got.Env[k] != v {
+				t.Fatalf("Env[%s] = %q, want %q", k, got.Env[k], v)
+			}
+		})
+	}
+	// GOTMPDIR must be inside the WORKSPACE, never on the tmpfs: `go test`
+	// executes the binary it links there, and the tmpfs is noexec.
+	if strings.HasPrefix(got.Env["GOTMPDIR"], "/tmp") {
+		t.Fatalf("GOTMPDIR = %q; a noexec tmpfs cannot host the test binary go test links into it", got.Env["GOTMPDIR"])
+	}
+}
+
+// TestNormalize_ConfiguredEnvOverridesTheDefaults keeps sandbox.env the
+// operator's final word.
+func TestNormalize_ConfiguredEnvOverridesTheDefaults(t *testing.T) {
+	t.Parallel()
+	got := Config{
+		Enabled: true,
+		Env:     map[string]string{"GOCACHE": "/workspace/.cache", "EXTRA": "1"},
+	}.Normalize(t.TempDir())
+	if got.Env["GOCACHE"] != "/workspace/.cache" {
+		t.Fatalf("configured GOCACHE was overwritten by the default: %q", got.Env["GOCACHE"])
+	}
+	if got.Env["EXTRA"] != "1" {
+		t.Fatal("configured env entries must survive the merge")
+	}
+	if got.Env["HOME"] != "/tmp" {
+		t.Fatalf("untouched defaults must still be filled in; HOME = %q", got.Env["HOME"])
+	}
+}
+
+// TestDefaultToolchainEnv_NoGOTMPDIRWithoutAWritableWorkspace: with a
+// read-only workspace there is nowhere exec-capable to link a test binary, so
+// the sandbox says nothing rather than pointing GOTMPDIR at an unwritable
+// path and turning a clear failure into a confusing one.
+func TestDefaultToolchainEnv_NoGOTMPDIRWithoutAWritableWorkspace(t *testing.T) {
+	t.Parallel()
+	for _, access := range []WorkspaceAccess{WorkspaceRO, WorkspaceNone} {
+		t.Run(string(access), func(t *testing.T) {
+			t.Parallel()
+			got := Config{Enabled: true, WorkspaceAccess: access}.Normalize(t.TempDir())
+			if _, ok := got.Env["GOTMPDIR"]; ok {
+				t.Fatalf("GOTMPDIR must not be set for a %s workspace; got %q", access, got.Env["GOTMPDIR"])
+			}
+		})
 	}
 }

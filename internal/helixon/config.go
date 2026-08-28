@@ -115,20 +115,46 @@ type SandboxBindFileConfig struct {
 //	  enabled: true                # default
 //	  image: docker.io/library/golang:1.26-bookworm
 //	  network: none                # none (default) | bridge
+//	  userns: keep-id              # keep-id (default) | disabled
 //	  workspace: /home/agent/work  # defaults to the process working directory
 //	  workspace_access: rw         # none | ro | rw (default rw)
-//	  memory_limit: 512m
+//	  memory_limit: 2g
 //	  pids_limit: 256
+//	  tmpfs_size: 256m
 //	  timeout: 2m
 //	  max_output_bytes: 65536
+//	  env:                         # merged OVER the toolchain defaults below
+//	    GOFLAGS: -mod=mod
 //	  binds:
 //	    - {host: /opt/toolchain, container: /opt/toolchain, mode: ro}
 //	  allow_unsandboxed_host_execution: false
+//
+// Two blocks here are usability controls rather than knobs, and both were
+// missing in v18779, which is why every `go` check the agent ran came back as
+// an unexplained failure:
+//
+//   - userns: keep-id maps the container process to the host user that owns
+//     the bind-mounted workspace. Under rootless podman, `user: 65534:65534`
+//     maps to a SUBORDINATE host uid instead, and the sandbox cannot write to
+//     its own workspace. Set `userns: disabled` (and then `user:`) only for a
+//     rootful engine, where podman rejects keep-id. Setting `user:` together
+//     with keep-id is REJECTED, not reconciled: the two say different things
+//     about who the container is, and guessing is how this bug survived.
+//   - env: the sandbox pre-populates HOME, GOCACHE, GOPATH and GOTMPDIR (see
+//     sandbox.DefaultToolchainEnv) because the container user's HOME is
+//     /nonexistent on a read-only root, and because `go test` executes the
+//     test binary it links into GOTMPDIR — which therefore cannot live on the
+//     noexec scratch tmpfs. Anything set here overrides those defaults.
+//
+// memory_limit and tmpfs_size are coupled: /tmp holds the build and module
+// caches and is charged against the container's memory cgroup, so shrinking
+// one without the other turns a build into an OOM kill.
 type SandboxFileConfig struct {
 	Enabled         *bool                   `yaml:"enabled"`
 	Engine          string                  `yaml:"engine"`
 	Image           string                  `yaml:"image"`
 	Network         string                  `yaml:"network"`
+	UserNS          string                  `yaml:"userns"`
 	User            string                  `yaml:"user"`
 	MemoryLimit     string                  `yaml:"memory_limit"`
 	PidsLimit       int                     `yaml:"pids_limit"`
@@ -316,6 +342,7 @@ func (s SandboxFileConfig) toConfig() (sandbox.Config, error) {
 		Engine:                        s.Engine,
 		Image:                         s.Image,
 		Network:                       s.Network,
+		UserNS:                        s.UserNS,
 		User:                          s.User,
 		MemoryLimit:                   s.MemoryLimit,
 		PidsLimit:                     s.PidsLimit,
