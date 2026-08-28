@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/agent"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/builtins"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/memory"
@@ -84,14 +86,14 @@ func setupTaskRuntime(ctx context.Context, configPath string) (*helixon.Runtime,
 	if err := rt.Init(ctx); err != nil {
 		return nil, helixon.RuntimeConfig{}, fmt.Errorf("runtime init: %w", err)
 	}
-	if err := builtins.RegisterAll(rt.Registry(), builtins.Options{
-		Shell:     &builtins.ShellConfig{},
-		FileRead:  &builtins.FileReadConfig{},
-		FileWrite: &builtins.FileWriteConfig{},
-	}); err != nil {
+	g, err := newGuardrails(cfg)
+	if err != nil {
+		return nil, helixon.RuntimeConfig{}, err
+	}
+	if err := builtins.RegisterAll(rt.Registry(), g.toolOptions(false)); err != nil {
 		return nil, helixon.RuntimeConfig{}, fmt.Errorf("register builtins: %w", err)
 	}
-	if err := rt.Configure(ctx); err != nil {
+	if err := rt.Configure(ctx, g.configOptions()...); err != nil {
 		return nil, helixon.RuntimeConfig{}, fmt.Errorf("runtime configure: %w", err)
 	}
 	return rt, cfg, nil
@@ -129,6 +131,17 @@ func executeAndReport(ctx context.Context, rt *helixon.Runtime, taskPrompt, tick
 		Content: taskPrompt,
 	})
 	if err != nil {
+		// An escalation is NOT a completion. Reporting "complete" with the
+		// escalation text as evidence is exactly the outcome the gate
+		// exists to prevent, so the ticket is left claimed and a human is
+		// told why.
+		if errors.Is(err, agent.ErrNeedsHumanApproval) || errors.Is(err, agent.ErrNoVerifierEvidence) {
+			fmt.Fprintf(out, "\nhelixon task: STOPPED FOR HUMAN APPROVAL: %v\n", err)
+			if ticketID != "" {
+				fmt.Fprintf(out, "helixon task: ticket %s left claimed and NOT completed\n", ticketID)
+			}
+			return "", fmt.Errorf("agent run: %w", err)
+		}
 		if ticketID != "" && sbClient != nil {
 			_ = sbClient.CompleteTicket(ctx, ticketID, fmt.Sprintf("error: %v", err))
 		}

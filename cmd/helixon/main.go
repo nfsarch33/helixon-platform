@@ -155,7 +155,7 @@ func runServe(cmd *cobra.Command, f serveFlags) error {
 	}
 	ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	if err := initAndConfigureRuntime(ctx, rt, f.httpAddr); err != nil {
+	if err := initAndConfigureRuntime(ctx, rt, cfg, f.httpAddr); err != nil {
 		return err
 	}
 	out := cmd.OutOrStdout()
@@ -207,19 +207,19 @@ func buildServeRuntime(cfg helixon.RuntimeConfig) (*helixon.Runtime, error) {
 	return rt, nil
 }
 
-func initAndConfigureRuntime(ctx context.Context, rt *helixon.Runtime, httpAddr string) error {
+//nolint:gocritic // hugeParam: RuntimeConfig is copied deliberately
+func initAndConfigureRuntime(ctx context.Context, rt *helixon.Runtime, cfg helixon.RuntimeConfig, httpAddr string) error {
 	if err := rt.Init(ctx); err != nil {
 		return fmt.Errorf("runtime init: %w", err)
 	}
-	if err := builtins.RegisterAll(rt.Registry(), builtins.Options{
-		Shell:     &builtins.ShellConfig{},
-		FileRead:  &builtins.FileReadConfig{},
-		FileWrite: &builtins.FileWriteConfig{},
-		WebFetch:  &builtins.WebFetchConfig{},
-	}); err != nil {
+	g, err := newGuardrails(cfg)
+	if err != nil {
+		return err
+	}
+	if err := builtins.RegisterAll(rt.Registry(), g.toolOptions(true)); err != nil {
 		return fmt.Errorf("register builtins: %w", err)
 	}
-	configOpts := []helixon.ConfigOption{}
+	configOpts := g.configOptions()
 	if httpAddr != "" {
 		configOpts = append(configOpts, helixon.WithChannel(
 			helixon.NewHTTPChannel(helixon.HTTPChannelConfig{
@@ -348,14 +348,14 @@ func setupReplRuntime(cfg helixon.RuntimeConfig, provider llm.Provider) (*helixo
 	if err := rt.Init(ctx); err != nil {
 		return nil, fmt.Errorf("runtime init: %w", err)
 	}
-	if err := builtins.RegisterAll(rt.Registry(), builtins.Options{
-		Shell:     &builtins.ShellConfig{},
-		FileRead:  &builtins.FileReadConfig{},
-		FileWrite: &builtins.FileWriteConfig{},
-	}); err != nil {
+	g, err := newGuardrails(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := builtins.RegisterAll(rt.Registry(), g.toolOptions(false)); err != nil {
 		return nil, fmt.Errorf("register builtins: %w", err)
 	}
-	if err := rt.Configure(ctx); err != nil {
+	if err := rt.Configure(ctx, g.configOptions()...); err != nil {
 		return nil, fmt.Errorf("runtime configure: %w", err)
 	}
 	return rt, nil
@@ -428,8 +428,15 @@ func newVersionCmd() *cobra.Command {
 
 func loadConfig(path string) (helixon.RuntimeConfig, error) {
 	if path == "" {
-		// repl-style: zero config + defaults.
-		return helixon.RuntimeConfig{Logger: slog.Default()}, nil
+		// repl-style: no file, but the SAME guardrail defaults an empty
+		// YAML document would produce. Returning a bare zero value here
+		// would quietly hand the config-less path a disabled sandbox.
+		cfg, err := helixon.DefaultRuntimeConfig()
+		if err != nil {
+			return helixon.RuntimeConfig{}, err
+		}
+		cfg.Logger = slog.Default()
+		return cfg, nil
 	}
 	cfg, err := helixon.LoadConfig(path)
 	if err != nil {

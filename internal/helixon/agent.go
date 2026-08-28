@@ -2,6 +2,7 @@ package helixon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -10,8 +11,10 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agent"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/memory"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/sandbox"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/tooldispatch"
 	"github.com/nfsarch33/helixon-platform/internal/llm"
+	"github.com/nfsarch33/helixon-platform/internal/loopguard"
 )
 
 // Phase represents the current lifecycle stage of the runtime.
@@ -39,6 +42,28 @@ type RuntimeConfig struct {
 	SprintboardURL          string
 	SprintboardCapabilities string
 	Logger                  *slog.Logger
+	// Sandbox describes the execution boundary for tool calls.
+	Sandbox sandbox.Config
+	// Completion gates run completion behind verifier evidence.
+	Completion agent.CompletionPolicy
+	// LoopGuard bounds identical repeated tool calls.
+	LoopGuard LoopGuardConfig
+	// Agentrace records one NDJSON event per tool call.
+	Agentrace AgentraceConfig
+}
+
+// LoopGuardConfig configures the loop detector wired in front of the tool
+// executor.
+type LoopGuardConfig struct {
+	Enabled   bool
+	Threshold int
+	Window    time.Duration
+}
+
+// AgentraceConfig configures the NDJSON tool-call trace.
+type AgentraceConfig struct {
+	Enabled bool
+	LogPath string
 }
 
 func (c RuntimeConfig) withDefaults() RuntimeConfig {
@@ -79,6 +104,7 @@ type Runtime struct {
 	registry   *tooldispatch.Registry
 	executor   agent.ToolExecutor
 	traced     *tooldispatch.TracedExecutor
+	sandboxRun *sandbox.Runner
 	store      *agent.SessionStore
 	agent      *agent.Agent
 	memory     *memory.HybridSearcher
@@ -156,6 +182,7 @@ func (r *Runtime) Configure(ctx context.Context, opts ...ConfigOption) error { /
 		Timeout:       r.cfg.Timeout,
 		SystemPrompt:  r.cfg.SystemPrompt,
 		Logger:        r.logger,
+		Completion:    r.cfg.Completion,
 	})
 
 	r.phase = PhaseConfigured
@@ -264,6 +291,17 @@ func (r *Runtime) Registry() *tooldispatch.Registry {
 	return r.registry
 }
 
+// Executor returns the fully decorated tool executor the agent loop uses:
+// the registry wrapped by whichever of the sandbox gate, loop guard, and
+// agentrace recorder were configured. Exposed so the decorator chain can be
+// exercised directly, without driving a whole model conversation to find out
+// whether a guardrail is actually in the path.
+func (r *Runtime) Executor() agent.ToolExecutor {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.executor
+}
+
 // HandleMessage processes an incoming message through the agent loop.
 // It creates a session if none is specified and runs the full tool-augmented
 // conversation loop.
@@ -346,6 +384,103 @@ func WithAgentrace(cfg tooldispatch.AgentraceConfig) ConfigOption {
 		}
 		r.executor = traced
 		r.traced = traced
+		return nil
+	}
+}
+
+// WithSandbox wraps the current tool executor in the sandbox gate, so one
+// decorator covers shell, file_write, and every tool registered after it.
+// Modeled on WithAgentrace and applied during Configure, before agent.New
+// consumes the executor.
+//
+// Three outcomes, all of them loud:
+//
+//   - sandbox disabled and host execution NOT explicitly permitted: an error.
+//     A config that switches the boundary off without saying so is the case
+//     this whole change exists to remove.
+//   - sandbox disabled and allow_unsandboxed_host_execution set: no gate is
+//     installed, and a warning names the risk on every start.
+//   - sandbox enabled: the gate is installed.
+//
+//nolint:gocritic // hugeParam: sandbox.Config is passed by value by design
+func WithSandbox(cfg sandbox.Config) ConfigOption {
+	return func(r *Runtime) error {
+		runner, err := sandbox.NewRunner(cfg)
+		if err != nil {
+			return fmt.Errorf("helixon: sandbox: %w", err)
+		}
+		return applySandbox(r, runner, cfg.AllowUnsandboxedHostExecution)
+	}
+}
+
+// WithSandboxRunner is WithSandbox for callers that already built the runner,
+// which the CLI does because the verifier tool must be registered against the
+// same runner before Configure runs.
+func WithSandboxRunner(runner *sandbox.Runner, allowHostExecution bool) ConfigOption {
+	return func(r *Runtime) error {
+		return applySandbox(r, runner, allowHostExecution)
+	}
+}
+
+func applySandbox(r *Runtime, runner *sandbox.Runner, allowHostExecution bool) error {
+	if r.executor == nil {
+		return errors.New("helixon: WithSandbox requires Init to have run")
+	}
+	if runner == nil {
+		if !allowHostExecution {
+			return errors.New("helixon: sandbox is disabled but sandbox.allow_unsandboxed_host_execution is not set; " +
+				"either enable the sandbox or state explicitly that agent tools may execute on this host with no boundary")
+		}
+		r.logger.Warn("SANDBOX DISABLED: agent tool commands will execute directly on this host with no container boundary, no network isolation, and this process's full ambient authority (sandbox.allow_unsandboxed_host_execution is set)")
+		return nil
+	}
+	cfg := runner.Config()
+	policy := sandbox.PolicyFor(cfg)
+	exec, err := sandbox.NewExecutor(r.executor, runner, policy, r.logger)
+	if err != nil {
+		return fmt.Errorf("helixon: sandbox executor: %w", err)
+	}
+	r.executor = exec
+	r.sandboxRun = runner
+	r.logger.Info("sandbox gate installed",
+		slog.String("engine", cfg.Engine),
+		slog.String("image", cfg.Image),
+		slog.String("network", cfg.Network),
+		slog.String("workspace", cfg.Workspace),
+		slog.String("workspace_access", string(cfg.WorkspaceAccess)),
+		slog.String("unlisted_tools", policy.Default.String()),
+	)
+	return nil
+}
+
+// SandboxRunner returns the installed sandbox runner, or nil.
+func (r *Runtime) SandboxRunner() *sandbox.Runner {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.sandboxRun
+}
+
+// WithLoopGuard wraps the current tool executor in the existing
+// tooldispatch.LoopGuardExecutor. The machinery has been in the tree since
+// v17003 and was wired into nothing; a repeated identical tool call now
+// fails fast instead of burning the token budget.
+func WithLoopGuard(cfg LoopGuardConfig) ConfigOption {
+	return func(r *Runtime) error {
+		if !cfg.Enabled {
+			return nil
+		}
+		if r.executor == nil {
+			return errors.New("helixon: WithLoopGuard requires Init to have run")
+		}
+		guard := loopguard.New(cfg.Threshold, cfg.Window)
+		logger := r.logger
+		r.executor = tooldispatch.NewLoopGuardExecutor(r.executor, guard).
+			WithOnDetect(func(toolName, hash string) {
+				logger.Warn("loop guard tripped",
+					slog.String("tool", toolName),
+					slog.String("hash", hash),
+				)
+			})
 		return nil
 	}
 }

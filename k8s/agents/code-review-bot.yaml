@@ -110,36 +110,28 @@ metadata:
   name: code-review-bot-config
   namespace: helixon-agents
 data:
+  # v18779: `helixon serve` decodes this document STRICTLY, so every key
+  # here must exist in helixon.FileConfig. The previous payload used
+  # `channels:` and `tools:` blocks the loader has never had fields for —
+  # non-strict decoding discarded them silently, so this ConfigMap
+  # configured nothing while looking like it configured everything. The
+  # intent is preserved below until those blocks are implemented.
+  #
+  #   channels: webhook /webhook/github (secret from 1Password)
+  #             engram read (127.0.0.1:8280; code-review-context, pr-history)
+  #             mcp write -> sprintboard_create_ticket
+  #   tools:    file_read, grep_search, shell(allowlist: gh, git),
+  #             github_post_comment
   code-review-bot.yaml: |
     agent_id: code-review-bot-v13923
-    channels:
-      - name: github-pr-events
-        type: webhook
-        config:
-          path: /webhook/github
-          secret_op: op://Cursor_IronClaw/github pat/password
-      - name: engram-read
-        type: engram
-        config:
-          addr: 127.0.0.1:8280
-          collections: [code-review-context, pr-history]
-      - name: sprintboard-write
-        type: mcp
-        config:
-          url: http://sprintboard-api.helixon:8080
-          tool: sprintboard_create_ticket
-    tools:
-      - name: read_file
-        builtin: file_read
-      - name: grep
-        builtin: grep_search
-      - name: shell
-        builtin: shell_exec
-        config:
-          allowlist: [gh, git]
-      - name: post_review_comment
-        builtin: github_post_comment
     heartbeat_every: 60s
+    sprintboard:
+      url: http://sprintboard-api.helixon:8080
+      capabilities: "code-review"
+    sandbox:
+      workspace: /var/lib/engram
+      workspace_access: ro
+      network: none
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

@@ -57,7 +57,11 @@ func TestServe_InvalidHeartbeatErrors(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := dir + "/helixon.yaml"
-	if err := writeFile(path, "agent_id: cov-test\ntimeout: 1m\nheartbeat_every: 30s\nprovider:\n  type: echo\n"); err != nil {
+	// v18779: this fixture used `provider: {type: echo}`. ProviderConfig has
+	// never had a `type` field — the key was silently dropped by the
+	// non-strict decoder, which is precisely the failure mode strict
+	// decoding now surfaces. The field is `kind`.
+	if err := writeFile(path, "agent_id: cov-test\ntimeout: 1m\nheartbeat_every: 30s\nprovider:\n  kind: none\n"); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 	out, errOut, err := runRoot(t, "serve", "--config", path, "--heartbeat", "not-a-duration")
