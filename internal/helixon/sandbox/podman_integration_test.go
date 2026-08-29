@@ -20,32 +20,71 @@ import (
 // seen contain anything, so every skip prints why it skipped and says
 // explicitly that the assertions did not run.
 //
-//	HELIXON_SANDBOX_REQUIRE_PODMAN=1   turn every skip into a failure
+//	HLXN_SANDBOX_INTEGRATION=1         run them at all (they are OPT-IN)
+//	HELIXON_SANDBOX_REQUIRE_PODMAN=1   run them AND turn every skip into a
+//	                                   failure; implies the opt-in above
 //	HELIXON_SANDBOX_TEST_IMAGE=<ref>   override the image under test
-//	go test -short                     skip them (they are slow, see below)
 //
-// TIMING: on win1/wsl1 podman's storage driver is vfs, which copies the whole
-// image on every container creation. One container start costs 70-130s here
-// regardless of image size, so the per-command ceilings below are generous on
-// purpose. A tighter ceiling would turn an environment characteristic into a
-// flaky security test — and a timeout that reads as "the write was blocked"
-// is exactly the false pass these tests exist to avoid, which is why every
-// assertion below checks the OUTCOME and not merely "did not pass".
+// THEY ARE OPT-IN, and the two variables above are the whole reason. This
+// file already said "RUN THEM SEPARATELY — `go test ./...` starves the rest
+// of the suite", but nothing enforced it, and CI's build-and-test step is
+// exactly `go test -race ./...` with no -short. So all sixteen container
+// tests in this package ran on every CI run and the package hit the 10m
+// default deadline every time:
 //
-// RUN THEM SEPARATELY on a vfs-backed host. `go test ./...` runs packages
-// concurrently, and the I/O these containers generate starves the rest of the
-// suite badly enough to push time-boxed tests in OTHER packages over their
-// ceilings (internal/helixon/agent and internal/helixon/memory both have
-// tests with 10-30s budgets). Measured on win1/wsl1: this file alone is
-// green, and the rest of the suite is green under -short; run together they
-// produce load-induced failures that say nothing about either change. So:
+//	panic: test timed out after 10m0s
+//	  TestIT_Podman_NetworkIsUnreachable (303.70s)
 //
-//	go test -short ./...                        # everything else
-//	go test ./internal/helixon/sandbox/ -run IT # these, on their own
+// A package that panics reports nothing about the other tests in it, so this
+// suite was not merely slow: it permanently hid every regression the rest of
+// the package could have caught, and a genuine break elsewhere would have
+// looked exactly like the red everyone had learned to expect. Skipping by
+// default and running these in a job of their own is what makes both signals
+// real — see the sandbox-integration job in .github/workflows/ci.yml, which
+// sets HELIXON_SANDBOX_REQUIRE_PODMAN=1 so that a skip there is a FAILURE.
+// That job is the positive control for this gate: without it, "opt-in" would
+// just be a longer way to spell "deleted".
+//
+// TIMING: one container start dominates, and it is a property of the host
+// rather than of the image. TestIT_Podman_RunawayIsKilledAtTheTimeout alone
+// spends 150s proving the wall clock is enforced, so no amount of per-host
+// tuning makes the full set fit inside a 10m package budget beside
+// everything else; the dedicated job carries its own -timeout instead. The
+// per-command ceilings below stay generous on purpose. A tighter ceiling
+// would turn an environment characteristic into a flaky security test — and
+// a timeout that reads as "the write was blocked" is exactly the false pass
+// these tests exist to avoid, which is why every assertion below checks the
+// OUTCOME and not merely "did not pass".
+//
+//	go test ./...                                  # everything else; these skip
+//	HELIXON_SANDBOX_REQUIRE_PODMAN=1 \
+//	  go test ./internal/helixon/sandbox/ -run IT -timeout 40m
+
+// integrationOptIn is the variable that has to be set for the container tests
+// to run at all. It is deliberately NOT the same variable as the strict one:
+// "run these" and "a skip is a failure" are different questions, and folding
+// them together would leave no way to ask the first without the second.
+const integrationOptIn = "HLXN_SANDBOX_INTEGRATION"
 
 const (
 	integrationCommandTimeout = 5 * time.Minute
 	integrationCtxTimeout     = 6 * time.Minute
+	// imageCheckTimeout bounds the `image exists` probe in the guard.
+	//
+	// It was 2 minutes, and that was not a generous ceiling — it was a
+	// SILENT FAILURE SOURCE. The probe is a metadata lookup that measures
+	// 0.54s on an idle host, but the engine's state database lives on this
+	// host's slow substrate, and under the load this very suite generates
+	// the probe was measured blowing straight past 120s. Its expiry was then
+	// reported as "image is not present", so on a busy host the containment
+	// assertions SKIPPED — quietly, and precisely when a long run had made
+	// them most likely to matter. Five of them skipped that way in one
+	// measured baseline run on main.
+	//
+	// The number is deliberately far above anything a working engine needs:
+	// its job is to catch an engine that is wedged, not to referee one that
+	// is merely busy.
+	imageCheckTimeout = 5 * time.Minute
 )
 
 func integrationImage() string {
@@ -65,17 +104,27 @@ func requirePodman(t *testing.T) {
 		}
 		t.Skipf("SKIPPED — the podman containment assertions did NOT run: "+format, args...)
 	}
+	if !strict && os.Getenv(integrationOptIn) != "1" {
+		fail("%s is not set; these are opt-in because the full set cannot fit the default 10m package deadline (see the file header)", integrationOptIn)
+	}
 	if testing.Short() && !strict {
-		fail("-short was set; container start costs minutes on a vfs-backed rootless podman")
+		fail("-short was set; container start costs minutes on a rootless podman")
 	}
 	if _, err := exec.LookPath("podman"); err != nil {
 		fail("podman is not on PATH (%v); these tests are the only proof the container flags work", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), imageCheckTimeout)
 	defer cancel()
 	img := integrationImage()
 	//nolint:gosec // G204 img comes from a constant or the test operator's own env
-	if err := exec.CommandContext(ctx, "podman", "image", "exists", img).Run(); err != nil {
+	err := exec.CommandContext(ctx, "podman", "image", "exists", img).Run()
+	// A probe that ran out of time and a probe that answered "no" are
+	// different facts about the host, and reporting the first as the second
+	// sends the operator to `podman pull` for an image they already have.
+	switch {
+	case ctx.Err() != nil:
+		fail("`podman image exists %s` did not answer within %s; the engine is unusable on this host, which is NOT the same as the image being absent", img, imageCheckTimeout)
+	case err != nil:
 		fail("image %q is not present (%v); run `podman pull %s`", img, err, img)
 	}
 }

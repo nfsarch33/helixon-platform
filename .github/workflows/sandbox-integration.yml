@@ -1,0 +1,102 @@
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology,personal_path_id
+#
+# The container-backed containment and verifier assertions.
+#
+# These live OUTSIDE ci.yml on purpose. They are the only tests that prove the
+# sandbox flags do what the argv says they do, and they are also, by an order
+# of magnitude, the slowest thing in the repository: twenty-one container
+# starts plus a deliberate 150s runaway-timeout proof. Measured end to end on
+# the wsl1 self-hosted runner: ~33 min for internal/helixon/sandbox and ~14 min
+# for internal/helixon/builtins.
+#
+# Why not a step in build-and-test, where they used to run:
+#
+#   * They cannot fit. `go test ./...` gives each package the 10m default
+#     deadline, and this set blew it on every single run — which took the
+#     other ~40 tests in those two packages down with it and left CI
+#     permanently red, so a genuine regression anywhere else was
+#     indistinguishable from the red everyone had stopped reading.
+#   * There is ONE self-hosted runner for this repository. A 45m job on the
+#     pull_request trigger serialises every other check in the repo behind it.
+#   * They are load-sensitive on this host. A container start measured between
+#     29s and 95s depending on what else the box was doing, and a sustained
+#     run of the full set degrades the engine enough that individual tests
+#     fail for reasons that say nothing about the change under review. A
+#     flaky required check is how CI became unreadable in the first place.
+#
+# So: nightly, plus on demand. A containment regression is caught within a
+# day, and nobody's pull request waits 45 minutes behind a container start.
+name: Sandbox integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 15:20 UTC = 01:20 AEST, when the box is idlest.
+    - cron: "20 15 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  containment:
+    runs-on: self-hosted
+    # Well clear of the ~47m measured worst case, so a genuine hang is still
+    # bounded but a merely slow host is not reported as a containment failure.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          # cache: false is not an optimisation, it is an availability
+          # control. setup-go's cache-save tars the module and build caches
+          # with zstdmt, and on this runner's substrate that tar has been
+          # observed stuck in uninterruptible IO (D state) for over five
+          # hours, holding the ONE self-hosted runner this repository has and
+          # queueing every other job behind it. A nightly job that can wedge
+          # CI for the whole repo is worse than a nightly job that recompiles.
+          cache: false
+
+      # The sandbox refuses to fall back to host execution, so a missing image
+      # is a hard failure by design. Pulling here keeps that failure meaning
+      # "containment is broken" rather than "the host was never set up".
+      #
+      # This reference must track sandbox.DefaultImage, which in turn tracks
+      # the go directive in go.mod: the verifier's go build/test/vet run inside
+      # this image with --network=none, so it cannot download a toolchain it
+      # does not already ship. Drift is not silent — with
+      # HELIXON_SANDBOX_REQUIRE_PODMAN=1 the suite fails on the absent image
+      # rather than skipping past it.
+      - name: Pull the execution image
+        run: podman pull docker.io/library/golang:1.27-bookworm
+
+      # HELIXON_SANDBOX_REQUIRE_PODMAN=1 is what stops "opt-in" from meaning
+      # "never runs again": it turns every skip reason — no podman, no image,
+      # -short — into a FAILURE. Without it a runner that cannot contain
+      # anything would report a quiet green having asserted nothing.
+      #
+      # -p 1 serialises the two packages. They contend for one container
+      # engine, so running them concurrently overlaps no real work; it only
+      # puts more container starts in flight and makes each one slower.
+      - name: Containment and verifier assertions
+        env:
+          HELIXON_SANDBOX_REQUIRE_PODMAN: "1"
+        run: |
+          go test -count=1 -p 1 -timeout 45m \
+            -run 'TestIT_' \
+            ./internal/helixon/sandbox/ ./internal/helixon/builtins/
+
+      # A run killed at its deadline kills the podman CLI, not the container it
+      # started. Runner.reap handles that in-process; this reaps whatever a
+      # cancelled or killed JOB left behind, so orphans cannot accumulate on a
+      # long-lived self-hosted runner the way they did before this job existed
+      # (28 containers, the oldest seven hours old, by which point the engine
+      # had degraded to the point that `podman ps -a` did not return in 229s).
+      - name: Reap leaked sandbox containers
+        if: always()
+        run: |
+          leaked=$(podman ps -aq --filter label=hlxn.sandbox=1 || true)
+          if [ -n "$leaked" ]; then
+            echo "::warning::reaping leaked sandbox containers: $leaked"
+            echo "$leaked" | xargs -r podman rm -f
+          fi
