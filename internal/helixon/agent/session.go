@@ -38,6 +38,11 @@ type Turn struct {
 	TokensIn   int             `json:"tokens_in"`
 	TokensOut  int             `json:"tokens_out"`
 	CreatedAt  time.Time       `json:"created_at"`
+
+	// Seq is the turn's 1-based position within its session, assigned when the
+	// turn is appended. It, not CreatedAt, defines conversation order: CreatedAt
+	// is a wall-clock reading and wall clocks tie, stall and step backwards.
+	Seq int64 `json:"seq"`
 }
 
 // Session groups a sequence of turns under a single conversation.
@@ -53,6 +58,10 @@ type Session struct {
 type SessionStore struct {
 	db *sql.DB
 	mu sync.RWMutex
+
+	// now supplies wall-clock stamps. Overridable so tests can freeze or rewind
+	// it; ordering must not depend on what it returns.
+	now func() time.Time
 }
 
 // NewSessionStore opens (or creates) a SQLite database and initializes the schema.
@@ -76,7 +85,10 @@ func NewSessionStore(ctx context.Context, dsn string) (*SessionStore, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
-	return &SessionStore{db: db}, nil
+	return &SessionStore{
+		db:  db,
+		now: func() time.Time { return time.Now().UTC() },
+	}, nil
 }
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -98,7 +110,8 @@ CREATE TABLE IF NOT EXISTS turns (
 	tool_call_id TEXT DEFAULT '',
 	tokens_in    INTEGER DEFAULT 0,
 	tokens_out   INTEGER DEFAULT 0,
-	created_at   TEXT NOT NULL
+	created_at   TEXT NOT NULL,
+	seq          INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_turns_session ON turns(session_id, created_at);
@@ -111,8 +124,71 @@ CREATE TRIGGER IF NOT EXISTS turns_ai AFTER INSERT ON turns BEGIN
 	VALUES (new.rowid, new.content, new.session_id);
 END;
 `
-	_, err := db.ExecContext(ctx, ddl)
+	if _, err := db.ExecContext(ctx, ddl); err != nil {
+		return err
+	}
+	if err := ensureTurnSeq(ctx, db); err != nil {
+		return err
+	}
+	// Created after ensureTurnSeq so it also lands on databases that predate the
+	// column. This is the index ListTurns reads.
+	_, err := db.ExecContext(ctx,
+		`CREATE INDEX IF NOT EXISTS idx_turns_session_seq ON turns(session_id, seq)`)
 	return err
+}
+
+// ensureTurnSeq adds turns.seq to databases created before it existed and
+// backfills it, so conversation order survives the upgrade.
+func ensureTurnSeq(ctx context.Context, db *sql.DB) error {
+	has, err := hasColumn(ctx, db, "turns", "seq")
+	if err != nil {
+		return err
+	}
+	if has {
+		return nil
+	}
+
+	if _, err := db.ExecContext(ctx,
+		`ALTER TABLE turns ADD COLUMN seq INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return fmt.Errorf("add turns.seq: %w", err)
+	}
+
+	// Backfill from rowid, which is insertion order: turns are only ever
+	// appended and nothing deletes them, so rowid is the one trustworthy record
+	// of the order the conversation actually happened in. created_at is not --
+	// recovering order from it is exactly the bug this column exists to fix.
+	if _, err := db.ExecContext(ctx, `
+		UPDATE turns SET seq = (
+			SELECT COUNT(*) FROM turns AS prior
+			WHERE prior.session_id = turns.session_id AND prior.rowid <= turns.rowid
+		)`); err != nil {
+		return fmt.Errorf("backfill turns.seq: %w", err)
+	}
+	return nil
+}
+
+// hasColumn reports whether table already has the named column.
+func hasColumn(ctx context.Context, db *sql.DB, table, column string) (bool, error) {
+	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
+	if err != nil {
+		return false, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	found := false
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return false, fmt.Errorf("scan %s column: %w", table, err)
+		}
+		if name == column {
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	return found, nil
 }
 
 // CreateSession starts a new conversation session.
@@ -120,7 +196,7 @@ func (s *SessionStore) CreateSession(ctx context.Context, agentID string, meta m
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := s.now()
 	sess := &Session{
 		ID:        uuid.New().String(),
 		AgentID:   agentID,
@@ -174,7 +250,7 @@ func (s *SessionStore) AppendTurn(ctx context.Context, sessionID string, role Ro
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := s.now()
 	turn := &Turn{
 		ID:         uuid.New().String(),
 		SessionID:  sessionID,
@@ -193,10 +269,15 @@ func (s *SessionStore) AppendTurn(ctx context.Context, sessionID string, role Ro
 		tcStr = &s
 	}
 
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO turns (id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		turn.ID, turn.SessionID, string(turn.Role), turn.Content, tcStr, turn.ToolCallID, turn.TokensIn, turn.TokensOut, now.Format(time.RFC3339Nano),
-	)
+	// seq is derived inside the INSERT so the read-modify-write is a single
+	// atomic statement, and returned so callers see the position that was
+	// actually assigned.
+	err := s.db.QueryRowContext(ctx,
+		`INSERT INTO turns (id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at, seq)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM turns WHERE session_id = ?))
+		 RETURNING seq`,
+		turn.ID, turn.SessionID, string(turn.Role), turn.Content, tcStr, turn.ToolCallID, turn.TokensIn, turn.TokensOut, now.Format(time.RFC3339Nano), sessionID,
+	).Scan(&turn.Seq)
 	if err != nil {
 		return nil, fmt.Errorf("insert turn: %w", err)
 	}
@@ -209,7 +290,13 @@ func (s *SessionStore) AppendTurn(ctx context.Context, sessionID string, role Ro
 	return turn, nil
 }
 
-// ListTurns retrieves all turns for a session, ordered chronologically.
+// ListTurns retrieves all turns for a session in the order they were appended.
+//
+// Ordering is by seq, never by created_at. Agent.buildMessages feeds this slice
+// straight to the model, so a wrong order shows the model a tool result before
+// the assistant turn that asked for it. created_at cannot carry that weight: two
+// turns can share a stamp, and the wall clock it comes from can step backwards
+// between appends, which reorders a conversation that was written correctly.
 func (s *SessionStore) ListTurns(ctx context.Context, sessionID string, limit int) ([]Turn, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -219,8 +306,8 @@ func (s *SessionStore) ListTurns(ctx context.Context, sessionID string, limit in
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at 
-		 FROM turns WHERE session_id = ? ORDER BY created_at ASC LIMIT ?`, sessionID, limit,
+		`SELECT id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at, seq
+		 FROM turns WHERE session_id = ? ORDER BY seq ASC, rowid ASC LIMIT ?`, sessionID, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query turns: %w", err)
@@ -232,7 +319,7 @@ func (s *SessionStore) ListTurns(ctx context.Context, sessionID string, limit in
 		var t Turn
 		var tcStr sql.NullString
 		var createdStr string
-		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr); err != nil {
+		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr, &t.Seq); err != nil {
 			return nil, fmt.Errorf("scan turn: %w", err)
 		}
 		if tcStr.Valid {
@@ -254,7 +341,7 @@ func (s *SessionStore) SearchTurns(ctx context.Context, query string, limit int)
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT t.id, t.session_id, t.role, t.content, t.tool_calls, t.tool_call_id, t.tokens_in, t.tokens_out, t.created_at
+		`SELECT t.id, t.session_id, t.role, t.content, t.tool_calls, t.tool_call_id, t.tokens_in, t.tokens_out, t.created_at, t.seq
 		 FROM turns t
 		 JOIN turns_fts f ON t.rowid = f.rowid
 		 WHERE turns_fts MATCH ?
@@ -271,7 +358,7 @@ func (s *SessionStore) SearchTurns(ctx context.Context, query string, limit int)
 		var t Turn
 		var tcStr sql.NullString
 		var createdStr string
-		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr); err != nil {
+		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr, &t.Seq); err != nil {
 			return nil, fmt.Errorf("scan turn: %w", err)
 		}
 		if tcStr.Valid {
