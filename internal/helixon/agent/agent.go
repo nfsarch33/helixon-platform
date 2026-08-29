@@ -25,6 +25,21 @@ type ToolExecutor interface {
 	Available() []llm.Tool
 }
 
+// RunObserver receives per-iteration telemetry from the loop.
+//
+// It is an interface declared HERE, and satisfied elsewhere, so the agent loop
+// carries no dependency on any instrumentation library: the loop is the code
+// that must stay readable, and a metrics import in it would be the first of
+// many. A nil Observer is the normal case for library callers.
+type RunObserver interface {
+	// ObserveLoopIteration is called once per iteration the loop commits to.
+	ObserveLoopIteration()
+	// ObserveTokens is called with the REAL usage the provider reported for
+	// one iteration. Before v18779 these were hard-coded to zero everywhere,
+	// so the cost of a run was unrecoverable after the fact.
+	ObserveTokens(promptTokens, completionTokens int)
+}
+
 // Config controls agent loop behavior.
 type Config struct {
 	MaxIterations int
@@ -38,6 +53,8 @@ type Config struct {
 	// never heard of the gate keeps its existing behavior; the CLI turns
 	// it on explicitly.
 	Completion CompletionPolicy
+	// Observer, when non-nil, receives loop telemetry. Optional.
+	Observer RunObserver
 }
 
 func (c Config) withDefaults() Config {
@@ -157,6 +174,13 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	if err := checkRunTermination(ctx, result, iter, a.cfg.MaxTokens, a.cfg.MaxIterations); err != nil {
 		return false, err
 	}
+	// Counted here, not after the model answers: an iteration the loop
+	// committed to but that died at the provider is still an iteration, and
+	// counting only the successful ones would make a run that burned its whole
+	// budget on transport errors look like a run that never started.
+	if a.cfg.Observer != nil {
+		a.cfg.Observer.ObserveLoopIteration()
+	}
 	messages, err := a.buildMessages(ctx, sessionID)
 	if err != nil {
 		return false, fmt.Errorf("build messages: %w", err)
@@ -170,6 +194,9 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	choice := resp.Choices[0]
 	result.TokensIn += resp.Usage.PromptTokens
 	result.TokensOut += resp.Usage.CompletionTokens
+	if a.cfg.Observer != nil {
+		a.cfg.Observer.ObserveTokens(resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+	}
 	a.logger.Debug("agent iteration",
 		slog.Int("iteration", iter),
 		slog.Int("tool_calls", len(choice.Message.ToolCalls)),

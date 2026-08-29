@@ -3,10 +3,16 @@ package helixon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // IncomingMessage is a channel-agnostic message arriving at the runtime.
@@ -34,6 +40,17 @@ type HTTPChannelConfig struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	Logger       *slog.Logger
+	// Gatherer, when set, makes the channel serve GET /metrics from it.
+	//
+	// This is the agent's ONLY exposition path. platform.Server has a
+	// PrometheusRegisterer field, but that server is a different process
+	// surface (`helixon platform`, :8787) and serve mode never starts it —
+	// which is why :8686/metrics answered 404 on a live agent while the
+	// unset field made it look wired. Left nil, /metrics stays absent rather
+	// than serving the process-global default registry, so a scrape can
+	// never mistake "Go runtime metrics from a binary with no agent" for
+	// "the agent is reporting".
+	Gatherer prometheus.Gatherer
 }
 
 func (c HTTPChannelConfig) withDefaults() HTTPChannelConfig {
@@ -57,6 +74,9 @@ type HTTPChannel struct {
 	cfg    HTTPChannelConfig
 	server *http.Server
 	logger *slog.Logger
+
+	mu        sync.Mutex
+	boundAddr string
 }
 
 // NewHTTPChannel creates an HTTP channel for REST-based agent interaction.
@@ -70,27 +90,68 @@ func NewHTTPChannel(cfg HTTPChannelConfig) *HTTPChannel {
 
 func (h *HTTPChannel) Name() string { return "http" }
 
-func (h *HTTPChannel) Serve(ctx context.Context, handler MessageHandler) error {
+// Routes returns the channel's handler without binding a listener, so the
+// route table can be asserted directly. Modeled on platform.Server.Routes.
+//
+// /healthz and /metrics are siblings of the pre-existing /api/v1/health for a
+// reason: /api/v1/health is the channel's own liveness answer, while /healthz
+// and /metrics are what every probe, scraper and systemd unit in this estate
+// already looks for. An endpoint nobody's tooling asks for is an endpoint that
+// might as well not exist — which is exactly the state the agent was in.
+func (h *HTTPChannel) Routes(handler MessageHandler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/chat", h.chatHandler(handler))
 	mux.HandleFunc("GET /api/v1/health", h.healthHandler())
+	mux.HandleFunc("GET /healthz", h.healthHandler())
+	if h.cfg.Gatherer != nil {
+		mux.Handle("GET /metrics", promhttp.HandlerFor(h.cfg.Gatherer, promhttp.HandlerOpts{}))
+	}
+	return mux
+}
 
-	h.server = &http.Server{
+func (h *HTTPChannel) Serve(ctx context.Context, handler MessageHandler) error {
+	// net.Listen rather than ListenAndServe so a ":0" bind can report the
+	// port it actually got. Without that, an end-to-end test of the metrics
+	// endpoint has to hard-code a port and race every other test in the tree
+	// for it.
+	ln, err := net.Listen("tcp", h.cfg.Addr)
+	if err != nil {
+		return fmt.Errorf("helixon: http channel listen %s: %w", h.cfg.Addr, err)
+	}
+
+	srv := &http.Server{
 		Addr:         h.cfg.Addr,
-		Handler:      mux,
+		Handler:      h.Routes(handler),
 		ReadTimeout:  h.cfg.ReadTimeout,
 		WriteTimeout: h.cfg.WriteTimeout,
 	}
+	// Published under the mutex: Shutdown runs on another goroutine, and a
+	// bound listener nobody can safely observe is not much better than none.
+	h.mu.Lock()
+	h.server = srv
+	h.boundAddr = ln.Addr().String()
+	h.mu.Unlock()
 
-	h.logger.Info("HTTP channel listening", slog.String("addr", h.cfg.Addr))
-	return runServerUntilCancel(ctx, h.server)
+	h.logger.Info("HTTP channel listening", slog.String("addr", ln.Addr().String()))
+	return serveListenerUntilCancel(ctx, srv, ln)
+}
+
+// BoundAddr returns the address the channel actually bound, or "" before
+// Serve has bound one.
+func (h *HTTPChannel) BoundAddr() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.boundAddr
 }
 
 func (h *HTTPChannel) Shutdown(ctx context.Context) error {
-	if h.server == nil {
+	h.mu.Lock()
+	srv := h.server
+	h.mu.Unlock()
+	if srv == nil {
 		return nil
 	}
-	return h.server.Shutdown(ctx)
+	return srv.Shutdown(ctx)
 }
 
 type chatRequest struct {
@@ -233,7 +294,24 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func runServerUntilCancel(ctx context.Context, srv *http.Server) error {
 	errCh := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		return nil
+	}
+}
+
+// serveListenerUntilCancel is runServerUntilCancel for a caller that already
+// bound the listener (so it can report the chosen port).
+func serveListenerUntilCancel(ctx context.Context, srv *http.Server, ln net.Listener) error {
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()

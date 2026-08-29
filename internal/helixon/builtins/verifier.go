@@ -57,6 +57,29 @@ type VerifierConfig struct {
 	// MaxOutputBytes bounds the excerpt returned to the model, separately
 	// from the sandbox's own retention cap.
 	MaxOutputBytes int
+	// OnOutcome, when set, is called once per invocation with the verdict.
+	// It is how the verifier's pass/fail/error split reaches an operator
+	// without this package depending on an instrumentation library.
+	OnOutcome func(outcome string)
+}
+
+// Verifier outcomes reported to VerifierConfig.OnOutcome.
+//
+// `fail` is a check that ran and came back red. `error` is a check that never
+// produced a verdict at all — an unknown check name, a malformed call, or a
+// sandbox that could not start. They are deliberately separate: a verifier that
+// cannot run is an outage, a verifier that fails is the gate doing its job, and
+// an alert that cannot tell them apart is an alert nobody can act on.
+const (
+	VerifierOutcomePass  = "pass"
+	VerifierOutcomeFail  = "fail"
+	VerifierOutcomeError = "error"
+)
+
+// VerifierOutcomes returns every outcome this package emits, so the consuming
+// side can assert it accepts all of them.
+func VerifierOutcomes() []string {
+	return []string{VerifierOutcomePass, VerifierOutcomeFail, VerifierOutcomeError}
 }
 
 func (c VerifierConfig) withDefaults() VerifierConfig {
@@ -120,20 +143,33 @@ func VerifierTool(cfg VerifierConfig) tooldispatch.ToolDef {
 		}`),
 		Timeout: cfg.Timeout + 30*time.Second,
 		Handler: func(ctx context.Context, args map[string]any) (string, error) {
+			// Reported on every early return as well as on the verdict: a
+			// verifier that is never reachable must be as visible as one that
+			// keeps failing, and an observer that only fires on the happy path
+			// would make an unreachable verifier look like no verifier calls.
+			report := func(outcome string) {
+				if cfg.OnOutcome != nil {
+					cfg.OnOutcome(outcome)
+				}
+			}
 			if cfg.Runner == nil {
+				report(VerifierOutcomeError)
 				return "", errors.New("verifier_run: no sandbox is configured; the verifier never executes on the host")
 			}
 			name, _ := args["check"].(string)
 			check, ok := checks[name]
 			if !ok {
+				report(VerifierOutcomeError)
 				return "", fmt.Errorf("verifier_run: unknown check %q (available: %s)", name, strings.Join(names, ", "))
 			}
 			extra, err := verifierExtraArgs(args)
 			if err != nil {
+				report(VerifierOutcomeError)
 				return "", err
 			}
 			argv, err := buildVerifierArgv(check, extra, cfg.Runner.Config().WorkspaceMount)
 			if err != nil {
+				report(VerifierOutcomeError)
 				return "", err
 			}
 			res, err := cfg.Runner.Run(ctx, sandbox.Spec{
@@ -143,7 +179,13 @@ func VerifierTool(cfg VerifierConfig) tooldispatch.ToolDef {
 				SkipAllowList: true,
 			})
 			if err != nil {
+				report(VerifierOutcomeError)
 				return "", fmt.Errorf("verifier_run %s: %w", name, err)
+			}
+			if res.Pass() {
+				report(VerifierOutcomePass)
+			} else {
+				report(VerifierOutcomeFail)
 			}
 			return encodeVerifierResult(name, res, cfg.MaxOutputBytes)
 		},

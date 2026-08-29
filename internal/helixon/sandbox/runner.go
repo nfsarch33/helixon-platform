@@ -36,6 +36,29 @@ var ErrImageMissing = errors.New("sandbox: execution image is not present")
 // ErrEngineMissing is returned when the container engine binary is absent.
 var ErrEngineMissing = errors.New("sandbox: container engine is not available")
 
+// Failure kinds reported to a FailureObserver.
+//
+// The split is the one the operator has to act on, not the one the code finds
+// convenient. `preflight` means the sandbox refused to start the command at
+// all — a rejected argv, a command outside the allow-list, a missing engine or
+// image — and is usually a config or host problem. `timeout` means the command
+// ran and was killed at the wall clock, which says nothing about the code under
+// test. `exec` means the engine itself failed. A non-zero exit is NOT here: a
+// red check is a verdict, not a sandbox failure, and counting it as one would
+// bury the failures that matter under ordinary red builds.
+const (
+	FailureKindPreflight = "preflight"
+	FailureKindTimeout   = "timeout"
+	FailureKindExec      = "exec"
+)
+
+// FailureKinds returns every kind this package emits. Exported so the metrics
+// side can assert it accepts all of them, rather than each side testing its own
+// copy of the strings and both passing while disagreeing.
+func FailureKinds() []string {
+	return []string{FailureKindPreflight, FailureKindTimeout, FailureKindExec}
+}
+
 // Spec is one command to run inside the sandbox.
 type Spec struct {
 	Command string
@@ -107,6 +130,26 @@ func (osEngine) run(ctx context.Context, name string, args []string, out io.Writ
 type Runner struct {
 	cfg    Config
 	engine engine
+	// onFailure is an optional observer for runs that never produced a
+	// verdict. It is a plain callback rather than a metrics handle so this
+	// package keeps no dependency on an instrumentation library: the sandbox
+	// is the most security-sensitive code here and its import list should
+	// stay short enough to read.
+	onFailure func(kind string)
+}
+
+// SetFailureObserver installs fn, called once per run that failed to produce a
+// verdict. It must be called before the runner is used; the callback is read
+// without synchronisation on every Run, which is safe only because wiring
+// happens once at start-up and never again.
+func (r *Runner) SetFailureObserver(fn func(kind string)) {
+	r.onFailure = fn
+}
+
+func (r *Runner) reportFailure(kind string) {
+	if r.onFailure != nil {
+		r.onFailure(kind)
+	}
 }
 
 // NewRunner validates cfg and returns a Runner. A disabled config returns
@@ -273,17 +316,21 @@ func containerPathWithin(mount, target string) (string, bool) {
 // argv) is returned as an error.
 func (r *Runner) Run(ctx context.Context, spec Spec) (Result, error) {
 	if err := ValidateArgv(spec.Command, spec.Args); err != nil {
+		r.reportFailure(FailureKindPreflight)
 		return Result{Outcome: OutcomeError, ExitCode: -1}, err
 	}
 	if !spec.SkipAllowList {
 		if err := r.cfg.CheckAllowed(spec.Command); err != nil {
+			r.reportFailure(FailureKindPreflight)
 			return Result{Outcome: OutcomeError, ExitCode: -1}, err
 		}
 	}
 	if err := r.Preflight(ctx); err != nil {
+		r.reportFailure(FailureKindPreflight)
 		return Result{Outcome: OutcomeError, ExitCode: -1}, err
 	}
 	if err := r.EnsureWorkspaceScratch(); err != nil {
+		r.reportFailure(FailureKindPreflight)
 		return Result{Outcome: OutcomeError, ExitCode: -1}, err
 	}
 
@@ -313,12 +360,14 @@ func (r *Runner) Run(ctx context.Context, spec Spec) (Result, error) {
 		if res.ExitCode == 0 {
 			res.ExitCode = -1
 		}
+		r.reportFailure(FailureKindTimeout)
 	case err == nil && code == 0:
 		res.Outcome = OutcomePassed
 	case code > 0:
 		res.Outcome = OutcomeFailed
 	default:
 		res.Outcome = OutcomeError
+		r.reportFailure(FailureKindExec)
 		return res, fmt.Errorf("sandbox: %s run: %w", r.cfg.Engine, err)
 	}
 	return res, nil

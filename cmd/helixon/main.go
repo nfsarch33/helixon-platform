@@ -24,11 +24,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 
 	_ "modernc.org/sqlite"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/agentmetrics"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/builtins"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/dashboard"
@@ -226,26 +228,115 @@ func initAndConfigureRuntime(ctx context.Context, rt *helixon.Runtime, cfg helix
 	if err := rt.Init(ctx); err != nil {
 		return fmt.Errorf("runtime init: %w", err)
 	}
+	metrics, gatherer, err := newAgentObservability(cfg, commit)
+	if err != nil {
+		return err
+	}
 	g, err := newGuardrails(cfg)
 	if err != nil {
 		return err
 	}
+	g = g.withMetrics(metrics)
 	if err := builtins.RegisterAll(rt.Registry(), g.toolOptions(true)); err != nil {
 		return fmt.Errorf("register builtins: %w", err)
 	}
 	configOpts := g.configOptions()
+	if am := buildAgentMemory(cfg); am != nil {
+		configOpts = append(configOpts, helixon.WithAgentMemory(am))
+	}
 	if httpAddr != "" {
-		configOpts = append(configOpts, helixon.WithChannel(
-			helixon.NewHTTPChannel(helixon.HTTPChannelConfig{
-				Addr:   httpAddr,
-				Logger: slog.Default(),
-			}),
-		))
+		configOpts = append(configOpts, helixon.WithChannel(newServeHTTPChannel(httpAddr, gatherer)))
 	}
 	if err := rt.Configure(ctx, configOpts...); err != nil {
 		return fmt.Errorf("runtime configure: %w", err)
 	}
 	return nil
+}
+
+// newAgentObservability builds the agent's own Prometheus registry.
+//
+// A dedicated registry, not prometheus.DefaultRegisterer: the default one is
+// process-global and carries Go runtime and process collectors, so a scrape of
+// it succeeds — with plausible-looking series — from a binary in which the
+// agent was never wired at all. The whole point of hlxn_agent_build_info is
+// that its ABSENCE means "no agent here", and that only holds if nothing else
+// can answer on the same endpoint.
+//
+// Returns (nil, nil, nil) when metrics are switched off. A nil Gatherer is what
+// makes /metrics 404 rather than serve an empty page, so "disabled" and
+// "running but reporting nothing" stay distinguishable from the outside.
+//
+//nolint:gocritic // hugeParam: see initAndConfigureRuntime
+func newAgentObservability(cfg helixon.RuntimeConfig, revision string) (*agentmetrics.Metrics, prometheus.Gatherer, error) {
+	if !cfg.Metrics.Enabled {
+		return nil, nil, nil
+	}
+	reg := prometheus.NewRegistry()
+	m, err := agentmetrics.New(reg, revision)
+	if err != nil {
+		return nil, nil, fmt.Errorf("agent metrics: %w", err)
+	}
+	return m, reg, nil
+}
+
+// newServeHTTPChannel builds the serve-mode HTTP channel. It is a named
+// function so a test can assert what the serve path actually hands the channel
+// — the wiring that was missing is exactly the kind an inline struct literal
+// hides.
+func newServeHTTPChannel(addr string, gatherer prometheus.Gatherer) *helixon.HTTPChannel {
+	return helixon.NewHTTPChannel(helixon.HTTPChannelConfig{
+		Addr:     addr,
+		Logger:   slog.Default(),
+		Gatherer: gatherer,
+	})
+}
+
+// buildAgentMemory wires loop memory for the ticket path, or returns nil.
+//
+// The local FTS5 mirror is deliberately not wired here (a nil *sql.DB): the
+// canonical store is Engram, HybridSearcher already treats a nil db as "no
+// local index", and standing up a second durable store on the agent host is a
+// separate decision from letting the agent remember anything at all.
+//
+//nolint:gocritic // hugeParam: see initAndConfigureRuntime
+func buildAgentMemory(cfg helixon.RuntimeConfig) *memory.AgentMemory {
+	mc := cfg.Memory
+	if !mc.Active() {
+		return nil
+	}
+	workspace := mc.WorkspaceID
+	if workspace == "" {
+		workspace = cfg.TenantID
+	}
+	client := memory.NewEngramClient(memory.EngramConfig{
+		BaseURL: mc.EngramURL,
+		Timeout: mc.Timeout,
+	}, slog.Default())
+	searcher := memory.NewHybridSearcher(nil, client, memory.HybridSearchConfig{
+		MaxResults: mc.MaxContext,
+	}, slog.Default())
+	return memory.NewAgentMemory(searcher, memory.AgentMemoryConfig{
+		AppID:      mc.AppID,
+		UserID:     cfg.AgentID,
+		TenantID:   workspace,
+		MaxContext: mc.MaxContext,
+		Logger:     slog.Default(),
+	})
+}
+
+// resolveMemoryURL fills an unset memory.engram_url from $HELIXON_ENGRAM_URL.
+//
+// The env fallback lives at the CLI layer, not in the config decoder, for the
+// same reason defaultMemoryBackend() already reads that variable here: a
+// RuntimeConfig built in a test must depend on nothing but the bytes it was
+// given. An explicit YAML value always wins.
+//
+//nolint:gocritic // hugeParam: value semantics; the resolved copy is returned
+func resolveMemoryURL(mc helixon.LoopMemoryConfig, env string) helixon.LoopMemoryConfig {
+	if mc.EngramURL == "" {
+		mc.EngramURL = strings.TrimSpace(env)
+	}
+	return mc
 }
 
 func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Writer) *http.Server {
@@ -450,6 +541,7 @@ func loadConfig(path string) (helixon.RuntimeConfig, error) {
 			return helixon.RuntimeConfig{}, err
 		}
 		cfg.Logger = slog.Default()
+		cfg.Memory = resolveMemoryURL(cfg.Memory, os.Getenv("HELIXON_ENGRAM_URL"))
 		return cfg, nil
 	}
 	cfg, err := helixon.LoadConfig(path)
@@ -457,6 +549,7 @@ func loadConfig(path string) (helixon.RuntimeConfig, error) {
 		return helixon.RuntimeConfig{}, err
 	}
 	cfg.Logger = slog.Default()
+	cfg.Memory = resolveMemoryURL(cfg.Memory, os.Getenv("HELIXON_ENGRAM_URL"))
 	return cfg, nil
 }
 
