@@ -191,8 +191,23 @@ func TestAgentMaxIterations(t *testing.T) {
 	sess, err := store.CreateSession(context.Background(), "test", nil)
 	require.NoError(t, err)
 
-	_, err = agent.Run(context.Background(), sess.ID, "loop forever")
+	result, err := agent.Run(context.Background(), sess.ID, "loop forever")
 	assert.ErrorIs(t, err, ErrMaxIterations)
+	require.NotNil(t, result)
+	assert.Equal(t, 3, result.Iterations, "the loop must stop AT MaxIterations, not near it")
+
+	// The iteration cap is what stopped this run, so the store must hold
+	// exactly the turns those iterations produced: one user turn, then an
+	// assistant turn and a tool turn per iteration. Asserting the count keeps
+	// the test honest about WHY it passed — a run that died early on a slow
+	// durable write would satisfy ErrMaxIterations only by accident, and this
+	// catches that without reference to any clock.
+	turns, err := store.ListTurns(context.Background(), sess.ID, 0)
+	require.NoError(t, err)
+	// len(), not assert.Len: a mismatch here should print two numbers, not
+	// dump every persisted turn.
+	assert.Equal(t, 1+2*3, len(turns),
+		"expected the user turn plus an assistant and a tool turn per iteration")
 }
 
 func TestAgentBudgetExhaust(t *testing.T) {
@@ -229,6 +244,29 @@ func TestAgentBudgetExhaust(t *testing.T) {
 	sess, err := store.CreateSession(context.Background(), "test", nil)
 	require.NoError(t, err)
 
-	_, err = agent.Run(context.Background(), sess.ID, "expensive query")
+	result, err := agent.Run(context.Background(), sess.ID, "expensive query")
 	assert.ErrorIs(t, err, ErrBudgetExhaust)
+	require.NotNil(t, result)
+	assert.Greater(t, result.TokensIn+result.TokensOut, 15000,
+		"the run must actually have exceeded the budget it reports exhausting")
+
+	// The budget verdict lands on the second model response, before the loop
+	// persists that iteration's assistant turn or runs its tool calls — so
+	// the store holds exactly the user turn plus the first iteration's
+	// assistant and tool turns.
+	//
+	// This is the load-independent form of the assertion. The count is decided
+	// by control flow, not by how fast the host can fsync, and it fails if
+	// the budget check is moved back to the top of the next iteration (which
+	// would leave 5 turns, one further round of tool side effects having
+	// already happened).
+	turns, err := store.ListTurns(context.Background(), sess.ID, 0)
+	require.NoError(t, err)
+	// len(), not require.Len: a mismatch here should print two numbers, not
+	// dump every persisted turn.
+	require.Equal(t, 3, len(turns),
+		"nothing may be persisted after the budget verdict; got an extra round of turns")
+	assert.Equal(t, RoleUser, turns[0].Role)
+	assert.Equal(t, RoleAssistant, turns[1].Role)
+	assert.Equal(t, RoleTool, turns[2].Role)
 }

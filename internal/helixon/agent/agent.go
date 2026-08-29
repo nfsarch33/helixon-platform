@@ -159,7 +159,7 @@ func (a *Agent) startRun(ctx context.Context, sessionID, userMessage string) (co
 	cleanup := func() { cancel() }
 	if _, err := a.store.AppendTurn(ctx, sessionID, RoleUser, userMessage, nil, "", 0, 0); err != nil {
 		cleanup()
-		return nil, nil, func() {}, fmt.Errorf("append user turn: %w", err)
+		return nil, nil, func() {}, storeErr(ctx, "append user turn", err)
 	}
 	return ctx, &RunResult{SessionID: sessionID}, cleanup, nil
 }
@@ -183,7 +183,7 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	}
 	messages, err := a.buildMessages(ctx, sessionID)
 	if err != nil {
-		return false, fmt.Errorf("build messages: %w", err)
+		return false, storeErr(ctx, "build messages", err)
 	}
 	ctx = a.notifyRunStart(ctx, sessionID, iter, userMessage)
 
@@ -203,6 +203,20 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 		slog.Int("tokens_in", resp.Usage.PromptTokens),
 		slog.Int("tokens_out", resp.Usage.CompletionTokens),
 	)
+	// The budget verdict is reached HERE, on the numbers the provider just
+	// reported, and before the loop commits any further durable write or
+	// executes another tool call. Checking it only at the top of the next
+	// iteration meant a run that had already blown its budget still persisted
+	// an assistant turn and ran a whole further round of tool calls — with
+	// whatever side effects those carry — before anyone noticed it was
+	// supposed to have stopped. A limit enforced one full iteration late is
+	// not enforcing much.
+	//
+	// Placed after the debug line so the iteration that blew the budget is
+	// still observable, and after ObserveTokens so its cost is still counted.
+	if err := checkTokenBudget(result, a.cfg.MaxTokens); err != nil {
+		return false, err
+	}
 	if err := a.recordAssistantTurn(ctx, sessionID, &choice, resp.Usage); err != nil {
 		return false, err
 	}
@@ -238,7 +252,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []
 			toolResult = fmt.Sprintf("error: %s", toolErr.Error())
 		}
 		if _, err := a.store.AppendTurn(ctx, sessionID, RoleTool, toolResult, nil, tc.ID, 0, 0); err != nil {
-			return fmt.Errorf("append tool turn: %w", err)
+			return storeErr(ctx, "append tool turn", err)
 		}
 		if escalate {
 			result.NeedsHumanApproval = true
@@ -278,11 +292,35 @@ func checkRunTermination(ctx context.Context, r *RunResult, iter, maxTokens, max
 		r.Err = ErrTimeout
 		return ErrTimeout
 	}
+	return checkTokenBudget(r, maxTokens)
+}
+
+// checkTokenBudget returns ErrBudgetExhaust when the in+out token sum is
+// greater than maxTokens. It is deliberately free of I/O and of the context:
+// the budget is a property of numbers the loop already holds, so the verdict
+// is decidable without waiting on anything and cannot be pre-empted by a slow
+// durable write.
+func checkTokenBudget(r *RunResult, maxTokens int) error {
 	if r.TokensIn+r.TokensOut > maxTokens {
 		r.Err = ErrBudgetExhaust
 		return ErrBudgetExhaust
 	}
 	return nil
+}
+
+// storeErr classifies a session-store failure.
+//
+// A store call that failed because the RUN's own deadline expired is a run
+// timeout, not a storage fault. Reporting it verbatim names the wrong
+// subsystem — "append tool turn: insert turn: context deadline exceeded" says
+// nothing about which limit the run actually hit — so the typed ErrTimeout is
+// joined into the chain while the underlying cause is preserved for
+// diagnostics.
+func storeErr(ctx context.Context, op string, err error) error {
+	if ctx.Err() != nil {
+		return fmt.Errorf("%s: %w", op, errors.Join(ErrTimeout, err))
+	}
+	return fmt.Errorf("%s: %w", op, err)
 }
 
 // notifyRunStart fires the callbacks.OnStart hook if a handler is registered.
@@ -327,9 +365,11 @@ func (a *Agent) recordAssistantTurn(ctx context.Context, sessionID string, choic
 	if len(choice.Message.ToolCalls) > 0 {
 		toolCallsJSON, _ = json.Marshal(choice.Message.ToolCalls)
 	}
-	_, err := a.store.AppendTurn(ctx, sessionID, RoleAssistant, choice.Message.Content,
-		toolCallsJSON, "", usage.PromptTokens, usage.CompletionTokens)
-	return err
+	if _, err := a.store.AppendTurn(ctx, sessionID, RoleAssistant, choice.Message.Content,
+		toolCallsJSON, "", usage.PromptTokens, usage.CompletionTokens); err != nil {
+		return storeErr(ctx, "append assistant turn", err)
+	}
+	return nil
 }
 
 // finalizeRun inspects the assistant content and tool-call presence on the
