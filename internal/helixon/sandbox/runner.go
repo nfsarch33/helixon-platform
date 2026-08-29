@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -35,6 +36,30 @@ var ErrImageMissing = errors.New("sandbox: execution image is not present")
 
 // ErrEngineMissing is returned when the container engine binary is absent.
 var ErrEngineMissing = errors.New("sandbox: container engine is not available")
+
+// ContainerLabel is stamped on every container this package starts.
+//
+// `--rm` removes a container that EXITS. It does nothing for a container whose
+// client was killed, and that is the common case here: a run killed at its
+// deadline kills the engine CLI, while the container it started keeps running
+// unsupervised — holding its workspace bind mount, its share of the host, and
+// a slot in the engine's state database. Run reaps by name, but a test binary
+// that panics or is killed outright never gets to run any cleanup at all, so
+// the label is the out-of-band handle for whatever is left:
+//
+//	podman rm -f $(podman ps -aq --filter label=hlxn.sandbox=1)
+//
+// Measured on win1/wsl1 before this existed: 28 containers from earlier
+// timed-out runs were still up, the oldest for seven hours, and the engine had
+// degraded to the point where `podman ps -a` did not return within 229s.
+const ContainerLabel = "hlxn.sandbox=1"
+
+// reapTimeout bounds the best-effort removal of a container left behind by a
+// killed run. It is a ceiling, not a promise: on a host whose engine is
+// already struggling the removal is exactly what will be slow, and blocking a
+// caller indefinitely to tidy up would convert a bounded timeout into an
+// unbounded one. Whatever it fails to remove keeps ContainerLabel.
+const reapTimeout = 60 * time.Second
 
 // Failure kinds reported to a FailureObserver.
 //
@@ -175,13 +200,20 @@ func NewRunner(cfg Config) (*Runner, error) {
 //nolint:gocritic // hugeParam: returning by value is the point, see above
 func (r *Runner) Config() Config { return r.cfg }
 
-// EngineArgs builds the full engine argument vector for spec. It is exported
-// so the hardening flags can be asserted without a container runtime — every
-// flag here is a security control and each one has a test that fails when it
-// is removed.
-func (r *Runner) EngineArgs(spec Spec) []string {
+// EngineArgs builds the full engine argument vector for spec, for a container
+// registered under name. It is exported so the hardening flags can be asserted
+// without a container runtime — every flag here is a security control and each
+// one has a test that fails when it is removed.
+//
+// name is a parameter rather than something generated in here so that this
+// stays a pure function of its inputs: the argv the tests assert is then the
+// argv that actually runs, instead of one that differs from it by the field
+// cleanup depends on.
+func (r *Runner) EngineArgs(spec Spec, name string) []string {
 	args := []string{
 		"run", "--rm",
+		"--name=" + name,
+		"--label=" + ContainerLabel,
 		"--network=" + r.cfg.Network,
 		"--read-only",
 		"--cap-drop=ALL",
@@ -310,6 +342,35 @@ func containerPathWithin(mount, target string) (string, bool) {
 	return rel, true
 }
 
+// containerName returns a unique name for one container. Uniqueness is what
+// makes reaping safe: a fixed name would let a reap for one run remove the
+// container of another that happened to be in flight beside it.
+func containerName() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Only reached if the kernel CSPRNG is unavailable. A collision
+		// costs one refused run — the engine rejects a duplicate name
+		// loudly — which is strictly better than refusing to run at all.
+		return fmt.Sprintf("hlxn-sbx-%d-%d", os.Getpid(), time.Now().UnixNano())
+	}
+	return fmt.Sprintf("hlxn-sbx-%d-%x", os.Getpid(), b[:])
+}
+
+// reap force-removes a container the engine may have left running. It is
+// deliberately best-effort: the run it belongs to has already produced its
+// verdict, and a cleanup failure must not change that verdict into an error.
+//
+// The fresh context is load-bearing. The run's context is precisely the one
+// that just expired, and a cleanup that inherited it would be canceled before
+// it issued a single call — which is the shape this bug had in the first place.
+//
+//nolint:contextcheck // detaching from the run's context is the entire point; see above
+func (r *Runner) reap(name string) {
+	ctx, cancel := context.WithTimeout(context.Background(), reapTimeout)
+	defer cancel()
+	_, _ = r.engine.run(ctx, r.cfg.Engine, []string{"rm", "--force", "--ignore", name}, io.Discard)
+}
+
 // Run executes spec inside the sandbox and returns a bounded, structured
 // result. A non-zero exit is reported as a Result, not an error; only a
 // failure to run the sandbox at all (missing engine, missing image, rejected
@@ -341,10 +402,18 @@ func (r *Runner) Run(ctx context.Context, spec Spec) (Result, error) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	name := containerName()
 	out := NewBoundedBuffer(r.cfg.MaxOutputBytes)
 	started := time.Now()
-	code, err := r.engine.run(runCtx, r.cfg.Engine, r.EngineArgs(spec), out)
+	code, err := r.engine.run(runCtx, r.cfg.Engine, r.EngineArgs(spec, name), out)
 	elapsed := time.Since(started)
+	// A run that ended on its own was already removed by `--rm`. A run that
+	// was CANCELED had its engine client killed instead, which leaves the
+	// container behind: reap it explicitly, or every timeout permanently
+	// costs the host one running container.
+	if runCtx.Err() != nil {
+		r.reap(name)
+	}
 
 	res := Result{
 		Command:    strings.TrimSpace(spec.Command + " " + strings.Join(spec.Args, " ")),
