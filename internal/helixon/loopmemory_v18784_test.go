@@ -330,7 +330,14 @@ func TestLoopMemoryUsesTheCanonicalSearchField(t *testing.T) {
 	if _, err := rt.runTicketWork(context.Background(), memTicket); err != nil {
 		t.Fatalf("runTicketWork: %v", err)
 	}
-	searches, adds, _ := eng.snapshot()
+	searches, adds, rejections := eng.snapshot()
+	// The server answers a non-canonical body with 400 rather than absorbing
+	// it. Asserting the rejection log is what makes that refusal count: without
+	// it, a dropped field would fail the CALL while every field assertion below
+	// still passed against the body that was recorded before the rejection.
+	if len(rejections) != 0 {
+		t.Fatalf("the client spoke a non-canonical dialect: %v", rejections)
+	}
 	if len(searches) == 0 {
 		t.Fatal("no search issued")
 	}
@@ -342,6 +349,17 @@ func TestLoopMemoryUsesTheCanonicalSearchField(t *testing.T) {
 	}
 	if _, ok := searches[0]["top_k"]; !ok {
 		t.Errorf(`search body has no "top_k": %v`, searches[0])
+	}
+	// workspace_id is the tenant boundary on the wire. Dropping it does not
+	// break a call — it silently widens the query across every workspace.
+	if ws, ok := searches[0]["workspace_id"].(string); !ok || ws != "ws-42" {
+		t.Errorf(`search body workspace_id = %v, want "ws-42"; without it the query is not scoped to a tenant`, searches[0]["workspace_id"])
+	}
+	if _, ok := searches[0]["app_id"]; !ok {
+		t.Errorf(`search body has no "app_id": %v`, searches[0])
+	}
+	if _, ok := searches[0]["user_id"]; !ok {
+		t.Errorf(`search body has no "user_id": %v`, searches[0])
 	}
 	if len(adds) == 0 {
 		t.Fatal("no add issued")
@@ -355,6 +373,9 @@ func TestLoopMemoryUsesTheCanonicalSearchField(t *testing.T) {
 	}
 	if infer, _ := adds[0]["infer"].(bool); infer {
 		t.Error(`add body sent "infer": true; the canonical call sets it false`)
+	}
+	if ws, ok := adds[0]["workspace_id"].(string); !ok || ws != "ws-42" {
+		t.Errorf(`add body workspace_id = %v, want "ws-42"; an unscoped write is visible to every tenant`, adds[0]["workspace_id"])
 	}
 }
 

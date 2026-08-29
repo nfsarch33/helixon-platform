@@ -182,13 +182,38 @@ func VerifierTool(cfg VerifierConfig) tooldispatch.ToolDef {
 				report(VerifierOutcomeError)
 				return "", fmt.Errorf("verifier_run %s: %w", name, err)
 			}
-			if res.Pass() {
-				report(VerifierOutcomePass)
-			} else {
-				report(VerifierOutcomeFail)
-			}
+			report(verifierOutcome(res))
 			return encodeVerifierResult(name, res, cfg.MaxOutputBytes)
 		},
+	}
+}
+
+// verifierOutcome maps a sandbox result onto the reported outcome.
+//
+// A TIMEOUT is reported as `error`, not `fail`. This package already refuses to
+// fold the two together in its result JSON — "the tests failed" and "the tests
+// never finished" are different facts, and collapsing them would let a hung
+// suite masquerade as a red suite. The counter inherits that distinction: a
+// wave of timeouts is an infrastructure problem and a wave of failures is a
+// code problem, and an operator does opposite things about them.
+//
+// It is a named function rather than an inline branch so the mapping can be
+// asserted directly. A verdict mapping reachable only by starting a container
+// is a verdict mapping nobody tests.
+//
+//nolint:gocritic // hugeParam: sandbox.Result is a value type by design
+func verifierOutcome(res sandbox.Result) string {
+	switch res.Outcome {
+	case sandbox.OutcomePassed:
+		return VerifierOutcomePass
+	case sandbox.OutcomeFailed:
+		return VerifierOutcomeFail
+	case sandbox.OutcomeTimeout, sandbox.OutcomeError:
+		return VerifierOutcomeError
+	default:
+		// An outcome this function has never heard of has certainly not
+		// proved anything, so it is not a pass.
+		return VerifierOutcomeError
 	}
 }
 

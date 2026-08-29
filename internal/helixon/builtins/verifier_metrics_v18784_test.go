@@ -2,6 +2,7 @@ package builtins
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -92,5 +93,58 @@ func TestVerifierWithoutObserverStillWorks(t *testing.T) {
 	def := VerifierTool(VerifierConfig{})
 	if _, err := def.Handler(context.Background(), map[string]any{"check": "go_build"}); err == nil {
 		t.Fatal("expected the no-sandbox error")
+	}
+}
+
+// TestVerifierOutcomeMapsEveryVerdict pins the pass/fail/error split.
+//
+// The half that matters is the last two rows. A check that TIMED OUT never
+// produced a verdict, and reporting it as `fail` would let a hung suite look
+// like a red suite — the exact conflation this package refuses to make in its
+// result JSON. A wave of timeouts is an infrastructure problem and a wave of
+// failures is a code problem; an alert that cannot tell them apart sends
+// someone to read the wrong logs.
+func TestVerifierOutcomeMapsEveryVerdict(t *testing.T) {
+	for _, tc := range []struct {
+		outcome sandbox.Outcome
+		want    string
+	}{
+		{sandbox.OutcomePassed, VerifierOutcomePass},
+		{sandbox.OutcomeFailed, VerifierOutcomeFail},
+		{sandbox.OutcomeTimeout, VerifierOutcomeError},
+		{sandbox.OutcomeError, VerifierOutcomeError},
+		{sandbox.Outcome("something new"), VerifierOutcomeError},
+	} {
+		t.Run(string(tc.outcome), func(t *testing.T) {
+			got := verifierOutcome(sandbox.Result{Outcome: tc.outcome})
+			if got != tc.want {
+				t.Errorf("verifierOutcome(%q) = %q, want %q", tc.outcome, got, tc.want)
+			}
+			if tc.outcome != sandbox.OutcomePassed && got == VerifierOutcomePass {
+				t.Errorf("a non-passing verdict (%q) was reported as a pass", tc.outcome)
+			}
+		})
+	}
+}
+
+// TestVerifierOutcomeAgreesWithTheEncodedResult: the counter and the JSON the
+// agent reads must not disagree about whether a check passed.
+func TestVerifierOutcomeAgreesWithTheEncodedResult(t *testing.T) {
+	for _, outcome := range []sandbox.Outcome{
+		sandbox.OutcomePassed, sandbox.OutcomeFailed, sandbox.OutcomeTimeout, sandbox.OutcomeError,
+	} {
+		res := sandbox.Result{Outcome: outcome}
+		encoded, err := encodeVerifierResult("go_test", res, 1024)
+		if err != nil {
+			t.Fatalf("encodeVerifierResult: %v", err)
+		}
+		var decoded VerifierResult
+		if err := json.Unmarshal([]byte(encoded), &decoded); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		reportedPass := verifierOutcome(res) == VerifierOutcomePass
+		if reportedPass != decoded.Pass {
+			t.Errorf("outcome %q: counter says pass=%v but the agent reads pass=%v", outcome, reportedPass, decoded.Pass)
+		}
 	}
 }
