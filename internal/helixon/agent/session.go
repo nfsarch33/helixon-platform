@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,20 +56,69 @@ type SessionStore struct {
 	mu sync.RWMutex
 }
 
+// storePragmas are applied to every pooled connection via the DSN.
+//
+// They are carried in the DSN rather than issued as `PRAGMA ...` statements
+// after Open because journal_mode is the only one of the three that is stored
+// in the database file; synchronous and foreign_keys are per-CONNECTION, and
+// database/sql hands out a pool. Issuing them through db.ExecContext sets them
+// on whichever single connection served the statement — measured on this
+// package, 7 of 8 pooled connections still had foreign_keys OFF, so the
+// ON DELETE CASCADE from turns to sessions was unenforced on most of them.
+//
+// synchronous=NORMAL is the pairing SQLite documents for WAL: WAL cannot
+// corrupt the database at NORMAL, and an application crash is fully safe; the
+// exposure is losing the most recent transactions to an OS or power failure.
+// That is the right trade for a conversation log, and the cost of the
+// alternative is not small — at the default FULL every AppendTurn is an fsync
+// barrier, measured here at 220ms mean / 406ms worst idle and 1.4-5.2s per
+// write under -race at load average 9, against 1.6ms for a read.
+//
+// busy_timeout matches internal/notify/notifydb: connections racing to
+// initialize a fresh WAL database return SQLITE_BUSY immediately without it.
+var storePragmaList = []string{
+	"_pragma=journal_mode(WAL)",
+	"_pragma=synchronous(NORMAL)",
+	"_pragma=busy_timeout(5000)",
+	"_pragma=foreign_keys(ON)",
+}
+
+// storePragmas is the full set, as it appears in a DSN that named none of them.
+var storePragmas = strings.Join(storePragmaList, "&")
+
+// withStorePragmas adds the store's pragmas to a caller-supplied DSN,
+// respecting any query string it already carries — session DSNs in this repo
+// include forms like "file::memory:?cache=shared".
+//
+// The merge is PER PRAGMA, not all-or-nothing. A caller who sets one pragma to
+// tune something (say a longer busy_timeout) keeps their value and still gets
+// the rest; bailing out on the first sight of "_pragma=" would silently hand
+// back foreign_keys OFF and synchronous FULL, which are exactly the two
+// defects this indirection exists to prevent, and neither announces itself.
+func withStorePragmas(dsn string) string {
+	add := make([]string, 0, len(storePragmaList))
+	for _, p := range storePragmaList {
+		// "_pragma=synchronous(NORMAL)" -> key "_pragma=synchronous("
+		key := p[:strings.IndexByte(p, '(')+1]
+		if !strings.Contains(dsn, key) {
+			add = append(add, p)
+		}
+	}
+	if len(add) == 0 {
+		return dsn
+	}
+	sep := "?"
+	if strings.Contains(dsn, "?") {
+		sep = "&"
+	}
+	return dsn + sep + strings.Join(add, "&")
+}
+
 // NewSessionStore opens (or creates) a SQLite database and initializes the schema.
 func NewSessionStore(ctx context.Context, dsn string) (*SessionStore, error) {
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("sqlite", withStorePragmas(dsn))
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
-	}
-
-	if _, err := db.ExecContext(ctx, "PRAGMA journal_mode=WAL"); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("set WAL mode: %w", err)
-	}
-	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys=ON"); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
 	if err := migrate(ctx, db); err != nil {
