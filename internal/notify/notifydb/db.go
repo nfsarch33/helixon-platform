@@ -75,13 +75,42 @@ func DefaultMirror() *os.File {
 	return f
 }
 
+// dsnPragmas are applied to every pooled connection by traveling in the DSN.
+//
+// They belong here rather than in a `PRAGMA ...` issued after Open because
+// journal_mode is the only one of the three stored in the database file;
+// synchronous and busy_timeout are per-CONNECTION, and database/sql hands out
+// a pool, so an ExecContext would configure whichever single connection served
+// it and leave the rest at their defaults.
+//
+// synchronous=NORMAL is the pairing SQLite documents for WAL: WAL cannot
+// corrupt the database at NORMAL and an application crash is fully safe. The
+// exposure is losing the most recent transactions to an OS or power failure,
+// and every row here is a record of a send that has ALREADY left the process —
+// recordAudit runs after the vendor HTTP call returns, and its error is
+// discarded, so the row was never what made the notification real. The cost of
+// the alternative is not small: at the default FULL every Insert is an fsync
+// barrier, measured on this package at 863ms mean / 2.93s worst at load average
+// 5, and 1.10s mean / 7.12s worst under -race at load 42, against 339µs for a
+// read. Insert holds d.mu across that, so it is also how long every other
+// dispatch and every RecordKeyUse waits.
+//
+// That cost lands on a deadline the audit write does not own. recordAudit is
+// given the caller's send context — cmd/alert-notifier bounds a whole cycle at
+// 6×HTTPTimeout, cmd/send-end-email at 30s — and it runs last, on whatever
+// remains after the retries. A multi-second fsync there returns context
+// deadline exceeded into a discarded error, losing the row outright. FULL was
+// making the audit trail less reliable, not more, and losing it most often on
+// the dead-letter path where the row matters most.
+const dsnPragmas = "_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)"
+
 // Open creates or opens the DB at the given path. If mirror is non-nil,
 // every successful insert is also mirrored as NDJSON.
 func Open(path string, mirror *os.File) (*DB, error) {
 	if path == "" {
 		path = DefaultPath()
 	}
-	conn, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
+	conn, err := sql.Open("sqlite", path+"?"+dsnPragmas)
 	if err != nil {
 		return nil, fmt.Errorf("notifydb.Open: %w", err)
 	}
