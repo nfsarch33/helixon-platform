@@ -18,6 +18,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          # MUST stay false on the self-hosted runner. setup-go@v5 defaults
+          # cache to true, and its post-job cache-save tars go into
+          # uninterruptible sleep on this substrate, pinning the single runner
+          # this repository has until the timeout. One such tar held it for
+          # 5h38m with nine runs queued behind it. ~/go survives between jobs
+          # on a persistent runner anyway, so the cache buys nothing here.
+          cache: false
       - name: Build
         run: go build ./...
       - name: Vet
@@ -41,6 +48,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          # MUST stay false on the self-hosted runner. setup-go@v5 defaults
+          # cache to true, and its post-job cache-save tars go into
+          # uninterruptible sleep on this substrate, pinning the single runner
+          # this repository has until the timeout. One such tar held it for
+          # 5h38m with nine runs queued behind it. ~/go survives between jobs
+          # on a persistent runner anyway, so the cache buys nothing here.
+          cache: false
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
