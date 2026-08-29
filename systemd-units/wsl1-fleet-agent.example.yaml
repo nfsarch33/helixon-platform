@@ -48,7 +48,7 @@ registra:
 # sandbox:
 #   enabled: true
 #   engine: podman                                  # the only permitted engine
-#   image: docker.io/library/golang:1.26-bookworm   # pinned; must be present
+#   image: docker.io/library/golang:1.27-bookworm   # pinned; must be present
 #   network: none                                   # none | bridge
 #   userns: keep-id                                 # keep-id | disabled
 #   memory_limit: 2g
