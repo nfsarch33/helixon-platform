@@ -201,6 +201,7 @@ type recordingProvider struct {
 	err      error
 }
 
+//nolint:gocritic // hugeParam: the llm.Provider contract takes the request by value
 func (p *recordingProvider) Complete(_ context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
 	p.mu.Lock()
 	p.messages = append(p.messages, req.Messages...)

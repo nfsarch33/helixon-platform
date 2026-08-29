@@ -130,17 +130,17 @@ func TestBuildInfoCarriesTheRevision(t *testing.T) {
 	}
 }
 
-// TestBuildInfoIsNeverUnlabelled: an empty revision must still produce exactly
+// TestBuildInfoIsNeverUnlabeled: an empty revision must still produce exactly
 // one series, because absent build_info is the alert condition for "the agent
 // is gone" and a build that forgot to stamp itself is not gone.
-func TestBuildInfoIsNeverUnlabelled(t *testing.T) {
+func TestBuildInfoIsNeverUnlabeled(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	if _, err := New(reg, ""); err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	got := gathered(t, reg)
 	if v := got[NameBuildInfo+"{revision=unknown}"]; v != 1 {
-		t.Fatalf("%s with an empty revision = %v, want a single series labelled unknown", NameBuildInfo, v)
+		t.Fatalf("%s with an empty revision = %v, want a single series labeled unknown", NameBuildInfo, v)
 	}
 }
 

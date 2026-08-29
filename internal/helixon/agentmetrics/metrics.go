@@ -138,9 +138,10 @@ const (
 	NameLoopIterations   = "hlxn_agent_loop_iterations_total"
 	NameToolCalls        = "hlxn_agent_tool_calls_total"
 	NameSandboxFailures  = "hlxn_agent_sandbox_failures_total"
-	NameTokens           = "hlxn_agent_tokens_total"
-	NameRunDuration      = "hlxn_agent_run_duration_seconds"
-	NameBuildInfo        = "hlxn_agent_build_info"
+	// #nosec G101 -- a Prometheus metric name counting MODEL tokens, not a credential.
+	NameTokens      = "hlxn_agent_tokens_total"
+	NameRunDuration = "hlxn_agent_run_duration_seconds"
+	NameBuildInfo   = "hlxn_agent_build_info"
 )
 
 // Names returns every metric name in the contract, in contract order.
@@ -244,7 +245,7 @@ func (m *Metrics) collectors() []prometheus.Collector {
 	}
 }
 
-// initSeries materialises every series whose label domain is known up front.
+// initSeries materializes every series whose label domain is known up front.
 //
 // This is not cosmetic. `absent()` and `== 0` are different questions, and an
 // alert written against a counter that has never been touched cannot tell "no
@@ -274,7 +275,7 @@ func (m *Metrics) initSeries() {
 	m.InitToolSeries(nil)
 }
 
-// InitToolSeries materialises the zero series for a known set of tool names.
+// InitToolSeries materializes the zero series for a known set of tool names.
 //
 // Called once the registered tools are known (see MeteredExecutor), so an
 // operator can tell "shell has never been denied" from "shell has never been
@@ -317,7 +318,7 @@ func (m *Metrics) TicketCompleted() {
 	m.ticketsCompleted.Inc()
 }
 
-// Escalated records one ticket handed back to a human. An unrecognised reason
+// Escalated records one ticket handed back to a human. An unrecognized reason
 // is normalised to run_error rather than minting a new series.
 func (m *Metrics) Escalated(reason string) {
 	if m == nil {

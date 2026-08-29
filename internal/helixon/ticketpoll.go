@@ -159,14 +159,8 @@ type TicketPoller struct {
 	escalated map[string]struct{}
 }
 
-// NewTicketPoller validates the wiring and returns a poller.
-//
-// agentBudget is the agent's own per-run timeout. A per-ticket deadline
-// shorter than that is rejected here rather than discovered in production as
-// a board full of half-done claims.
-//
-// TicketPollerOption is optional poller wiring. It is variadic so adding a
-// dependency does not churn every existing call site — including the tests,
+// TicketPollerOption is optional poller wiring. Options are variadic so adding
+// a dependency does not churn every existing call site — including the tests,
 // which are the callers most worth leaving alone.
 type TicketPollerOption func(*TicketPoller)
 
@@ -176,6 +170,12 @@ func WithPollerMetrics(m *agentmetrics.Metrics) TicketPollerOption {
 	return func(p *TicketPoller) { p.metrics = m }
 }
 
+// NewTicketPoller validates the wiring and returns a poller.
+//
+// agentBudget is the agent's own per-run timeout. A per-ticket deadline
+// shorter than that is rejected here rather than discovered in production as
+// a board full of half-done claims.
+//
 //nolint:gocritic // hugeParam: the config is copied into the poller by design
 func NewTicketPoller(cfg TicketPollerConfig, board TicketBoard, work TicketWorker, agentName string, agentBudget time.Duration, logger *slog.Logger, opts ...TicketPollerOption) (*TicketPoller, error) {
 	if board == nil {

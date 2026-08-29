@@ -140,7 +140,7 @@ type Runner struct {
 
 // SetFailureObserver installs fn, called once per run that failed to produce a
 // verdict. It must be called before the runner is used; the callback is read
-// without synchronisation on every Run, which is safe only because wiring
+// without synchronization on every Run, which is safe only because wiring
 // happens once at start-up and never again.
 func (r *Runner) SetFailureObserver(fn func(kind string)) {
 	r.onFailure = fn
