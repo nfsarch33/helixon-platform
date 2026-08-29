@@ -127,6 +127,69 @@ func TestVerifierOutcomeMapsEveryVerdict(t *testing.T) {
 	}
 }
 
+// TestIT_VerifierReportsTheVerdictItReturns is the end-to-end control for the
+// handler's reporting call.
+//
+// Everything above tests the mapping. None of it catches the handler simply not
+// calling it: the success path needs a container, so a unit test cannot reach
+// it, and a suite that only exercised the error paths would stay green while
+// every real verdict went uncounted. That is the same shape as the defect this
+// whole change exists to fix — a counter that exists and is never reached.
+//
+// It uses `file_exists` rather than a Go check so the assertion costs two quick
+// container starts instead of two toolchain runs, and asserts BOTH directions:
+// a satisfied check reports pass, an unsatisfied one reports fail.
+func TestIT_VerifierReportsTheVerdictItReturns(t *testing.T) {
+	requirePodmanForVerifier(t)
+	runner, err := sandbox.NewRunner(sandbox.Config{
+		Enabled:        true,
+		Workspace:      verifierITWorkspace(t, false),
+		Timeout:        2 * time.Minute,
+		MaxOutputBytes: 4096,
+	})
+	if err != nil {
+		t.Fatalf("NewRunner: %v", err)
+	}
+	var seen []string
+	tool := VerifierTool(VerifierConfig{
+		Runner:    runner,
+		Timeout:   2 * time.Minute,
+		OnOutcome: func(o string) { seen = append(seen, o) },
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	for _, tc := range []struct {
+		name string
+		path string
+		want string
+	}{
+		{"a file that exists", "go.mod", VerifierOutcomePass},
+		{"a file that does not", "definitely-not-here.txt", VerifierOutcomeFail},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			before := len(seen)
+			raw, err := tool.Handler(ctx, map[string]any{"check": "file_exists", "args": []any{tc.path}})
+			if err != nil {
+				t.Fatalf("verifier_run file_exists %s: %v", tc.path, err)
+			}
+			var decoded VerifierResult
+			if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+				t.Fatalf("decode %q: %v", raw, err)
+			}
+			if len(seen) != before+1 {
+				t.Fatalf("the handler reported %d outcomes for one invocation, want exactly 1", len(seen)-before)
+			}
+			if got := seen[len(seen)-1]; got != tc.want {
+				t.Errorf("reported %q, want %q (verdict outcome=%q pass=%v)", got, tc.want, decoded.Outcome, decoded.Pass)
+			}
+			if (decoded.Pass) != (tc.want == VerifierOutcomePass) {
+				t.Errorf("the counter and the agent's verdict disagree: reported %q, JSON pass=%v", tc.want, decoded.Pass)
+			}
+		})
+	}
+}
+
 // TestVerifierOutcomeAgreesWithTheEncodedResult: the counter and the JSON the
 // agent reads must not disagree about whether a check passed.
 func TestVerifierOutcomeAgreesWithTheEncodedResult(t *testing.T) {
