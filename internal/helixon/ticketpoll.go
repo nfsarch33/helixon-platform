@@ -422,7 +422,7 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 func (p *TicketPoller) escalate(ctx context.Context, ticket controlplane.Ticket, cause error, partial string) {
 	p.holdEscalated(ticket.ID)
 	p.bump(func(s *TicketPollerStats) { s.Escalated++ })
-	body := escalationComment(p.agentName, cause, partial)
+	body := EscalationComment(p.agentName, cause, partial)
 	if err := p.board.AddComment(ctx, ticket.ID, p.agentName, body); err != nil {
 		p.bump(func(s *TicketPollerStats) { s.Errors++ })
 		p.logger.Error("escalation comment failed; ticket is stuck with no human-visible reason",
@@ -433,8 +433,15 @@ func (p *TicketPoller) escalate(ctx context.Context, ticket controlplane.Ticket,
 		slog.String("ticket", ticket.ID), slog.String("cause", cause.Error()))
 }
 
-// escalationComment renders the human-facing escalation text.
-func escalationComment(agentName string, cause error, partial string) string {
+// EscalationComment renders the human-facing escalation text.
+//
+// It is exported because task mode needs the same words. `helixon task` used
+// to answer a failed run by calling CompleteTicket with "error: ..." as the
+// evidence, which marks a ticket DONE on the board because the work failed —
+// the exact false-green the poller was built to refuse. There is one
+// escalation vocabulary now, and both entry points render it from here rather
+// than each inventing its own way to describe a failure.
+func EscalationComment(agentName string, cause error, partial string) string {
 	var b strings.Builder
 	b.WriteString("Automated escalation from ")
 	b.WriteString(agentName)

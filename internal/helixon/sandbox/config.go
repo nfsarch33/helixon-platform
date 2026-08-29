@@ -227,8 +227,12 @@ type Config struct {
 	// operator who needs host execution has to say so in writing, in the
 	// config, under a name that cannot be misread as harmless.
 	AllowUnsandboxedHostExecution bool
-	// DenyUnlistedTools flips the tool policy default from path-guarded to
-	// denied, so a tool nobody has classified cannot execute at all.
+	// DenyUnlistedTools used to flip the tool policy default from
+	// path-guarded to denied. Deny is now the default (see DefaultPolicy),
+	// so setting it changes nothing and clearing it cannot loosen anything:
+	// Policy.WithDefault only ever restricts. The field is retained so
+	// existing configs keep parsing, and as the hook a future looser default
+	// would be tightened through.
 	DenyUnlistedTools bool
 }
 

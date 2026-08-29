@@ -206,7 +206,7 @@ func TestExecuteAndReport_EscalationDoesNotCompleteTheTicket(t *testing.T) {
 	}, nil)
 
 	var out bytes.Buffer
-	_, runErr := executeAndReport(context.Background(), rt, "edit the file", "TICKET-1", sb, &out)
+	_, runErr := executeAndReport(context.Background(), rt, "edit the file", "TICKET-1", "serve-test", sb, &out)
 	if runErr == nil {
 		t.Fatal("a state-changing run with no verifier evidence must not succeed")
 	}
@@ -227,11 +227,21 @@ func TestExecuteAndReport_EscalationDoesNotCompleteTheTicket(t *testing.T) {
 	}
 }
 
+// TestSandboxPolicyFor_DenyUnlisted asserts the property that survived
+// v18783's default flip: an unlisted tool is denied, and no setting of
+// deny_unlisted_tools can loosen that. The test used to read the other way
+// round — base = path_guard, strict = deny — which documented the hole:
+// out of the box, a tool nobody had classified executed on the host.
 func TestSandboxPolicyFor_DenyUnlisted(t *testing.T) {
 	t.Parallel()
 	base := sandbox.PolicyFor(sandbox.Config{})
-	if got := base.For("some_new_tool"); got != sandbox.DispositionPathGuard {
-		t.Errorf("default policy for an unlisted tool = %s, want path_guard", got)
+	if got := base.For("some_new_tool"); got != sandbox.DispositionDeny {
+		t.Errorf("default policy for an unlisted tool = %s, want deny", got)
+	}
+	// Explicitly false must not widen it: WithDefault is monotonic.
+	loose := sandbox.PolicyFor(sandbox.Config{DenyUnlistedTools: false})
+	if got := loose.For("some_new_tool"); got != sandbox.DispositionDeny {
+		t.Errorf("deny_unlisted_tools:false widened the policy to %s; it must only ever restrict", got)
 	}
 	strict := sandbox.PolicyFor(sandbox.Config{DenyUnlistedTools: true})
 	if got := strict.For("some_new_tool"); got != sandbox.DispositionDeny {

@@ -65,23 +65,70 @@ type Policy struct {
 
 // DefaultPolicy classifies the built-in tools.
 //
-// The default disposition is PathGuard rather than Deny so that registering a
-// new read-only tool does not silently break an agent — but note that a tool
-// which executes commands MUST be listed as Sandbox, and an operator who
-// wants the strict posture sets sandbox.deny_unlisted_tools, which lifts the
-// default to Deny.
+// The default disposition is Deny. It used to be PathGuard, on the theory
+// that a new read-only tool should not silently break an agent — but the
+// theory had the failure mode backwards. PathGuard forwards a call to the
+// HOST handler after canonicalizing its path arguments, so every tool nobody
+// had classified ran on the host, with the host's network and the host's
+// ambient authority, while the sandbox advertised --network=none. web_fetch
+// was the concrete case: a tool whose entire purpose is outbound network
+// access, unlisted, therefore host-executed, therefore a live exfiltration
+// path out of a container that was configured to have no network at all.
 //
-// verifier_run is listed as Allow because it is sandboxed by construction:
-// its handler owns the same *Runner and cannot reach the host. Routing it
-// through DispositionSandbox as well would nest one container inside another.
+// Unlisted now means denied, and every tool this repository registers is
+// named below. The cost of that is real and deliberate: adding a tool without
+// classifying it here makes it fail loudly on first use, rather than quietly
+// running outside the boundary. A gap that fails closed is a bug report; a
+// gap that fails open is an incident.
+//
+// The classifications:
+//
+//   - shell — Sandbox. It is the command-execution primitive; it is
+//     intercepted and its {command, args} payload runs in the container.
+//   - file_read / file_write — PathGuard. They take a path and touch the
+//     filesystem; the guard canonicalizes the path against the workspace and
+//     the host handler then operates on the approved value.
+//   - verifier_run — Allow. It is sandboxed by construction: its handler owns
+//     the same *Runner and cannot reach the host. Routing it through
+//     DispositionSandbox as well would nest one container inside another.
+//   - memory* / sprintboard* — Allow. They talk to the agent's own memory
+//     store and its own control plane over a URL fixed by the operator's
+//     config. There is no caller-controlled destination and no command
+//     execution, so there is nothing for the guard or the container to add.
+//   - web_fetch — Deny. See below.
+//   - autoresearch_run — Deny. It shells out to a helper binary with
+//     os.Environ() attached, which is a second unsandboxed execution
+//     primitive wearing a different name.
+//
+// Why web_fetch is Deny rather than Sandbox: sandbox routing means "read the
+// {command, args} payload and run it in the container". web_fetch has no such
+// payload — it takes a url — so routing it there would only produce a
+// confusing argument error. Nor could the container serve it: the sandbox
+// runs --network=none, and Config.Validate already refuses to pair network
+// access with a writable workspace. A tool that exists to reach the network
+// cannot be honestly offered from behind a boundary whose defining property
+// is that it has none. An operator who genuinely wants agent egress must run
+// with the sandbox disabled and say so through
+// allow_unsandboxed_host_execution.
 func DefaultPolicy() Policy {
 	return Policy{
-		Default: DispositionPathGuard,
+		Default: DispositionDeny,
 		Tools: map[string]Disposition{
 			"shell":        DispositionSandbox,
 			"file_read":    DispositionPathGuard,
 			"file_write":   DispositionPathGuard,
 			"verifier_run": DispositionAllow,
+
+			"memory":                      DispositionAllow,
+			"memory.read":                 DispositionAllow,
+			"memory.search":               DispositionAllow,
+			"memory.write":                DispositionAllow,
+			"sprintboard":                 DispositionAllow,
+			"sprintboard.claim_ticket":    DispositionAllow,
+			"sprintboard.complete_ticket": DispositionAllow,
+
+			"web_fetch":        DispositionDeny,
+			"autoresearch_run": DispositionDeny,
 		},
 	}
 }
@@ -128,9 +175,13 @@ func (p Policy) WithDefault(d Disposition) Policy {
 	return out
 }
 
-// PolicyFor returns the policy a config asks for: the hardened default set,
-// with the fallback raised to Deny when the operator wants an unclassified
-// tool to be refused outright rather than merely path-guarded.
+// PolicyFor returns the policy a config asks for.
+//
+// Since the default set became default-deny, DenyUnlistedTools no longer has
+// anything left to tighten and this is effectively DefaultPolicy(). The call
+// is kept because WithDefault is monotonic: a future looser default could
+// still be raised here, and `deny_unlisted_tools: false` provably cannot
+// widen the policy — asking for a looser default is a no-op by construction.
 //
 //nolint:gocritic // hugeParam: Config is passed by value throughout this package, see Config.Normalize
 func PolicyFor(cfg Config) Policy {
