@@ -56,7 +56,7 @@ const (
 	DefaultEngine = "podman"
 	// DefaultImage is the pinned default execution image. It carries the Go
 	// toolchain because the verifier checks (go build/test/vet) run in it.
-	DefaultImage = "docker.io/library/golang:1.26-bookworm"
+	DefaultImage = "docker.io/library/golang:1.27-bookworm"
 	// DefaultNetwork disables networking entirely.
 	DefaultNetwork = "none"
 	// DefaultUser is nobody:nogroup — non-root inside the container. It is

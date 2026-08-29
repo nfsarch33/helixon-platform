@@ -2,7 +2,7 @@
 version: '3'
 
 vars:
-  GOVERSION: '1.26'
+  GOVERSION: '1.27'
 
 env:
   GOFLAGS: -buildvcs=false

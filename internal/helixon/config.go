@@ -154,7 +154,7 @@ type SandboxBindFileConfig struct {
 //
 //	sandbox:
 //	  enabled: true                # default
-//	  image: docker.io/library/golang:1.26-bookworm
+//	  image: docker.io/library/golang:1.27-bookworm
 //	  network: none                # none (default) | bridge
 //	  userns: keep-id              # keep-id (default) | disabled
 //	  workspace: /home/agent/work  # defaults to the process working directory
