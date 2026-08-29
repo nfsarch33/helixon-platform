@@ -62,7 +62,13 @@ const (
 // Sandbox failure kinds. These mirror sandbox.FailureKind* one-for-one;
 // AcceptedSandboxKinds is what a cross-package test asserts against so the two
 // halves cannot drift apart silently.
+//
+// `rejected` and `preflight` mean opposite things and alerts must treat them
+// differently: rejected is containment refusing the agent's command (working as
+// designed), preflight is the sandbox unable to start anything (an outage). See
+// the sandbox package's FailureKind* comment for why they were split.
 const (
+	SandboxRejected  = "rejected"
 	SandboxPreflight = "preflight"
 	SandboxTimeout   = "timeout"
 	SandboxExec      = "exec"
@@ -101,7 +107,7 @@ var (
 		ToolOK: {}, ToolError: {}, ToolDenied: {},
 	}
 	acceptedSandboxKinds = map[string]struct{}{
-		SandboxPreflight: {}, SandboxTimeout: {}, SandboxExec: {},
+		SandboxRejected: {}, SandboxPreflight: {}, SandboxTimeout: {}, SandboxExec: {},
 	}
 	acceptedRunOutcomes = map[string]struct{}{
 		RunCompleted: {}, RunEscalated: {},
