@@ -158,8 +158,11 @@ func (a *Agent) startRun(ctx context.Context, sessionID, userMessage string) (co
 	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
 	cleanup := func() { cancel() }
 	if _, err := a.store.AppendTurn(ctx, sessionID, RoleUser, userMessage, nil, "", 0, 0); err != nil {
+		// Classified BEFORE cleanup: cleanup cancels ctx, and a cancelled
+		// context must not be allowed to decide why the store failed.
+		wrapped := storeErr(ctx, "append user turn", err)
 		cleanup()
-		return nil, nil, func() {}, storeErr(ctx, "append user turn", err)
+		return nil, nil, func() {}, wrapped
 	}
 	return ctx, &RunResult{SessionID: sessionID}, cleanup, nil
 }
@@ -203,20 +206,6 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 		slog.Int("tokens_in", resp.Usage.PromptTokens),
 		slog.Int("tokens_out", resp.Usage.CompletionTokens),
 	)
-	// The budget verdict is reached HERE, on the numbers the provider just
-	// reported, and before the loop commits any further durable write or
-	// executes another tool call. Checking it only at the top of the next
-	// iteration meant a run that had already blown its budget still persisted
-	// an assistant turn and ran a whole further round of tool calls — with
-	// whatever side effects those carry — before anyone noticed it was
-	// supposed to have stopped. A limit enforced one full iteration late is
-	// not enforcing much.
-	//
-	// Placed after the debug line so the iteration that blew the budget is
-	// still observable, and after ObserveTokens so its cost is still counted.
-	if err := checkTokenBudget(result, a.cfg.MaxTokens); err != nil {
-		return false, err
-	}
 	if err := a.recordAssistantTurn(ctx, sessionID, &choice, resp.Usage); err != nil {
 		return false, err
 	}
@@ -226,6 +215,25 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	}
 	if done {
 		return true, a.gateCompletion(result)
+	}
+	// The budget verdict is reached HERE: on the numbers the provider just
+	// reported, and before this iteration's tool calls are dispatched.
+	//
+	// The position is load-bearing in three ways. It is AFTER
+	// recordAssistantTurn because the provider bills for the response that
+	// blew the budget, so it has to be written down — v18779 added the
+	// per-turn token columns precisely so a run's cost stayed recoverable, and
+	// dropping the last turn would undercount every over-budget run by its
+	// single most expensive call. It is AFTER the `done` branch because a run
+	// that has already produced its final answer has finished, and failing it
+	// for a limit it crossed on the way to succeeding would be perverse. And
+	// it is BEFORE executeToolCalls because the tool calls, not the write, are
+	// what the budget is protecting against: checking only at the top of the
+	// next iteration let a run that had already blown its budget dispatch a
+	// whole further round of tool calls, with whatever side effects those
+	// carry. A limit enforced one full iteration late is not enforcing much.
+	if err := checkTokenBudget(result, a.cfg.MaxTokens); err != nil {
+		return false, err
 	}
 	if err := a.executeToolCalls(ctx, sessionID, choice.Message.ToolCalls, result); err != nil {
 		return false, err
@@ -314,11 +322,21 @@ func checkTokenBudget(r *RunResult, maxTokens int) error {
 // timeout, not a storage fault. Reporting it verbatim names the wrong
 // subsystem — "append tool turn: insert turn: context deadline exceeded" says
 // nothing about which limit the run actually hit — so the typed ErrTimeout is
-// joined into the chain while the underlying cause is preserved for
-// diagnostics.
+// added to the chain while the underlying cause is preserved for diagnostics.
+//
+// The test is specifically DeadlineExceeded, not ctx.Err() != nil, because
+// that broader test misattributes two other things as an execution timeout:
+// an upstream cancellation (the caller went away — telling an operator to
+// raise Config.Timeout sends them nowhere), and any failure on a path that has
+// already cancelled the context itself, which would relabel a foreign-key
+// rejection or a full disk as a timeout zero seconds into the budget.
+//
+// Two %w verbs rather than errors.Join: Join separates its operands with a
+// NEWLINE, which splits one failure across two records in a line-oriented log.
+// Both errors stay reachable through errors.Is either way.
 func storeErr(ctx context.Context, op string, err error) error {
-	if ctx.Err() != nil {
-		return fmt.Errorf("%s: %w", op, errors.Join(ErrTimeout, err))
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("%s: %w: %w", op, ErrTimeout, err)
 	}
 	return fmt.Errorf("%s: %w", op, err)
 }

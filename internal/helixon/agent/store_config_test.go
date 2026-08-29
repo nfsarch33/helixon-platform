@@ -77,9 +77,13 @@ func TestWithStorePragmasRespectsExistingQuery(t *testing.T) {
 		assert.Equal(t, "file::memory:?cache=shared&"+storePragmas, got)
 	})
 
-	t.Run("caller's own pragmas are left alone", func(t *testing.T) {
-		dsn := "file:x.db?_pragma=synchronous(FULL)"
-		assert.Equal(t, dsn, withStorePragmas(dsn))
+	t.Run("caller's own value is kept and the rest are still added", func(t *testing.T) {
+		got := withStorePragmas("file:x.db?_pragma=synchronous(FULL)")
+		assert.Contains(t, got, "_pragma=synchronous(FULL)", "caller's value wins")
+		assert.NotContains(t, got, "_pragma=synchronous(NORMAL)", "not set twice")
+		assert.Contains(t, got, "_pragma=foreign_keys(ON)", "the others still apply")
+		assert.Contains(t, got, "_pragma=journal_mode(WAL)")
+		assert.Contains(t, got, "_pragma=busy_timeout(5000)")
 	})
 
 	// And the shared-cache in-memory form must still open and migrate.

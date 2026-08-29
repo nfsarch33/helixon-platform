@@ -250,23 +250,26 @@ func TestAgentBudgetExhaust(t *testing.T) {
 	assert.Greater(t, result.TokensIn+result.TokensOut, 15000,
 		"the run must actually have exceeded the budget it reports exhausting")
 
-	// The budget verdict lands on the second model response, before the loop
-	// persists that iteration's assistant turn or runs its tool calls — so
-	// the store holds exactly the user turn plus the first iteration's
-	// assistant and tool turns.
+	// The budget verdict lands on the second model response: that response is
+	// recorded (the provider billed for it — see
+	// TestBudgetExhaustStillAccountsForTheFinalCall) and then its tool calls
+	// are refused. So the store holds the user turn, the first iteration's
+	// assistant and tool turns, and the assistant turn that blew the budget —
+	// but no tool turn for it.
 	//
 	// This is the load-independent form of the assertion. The count is decided
-	// by control flow, not by how fast the host can fsync, and it fails if
-	// the budget check is moved back to the top of the next iteration (which
-	// would leave 5 turns, one further round of tool side effects having
-	// already happened).
+	// by control flow, not by how fast the host can fsync, and it fails if the
+	// budget check is moved back to the top of the next iteration, which would
+	// leave 5 turns with a further round of tool side effects already done.
 	turns, err := store.ListTurns(context.Background(), sess.ID, 0)
 	require.NoError(t, err)
 	// len(), not require.Len: a mismatch here should print two numbers, not
 	// dump every persisted turn.
-	require.Equal(t, 3, len(turns),
-		"nothing may be persisted after the budget verdict; got an extra round of turns")
+	require.Equal(t, 4, len(turns),
+		"expected user, assistant, tool, and the assistant turn that exhausted the budget")
 	assert.Equal(t, RoleUser, turns[0].Role)
 	assert.Equal(t, RoleAssistant, turns[1].Role)
 	assert.Equal(t, RoleTool, turns[2].Role)
+	assert.Equal(t, RoleAssistant, turns[3].Role,
+		"the budget-exhausting response must be recorded, not discarded")
 }

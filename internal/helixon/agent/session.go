@@ -76,21 +76,42 @@ type SessionStore struct {
 //
 // busy_timeout matches internal/notify/notifydb: connections racing to
 // initialize a fresh WAL database return SQLITE_BUSY immediately without it.
-const storePragmas = "_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)"
+var storePragmaList = []string{
+	"_pragma=journal_mode(WAL)",
+	"_pragma=synchronous(NORMAL)",
+	"_pragma=busy_timeout(5000)",
+	"_pragma=foreign_keys(ON)",
+}
 
-// withStorePragmas appends storePragmas to a caller-supplied DSN, respecting
-// any query string it already carries — session DSNs in this repo include
-// forms like "file::memory:?cache=shared". A DSN that already sets its own
-// _pragma is left alone; the caller has been explicit.
+// storePragmas is the full set, as it appears in a DSN that named none of them.
+var storePragmas = strings.Join(storePragmaList, "&")
+
+// withStorePragmas adds the store's pragmas to a caller-supplied DSN,
+// respecting any query string it already carries — session DSNs in this repo
+// include forms like "file::memory:?cache=shared".
+//
+// The merge is PER PRAGMA, not all-or-nothing. A caller who sets one pragma to
+// tune something (say a longer busy_timeout) keeps their value and still gets
+// the rest; bailing out on the first sight of "_pragma=" would silently hand
+// back foreign_keys OFF and synchronous FULL, which are exactly the two
+// defects this indirection exists to prevent, and neither announces itself.
 func withStorePragmas(dsn string) string {
-	if strings.Contains(dsn, "_pragma=") {
+	add := make([]string, 0, len(storePragmaList))
+	for _, p := range storePragmaList {
+		// "_pragma=synchronous(NORMAL)" -> key "_pragma=synchronous("
+		key := p[:strings.IndexByte(p, '(')+1]
+		if !strings.Contains(dsn, key) {
+			add = append(add, p)
+		}
+	}
+	if len(add) == 0 {
 		return dsn
 	}
 	sep := "?"
 	if strings.Contains(dsn, "?") {
 		sep = "&"
 	}
-	return dsn + sep + storePragmas
+	return dsn + sep + strings.Join(add, "&")
 }
 
 // NewSessionStore opens (or creates) a SQLite database and initializes the schema.
