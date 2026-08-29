@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/agentmetrics"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/builtins"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/sandbox"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/tooldispatch"
@@ -22,8 +23,26 @@ import (
 // single place all three commands now go through, so a guardrail cannot be
 // live in one entry point and absent in another.
 type guardrails struct {
-	runner *sandbox.Runner
-	cfg    helixon.RuntimeConfig
+	runner  *sandbox.Runner
+	cfg     helixon.RuntimeConfig
+	metrics *agentmetrics.Metrics
+}
+
+// withMetrics returns a copy of g wired to m, and attaches the sandbox failure
+// observer to the shared runner.
+//
+// It is a separate step from newGuardrails so the metrics stay optional: repl
+// and task mode build the same guardrails without an exposition endpoint to
+// serve them from, and a required parameter would only make those call sites
+// pass nil.
+//
+//nolint:gocritic // hugeParam: see newGuardrails
+func (g guardrails) withMetrics(m *agentmetrics.Metrics) guardrails {
+	g.metrics = m
+	if g.runner != nil && m != nil {
+		g.runner.SetFailureObserver(m.SandboxFailure)
+	}
+	return g
 }
 
 // newGuardrails builds the sandbox runner (nil when the sandbox is disabled).
@@ -84,7 +103,11 @@ func (g guardrails) toolOptions(withWebFetch bool) builtins.Options {
 		root := []string{g.runner.Config().Workspace}
 		opts.FileRead.AllowedPaths = root
 		opts.FileWrite.AllowedPaths = root
-		opts.Verifier = &builtins.VerifierConfig{Runner: g.runner}
+		vc := &builtins.VerifierConfig{Runner: g.runner}
+		if g.metrics != nil {
+			vc.OnOutcome = g.metrics.VerifierRun
+		}
+		opts.Verifier = vc
 	}
 	return opts
 }
@@ -108,6 +131,12 @@ func (g guardrails) configOptions() []helixon.ConfigOption {
 			AgentID: g.cfg.AgentID,
 			Server:  "helixon",
 		}))
+	}
+	// LAST, so the tool-call counter sits outside the sandbox gate and the
+	// loop guard and therefore sees the calls they refuse. A counter under
+	// them would report a quiet agent for one being denied at every turn.
+	if g.metrics != nil {
+		opts = append(opts, helixon.WithAgentMetrics(g.metrics))
 	}
 	return opts
 }

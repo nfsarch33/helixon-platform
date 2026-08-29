@@ -112,3 +112,40 @@ registra:
 #   verifier_tool: verifier_run
 #   mutating_tools: [shell, file_write, verifier_run]
 #   max_consecutive_failures: 2   # then STOP and escalate to a human
+#
+# metrics:         # v18784: hlxn_agent_* series on the --http-addr listener
+#   enabled: true
+#
+#   # With --http-addr set, the agent serves GET /metrics and GET /healthz on
+#   # that address. Both used to answer 404: the HTTP channel only had
+#   # /api/v1/chat and /api/v1/health, so nothing could scrape the agent and
+#   # nothing could liveness-check it. platform.Config.PrometheusRegisterer is
+#   # NOT this path — that field belongs to `helixon platform` on :8787, which
+#   # serve mode never starts.
+#   #
+#   # The registry is private to the agent, so /metrics carries hlxn_agent_*
+#   # and nothing else. That is deliberate: hlxn_agent_build_info being ABSENT
+#   # is how an operator learns the agent is gone, and a shared registry would
+#   # let Go runtime series answer a scrape from a process running no agent.
+#   #
+#   # Escalations are the load-bearing series:
+#   #   hlxn_agent_escalations_total{reason="verifier_failed"|"budget_exhausted"|"run_error"}
+#   # Before v18784 an escalation only mutated board state and told nobody.
+#
+# memory:          # v18784: loop memory (Engram) on the ticket path
+#   enabled: true
+#   engram_url: ""              # NO default; empty means memory is off
+#   app_id: helixon
+#   workspace_id: ""            # defaults to the runtime tenant
+#   max_context: 5
+#   timeout: 15s
+#
+#   # `enabled` defaults true but `engram_url` does not, so upgrading a binary
+#   # cannot give an agent a network destination nobody configured — the same
+#   # shape as sprintboard.url. $HELIXON_ENGRAM_URL fills an unset value; an
+#   # explicit setting here always wins.
+#   #
+#   # Before a ticket runs, relevant memories are recalled and prepended to the
+#   # prompt; after it finishes, a summary of the run (including failures) is
+#   # stored. Memory NEVER decides a ticket: a backend that is down or
+#   # unreachable degrades the agent and is logged, and the run proceeds.

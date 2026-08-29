@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agent"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/agentmetrics"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 )
 
@@ -147,6 +148,7 @@ type TicketPoller struct {
 	work      TicketWorker
 	agentName string
 	logger    *slog.Logger
+	metrics   *agentmetrics.Metrics
 
 	mu    sync.Mutex
 	stats TicketPollerStats
@@ -157,6 +159,17 @@ type TicketPoller struct {
 	escalated map[string]struct{}
 }
 
+// TicketPollerOption is optional poller wiring. Options are variadic so adding
+// a dependency does not churn every existing call site — including the tests,
+// which are the callers most worth leaving alone.
+type TicketPollerOption func(*TicketPoller)
+
+// WithPollerMetrics attaches the runtime metrics. A nil *Metrics is accepted
+// and inert, so the caller does not need a branch.
+func WithPollerMetrics(m *agentmetrics.Metrics) TicketPollerOption {
+	return func(p *TicketPoller) { p.metrics = m }
+}
+
 // NewTicketPoller validates the wiring and returns a poller.
 //
 // agentBudget is the agent's own per-run timeout. A per-ticket deadline
@@ -164,7 +177,7 @@ type TicketPoller struct {
 // a board full of half-done claims.
 //
 //nolint:gocritic // hugeParam: the config is copied into the poller by design
-func NewTicketPoller(cfg TicketPollerConfig, board TicketBoard, work TicketWorker, agentName string, agentBudget time.Duration, logger *slog.Logger) (*TicketPoller, error) {
+func NewTicketPoller(cfg TicketPollerConfig, board TicketBoard, work TicketWorker, agentName string, agentBudget time.Duration, logger *slog.Logger, opts ...TicketPollerOption) (*TicketPoller, error) {
 	if board == nil {
 		return nil, ErrPollerNoBoard
 	}
@@ -181,14 +194,18 @@ func NewTicketPoller(cfg TicketPollerConfig, board TicketBoard, work TicketWorke
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &TicketPoller{
+	p := &TicketPoller{
 		cfg:       cfg,
 		board:     board,
 		work:      work,
 		agentName: agentName,
 		logger:    logger.With(slog.String("component", "helixon.ticketpoll")),
 		reserved:  make(map[string]struct{}),
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p, nil
 }
 
 // Stats returns a snapshot of the outcome tally.
@@ -359,6 +376,7 @@ func (p *TicketPoller) claimNext(ctx context.Context, tickets []controlplane.Tic
 			return controlplane.Ticket{}, false
 		}
 		p.bump(func(s *TicketPollerStats) { s.Claimed++ })
+		p.metrics.TicketClaimed()
 		p.logger.Info("claimed ticket", slog.String("ticket", t.ID), slog.String("title", t.Title))
 		return t, true
 	}
@@ -373,12 +391,17 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 	ctx, cancel := context.WithTimeout(parent, p.cfg.TicketTimeout)
 	defer cancel()
 
+	started := time.Now()
 	result, err := p.work(ctx, ticket)
 
 	// Shutdown mid-ticket. The run did not fail and it did not succeed; it
 	// was interrupted by us. Writing either verdict to a durable board would
 	// be a fabrication, so the ticket is left claimed for the next start (or
 	// a human) and the fact is logged.
+	//
+	// The duration histogram is not observed either, for the same reason: an
+	// interrupted run has no terminal outcome, and filing it under one would
+	// make a fleet restart look like a wave of fast completions.
 	if parent.Err() != nil {
 		p.bump(func(s *TicketPollerStats) { s.Abandoned++ })
 		p.logger.Warn("shutdown during ticket; left claimed and unreported",
@@ -393,6 +416,7 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 
 	if err != nil {
 		p.escalate(reportCtx, ticket, err, result)
+		p.metrics.ObserveRunDuration(agentmetrics.RunEscalated, time.Since(started))
 		return
 	}
 	evidence := truncateEvidence(result, maxEvidenceBytes)
@@ -400,6 +424,7 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 		// An empty final message is not evidence. Treat it the same way the
 		// completion gate treats a missing verifier verdict: escalate.
 		p.escalate(reportCtx, ticket, errors.New("agent produced no final output"), "")
+		p.metrics.ObserveRunDuration(agentmetrics.RunEscalated, time.Since(started))
 		return
 	}
 	if cerr := p.board.CompleteTicket(reportCtx, ticket.ID, evidence); cerr != nil {
@@ -409,6 +434,8 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 		return
 	}
 	p.bump(func(s *TicketPollerStats) { s.Completed++ })
+	p.metrics.TicketCompleted()
+	p.metrics.ObserveRunDuration(agentmetrics.RunCompleted, time.Since(started))
 	p.logger.Info("ticket completed", slog.String("ticket", ticket.ID))
 }
 
@@ -422,6 +449,11 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 func (p *TicketPoller) escalate(ctx context.Context, ticket controlplane.Ticket, cause error, partial string) {
 	p.holdEscalated(ticket.ID)
 	p.bump(func(s *TicketPollerStats) { s.Escalated++ })
+	// Counted BEFORE the comment is attempted. An escalation whose comment
+	// fails to post is the worst case in this whole file — the ticket is stuck
+	// and no human has been told — so it must be the case the counter is most
+	// certain to catch, not the one it misses.
+	p.metrics.Escalated(EscalationReason(cause))
 	body := EscalationComment(p.agentName, cause, partial)
 	if err := p.board.AddComment(ctx, ticket.ID, p.agentName, body); err != nil {
 		p.bump(func(s *TicketPollerStats) { s.Errors++ })
@@ -463,6 +495,66 @@ func EscalationComment(agentName string, cause error, partial string) string {
 	b.WriteString("\n\nThe ticket remains claimed by this agent and will not be retried automatically.")
 	return b.String()
 }
+
+// EscalationReason classifies a run failure into the frozen `reason` label
+// domain of hlxn_agent_escalations_total.
+//
+// It deliberately mirrors the branches of EscalationComment: the words a human
+// reads on the board and the label an alert routes on must describe the same
+// three situations, or the counter that pages someone will disagree with the
+// comment that person then goes and reads.
+//
+// The two verifier stop conditions collapse into one reason on purpose. "The
+// checks kept failing" and "the run changed state and never proved anything"
+// are one operational fact — the gate refused to call this done — and an
+// operator does the same thing about both.
+func EscalationReason(cause error) string {
+	switch {
+	case errors.Is(cause, agent.ErrNeedsHumanApproval), errors.Is(cause, agent.ErrNoVerifierEvidence):
+		return agentmetrics.ReasonVerifierFailed
+	case errors.Is(cause, agent.ErrBudgetExhaust):
+		return agentmetrics.ReasonBudgetExhausted
+	default:
+		return agentmetrics.ReasonRunError
+	}
+}
+
+// TicketMemorySummary renders what loop memory records about a finished ticket.
+//
+// The shape follows the precedent already in the tree — `helixon task`'s Engram
+// persistence writes "Agent X executed task. Prompt: ... Result: ..." — with the
+// ticket identified and the OUTCOME stated. Recording only the successes would
+// build a memory that believes everything works.
+//
+// Returns "" when there is nothing worth writing, so the caller has one thing
+// to check rather than a policy to re-derive.
+//
+//nolint:gocritic // hugeParam: the ticket is a value snapshot, see runTicket
+func TicketMemorySummary(agentName string, ticket controlplane.Ticket, result string, runErr error) string {
+	outcome := "completed"
+	if runErr != nil {
+		outcome = "FAILED: " + runErr.Error()
+	}
+	body := strings.TrimSpace(result)
+	if body == "" && runErr == nil {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Agent %s executed SprintBoard ticket %s (%s). Outcome: %s.",
+		agentName, ticket.ID, truncateEvidence(ticket.Title, memorySummaryTitleBytes), outcome)
+	if body != "" {
+		b.WriteString(" Result: ")
+		b.WriteString(truncateEvidence(body, memorySummaryResultBytes))
+	}
+	return b.String()
+}
+
+// Bounds on what reaches the memory store. Agent output is model-controlled and
+// unbounded; a vector store's embedding call is not free.
+const (
+	memorySummaryTitleBytes  = 200
+	memorySummaryResultBytes = 1000
+)
 
 // truncateEvidence bounds model-controlled text before it is written to the board.
 func truncateEvidence(s string, maxLen int) string {

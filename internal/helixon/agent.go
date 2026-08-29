@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agent"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/agentmetrics"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/memory"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/sandbox"
@@ -52,7 +54,54 @@ type RuntimeConfig struct {
 	Agentrace AgentraceConfig
 	// Tickets configures the serve-mode ticket poller. Default OFF.
 	Tickets TicketPollerConfig
+	// Metrics configures the Prometheus agent-runtime series. Default ON.
+	Metrics MetricsConfig
+	// Memory configures loop memory (Engram) on the ticket path.
+	Memory LoopMemoryConfig
 }
+
+// MetricsConfig configures the agent runtime metrics.
+type MetricsConfig struct {
+	Enabled bool
+}
+
+// LoopMemoryConfig configures loop memory on the ticket path: what the agent
+// recalls before a run and what it writes back after one.
+type LoopMemoryConfig struct {
+	Enabled     bool
+	EngramURL   string
+	AppID       string
+	WorkspaceID string
+	MaxContext  int
+	// Timeout bounds a single memory operation. It exists because a memory
+	// backend that is DOWN must degrade the agent, not stall it: the Engram
+	// client retries, and without a ceiling a dead server could eat a
+	// meaningful slice of the per-ticket budget before the first model call.
+	Timeout time.Duration
+}
+
+func (c LoopMemoryConfig) withDefaults() LoopMemoryConfig {
+	if c.AppID == "" {
+		c.AppID = "helixon"
+	}
+	if c.MaxContext <= 0 {
+		c.MaxContext = 5
+	}
+	if c.Timeout <= 0 {
+		c.Timeout = DefaultMemoryOpTimeout
+	}
+	return c
+}
+
+// Active reports whether loop memory should actually be wired. The flag alone
+// is not enough: `enabled` defaults true, and without a configured server there
+// is nothing to talk to, so an upgraded binary must not start reaching for one.
+func (c LoopMemoryConfig) Active() bool {
+	return c.Enabled && strings.TrimSpace(c.EngramURL) != ""
+}
+
+// DefaultMemoryOpTimeout bounds one Engram call.
+const DefaultMemoryOpTimeout = 15 * time.Second
 
 // LoopGuardConfig configures the loop detector wired in front of the tool
 // executor.
@@ -90,6 +139,11 @@ func (c RuntimeConfig) withDefaults() RuntimeConfig {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
 	}
+	// Applied here as well as in the YAML decoder so a RuntimeConfig built in
+	// code — which every test does — cannot end up with a zero memory timeout.
+	// context.WithTimeout(ctx, 0) is already expired, so the failure would be
+	// "memory never works, silently", which is the hardest kind to notice.
+	c.Memory = c.Memory.withDefaults()
 	return c
 }
 
@@ -110,6 +164,8 @@ type Runtime struct {
 	store      *agent.SessionStore
 	agent      *agent.Agent
 	memory     *memory.HybridSearcher
+	agentMem   *memory.AgentMemory
+	metrics    *agentmetrics.Metrics
 	sprintCtl  *controlplane.SprintboardClient
 	poller     *TicketPoller
 	channels   []Channel
@@ -179,14 +235,21 @@ func (r *Runtime) Configure(ctx context.Context, opts ...ConfigOption) error { /
 		}
 	}
 
-	r.agent = agent.New(r.provider, r.executor, r.store, agent.Config{
+	agentCfg := agent.Config{
 		MaxIterations: r.cfg.MaxIterations,
 		MaxTokens:     r.cfg.MaxTokens,
 		Timeout:       r.cfg.Timeout,
 		SystemPrompt:  r.cfg.SystemPrompt,
 		Logger:        r.logger,
 		Completion:    r.cfg.Completion,
-	})
+	}
+	// Assigned through an explicit nil check: a typed nil placed straight into
+	// the interface would make every `Observer != nil` guard in the loop pass
+	// while holding nothing.
+	if r.metrics != nil {
+		agentCfg.Observer = r.metrics
+	}
+	r.agent = agent.New(r.provider, r.executor, r.store, agentCfg)
 
 	if err := r.buildTicketPoller(); err != nil {
 		return err
@@ -363,12 +426,29 @@ func (r *Runtime) buildTicketPoller() error {
 		return errors.New("helixon: tickets.enabled is set but no sprintboard client is wired; " +
 			"pass WithSprintboard (set sprintboard.url in the config)")
 	}
-	p, err := NewTicketPoller(r.cfg.Tickets, r.sprintCtl, r.runTicketWork, r.cfg.AgentID, r.cfg.Timeout, r.logger)
+	p, err := NewTicketPoller(r.cfg.Tickets, r.sprintCtl, r.runTicketWork, r.cfg.AgentID, r.cfg.Timeout, r.logger,
+		WithPollerMetrics(r.metrics))
 	if err != nil {
 		return fmt.Errorf("helixon: ticket poller: %w", err)
 	}
 	r.poller = p
 	return nil
+}
+
+// Metrics returns the agent-runtime metrics, or nil when they are off.
+// Exposed so a caller can assert that the wiring actually happened rather than
+// inferring it from a config flag that nothing read.
+func (r *Runtime) Metrics() *agentmetrics.Metrics {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.metrics
+}
+
+// AgentMemory returns the wired loop memory, or nil. Same reason as Metrics.
+func (r *Runtime) AgentMemory() *memory.AgentMemory {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.agentMem
 }
 
 // TicketPoller returns the configured poller, or nil when ticket polling is
@@ -396,11 +476,66 @@ func (r *Runtime) runTicketWork(ctx context.Context, ticket controlplane.Ticket)
 	if err != nil {
 		return "", fmt.Errorf("create ticket session: %w", err)
 	}
-	result, runErr := r.agent.Run(ctx, sess.ID, TicketPrompt(ticket))
+	prompt := TicketPrompt(ticket)
+	prompt = r.withRecalledContext(ctx, prompt)
+	result, runErr := r.agent.Run(ctx, sess.ID, prompt)
+	final := ""
 	if result != nil {
-		return result.FinalContent, runErr
+		final = result.FinalContent
 	}
-	return "", runErr
+	r.persistTicketMemory(ctx, ticket, final, runErr)
+	return final, runErr
+}
+
+// withRecalledContext prepends whatever loop memory knows about this ticket.
+//
+// Every failure mode here returns the prompt unchanged. A memory backend being
+// down degrades the agent — it works without recall, as it did before this
+// existed — and must never be able to fail a ticket, so there is deliberately
+// no error path out of this function for a caller to mishandle.
+func (r *Runtime) withRecalledContext(ctx context.Context, prompt string) string {
+	am := r.AgentMemory()
+	if am == nil {
+		return prompt
+	}
+	memCtx, cancel := context.WithTimeout(ctx, r.cfg.Memory.Timeout)
+	defer cancel()
+	recalled := strings.TrimSpace(am.RetrieveContext(memCtx, prompt))
+	if recalled == "" {
+		return prompt
+	}
+	r.logger.Debug("loop memory recalled context", slog.Int("bytes", len(recalled)))
+	return recalled + "\n\n" + prompt
+}
+
+// persistTicketMemory writes a summary of the run back to memory.
+//
+// The summary is built the same way `helixon task`'s Engram persistence builds
+// its own (agent, prompt, result), with the OUTCOME included: a failed run is
+// the most useful thing this agent can remember, and a memory store that only
+// records successes teaches it that everything works.
+//
+// The context is detached and re-bounded because this runs after the agent
+// loop, which may have exhausted the per-ticket deadline. Reusing the expired
+// context would mean the runs most worth remembering are exactly the ones never
+// written down.
+//
+//nolint:gocritic // hugeParam: the ticket is a value snapshot, see runTicketWork
+func (r *Runtime) persistTicketMemory(ctx context.Context, ticket controlplane.Ticket, result string, runErr error) {
+	am := r.AgentMemory()
+	if am == nil {
+		return
+	}
+	summary := TicketMemorySummary(r.cfg.AgentID, ticket, result, runErr)
+	if summary == "" {
+		return
+	}
+	memCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.cfg.Memory.Timeout)
+	defer cancel()
+	if err := am.StoreConversationSummary(memCtx, summary); err != nil {
+		r.logger.Warn("loop memory write failed (non-fatal; the ticket verdict is unaffected)",
+			slog.String("ticket", ticket.ID), slog.String("error", err.Error()))
+	}
 }
 
 func (r *Runtime) heartbeatLoop(ctx context.Context) {
@@ -442,6 +577,43 @@ func WithMemory(m *memory.HybridSearcher) ConfigOption {
 func WithSprintboard(client *controlplane.SprintboardClient) ConfigOption {
 	return func(r *Runtime) error {
 		r.sprintCtl = client
+		return nil
+	}
+}
+
+// WithAgentMemory wires loop memory onto the ticket path: recall before a run,
+// a summary after one.
+//
+// Every piece of this has existed and been tested since v17802 and was wired
+// into nothing — AgentMemory.RetrieveContext and StoreConversationSummary were
+// referenced only by their own tests. This is the wiring, not new machinery.
+func WithAgentMemory(am *memory.AgentMemory) ConfigOption {
+	return func(r *Runtime) error {
+		r.agentMem = am
+		return nil
+	}
+}
+
+// WithAgentMetrics installs the runtime metrics and puts the metered decorator
+// at the OUTSIDE of the executor chain.
+//
+// Outermost is the whole point. The sandbox gate and the loop guard both refuse
+// calls without ever reaching the registry, so a counter installed under them
+// would report a quiet, healthy agent for one whose every tool call was being
+// denied.
+//
+// Apply it LAST in the option list; it wraps whatever the earlier options
+// built.
+func WithAgentMetrics(m *agentmetrics.Metrics) ConfigOption {
+	return func(r *Runtime) error {
+		if m == nil {
+			return nil
+		}
+		if r.executor == nil {
+			return errors.New("helixon: WithAgentMetrics requires Init to have run")
+		}
+		r.metrics = m
+		r.executor = agentmetrics.NewMeteredExecutor(r.executor, m)
 		return nil
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -54,6 +55,46 @@ type FileConfig struct {
 	Agentrace  AgentraceFileConfig  `yaml:"agentrace"`
 	Completion CompletionFileConfig `yaml:"completion"`
 	Tickets    TicketsFileConfig    `yaml:"tickets"`
+	Metrics    MetricsFileConfig    `yaml:"metrics"`
+	Memory     MemoryFileConfig     `yaml:"memory"`
+}
+
+// MetricsFileConfig is the YAML shape for the agent runtime metrics.
+//
+//	metrics:
+//	  enabled: true   # default
+//
+// Default ON, like agentrace and unlike tickets. Observability is not a
+// capability grant: an agent with metrics off can do nothing an agent with
+// metrics on cannot, it just does it where nobody can see. The dangerous
+// default here is the silent one.
+type MetricsFileConfig struct {
+	Enabled *bool `yaml:"enabled"`
+}
+
+// MemoryFileConfig is the YAML shape for loop memory (Engram) on the ticket
+// path.
+//
+//	memory:
+//	  enabled: true                       # default
+//	  engram_url: "http://127.0.0.1:8280" # no default; empty means no memory
+//	  app_id: "helixon"
+//	  workspace_id: ""                    # defaults to the runtime tenant
+//	  max_context: 5
+//	  timeout: "15s"
+//
+// `enabled` defaults ON but `engram_url` has NO default, so an upgraded binary
+// acquires no new network destination: memory activates only where an operator
+// named a server, the same shape as sprintboard.url. Setting `enabled: false`
+// with a URL present is the explicit off switch, which is why the flag exists
+// at all rather than URL-presence being the only control.
+type MemoryFileConfig struct {
+	Enabled     *bool  `yaml:"enabled"`
+	EngramURL   string `yaml:"engram_url"`
+	AppID       string `yaml:"app_id"`
+	WorkspaceID string `yaml:"workspace_id"`
+	MaxContext  int    `yaml:"max_context"`
+	Timeout     string `yaml:"timeout"`
 }
 
 // TicketsFileConfig is the YAML shape for the serve-mode ticket poller.
@@ -281,6 +322,12 @@ func (fc FileConfig) ToRuntimeConfig() (RuntimeConfig, error) {
 		return RuntimeConfig{}, err
 	}
 	cfg.Tickets = tk
+	cfg.Metrics = fc.Metrics.toConfig()
+	mem, err := fc.Memory.toConfig()
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
+	cfg.Memory = mem
 	if cfg.Tickets.Enabled && cfg.SprintboardURL == "" {
 		return RuntimeConfig{}, errors.New("helixon: tickets.enabled is true but sprintboard.url is empty; " +
 			"an autonomous poller with no board to poll would start, log nothing, and do nothing")
@@ -396,6 +443,29 @@ func (l LoopGuardFileConfig) toConfig() (LoopGuardConfig, error) {
 		cfg.Window = loopguard.DefaultWindow
 	}
 	return cfg, nil
+}
+
+func (m MetricsFileConfig) toConfig() MetricsConfig {
+	return MetricsConfig{Enabled: boolOr(m.Enabled, true)}
+}
+
+//nolint:gocritic // hugeParam: value semantics, see ToRuntimeConfig
+func (m MemoryFileConfig) toConfig() (LoopMemoryConfig, error) {
+	cfg := LoopMemoryConfig{
+		Enabled:     boolOr(m.Enabled, true),
+		EngramURL:   strings.TrimSpace(m.EngramURL),
+		AppID:       m.AppID,
+		WorkspaceID: m.WorkspaceID,
+		MaxContext:  m.MaxContext,
+	}
+	if m.Timeout != "" {
+		d, err := time.ParseDuration(m.Timeout)
+		if err != nil {
+			return LoopMemoryConfig{}, fmt.Errorf("helixon: parse memory.timeout %q: %w", m.Timeout, err)
+		}
+		cfg.Timeout = d
+	}
+	return cfg.withDefaults(), nil
 }
 
 func (a AgentraceFileConfig) toConfig() AgentraceConfig {
