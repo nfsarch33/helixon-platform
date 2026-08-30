@@ -1,0 +1,50 @@
+name: Image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-run:
+    runs-on: self-hosted
+    timeout-minutes: 45
+    env:
+      # Tagged per run so two jobs on the same self-hosted runner cannot
+      # remove each other's image in the cleanup step.
+      IMAGE: helixon-platform:ci-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Nothing else in CI compiles this Dockerfile. `go build ./...` does not
+      # read one, and the only other consumer is the release workflow, which
+      # fires on tags. That is how the builder stage drifted to a Go older
+      # than the `go` directive in go.mod and stayed that way: the official
+      # golang images ship GOTOOLCHAIN=local, so a builder older than the
+      # directive cannot download its way out -- `go mod download` fails
+      # before the build step is ever reached.
+      - name: Build the image
+        run: docker build -t "$IMAGE" .
+
+      # Building is not the gate. ENTRYPOINT is resolved when the container
+      # STARTS, not when it is built, so an image with an unrunnable entry
+      # point -- a wrong path, or a binary that cannot link against the
+      # runtime base -- builds perfectly green and fails the moment anyone
+      # runs it. Start the container and assert it produced real output;
+      # exit status alone would accept a binary that printed nothing.
+      - name: Run the image
+        run: |
+          out=$(docker run --rm "$IMAGE" version)
+          echo "helixon version -> ${out}"
+          case "${out}" in
+            "helixon "*) echo "image runs and reports a version" ;;
+            *) echo "::error::image did not report a version; got: ${out}"; exit 1 ;;
+          esac
+
+      - name: Remove the image
+        if: always()
+        run: docker rmi -f "$IMAGE" || true
