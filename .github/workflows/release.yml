@@ -12,23 +12,25 @@ permissions:
 jobs:
   goreleaser:
     runs-on: [self-hosted, linux]
-    # The most generous cap here, and the only one with no measurement behind
-    # it: this workflow fires only on v* tags and has never executed, so there
-    # is no duration to size against.
+    # This workflow fires only on v* tags and has still never executed, so
+    # there is no duration of its own to size against. There is now a good
+    # proxy: the Image workflow runs this same goreleaser invocation on every
+    # PR, differing only in that it skips publishing. That measures at 1m1s
+    # warm and 2m33s cold, and the two image builds are now a FROM/COPY, not
+    # a compile.
     #
-    # Sized from what it would have to do rather than from history. The four
-    # cross-compiled targets are cheap, but the two container images are not:
-    # the root Dockerfile is multi-stage and compiles the binary INSIDE the
-    # image (`go mod download` then a CGO-enabled `go build`), so the arm64
-    # image does that whole build under QEMU emulation. That is the long pole
-    # and it can be tens of minutes.
+    # The old justification for this number no longer holds and is worth
+    # recording, because it was the shape of the bug: the root Dockerfile used
+    # to compile the binary INSIDE the image, so the arm64 leg did that whole
+    # build under QEMU and was assumed to be a tens-of-minutes long pole. It
+    # was not slow, it was broken -- goreleaser's build context has no source
+    # tree, so that Dockerfile could never build here at all.
     #
-    # 90m keeps the repository's worst-case single-job hold exactly where
-    # sandbox-integration already put it, so this adds no new ceiling while
-    # still cutting an uncapped release hang to a quarter of the 360m
-    # default. Note `[self-hosted, linux]` resolves to the same single runner
-    # every other job here queues behind, so a release hang costs precisely
-    # what a CI hang costs. Worth re-sizing once this has run even once.
+    # 90m is kept anyway. It is no new ceiling (sandbox-integration already
+    # holds the runner that long), it still cuts an uncapped release hang to a
+    # quarter of the 360m default, and the real risk here is publishing to
+    # ghcr, which is network-bound and unmeasured. Note `[self-hosted, linux]`
+    # resolves to the same single runner every other job queues behind.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +46,13 @@ jobs:
           # 5h38m with nine runs queued behind it. ~/go survives between jobs
           # on a persistent runner anyway, so the cache buys nothing here.
           cache: false
-      - uses: docker/setup-qemu-action@v3
+      # No setup-qemu-action. It was here to emulate arm64 for a Dockerfile
+      # that compiled inside the image; the Dockerfile now only does
+      # FROM/COPY/ENTRYPOINT, which executes no target-architecture
+      # instruction, so buildx assembles the arm64 image on an amd64 host with
+      # no binfmt handler. The Image workflow proves this on every PR by
+      # running the identical build with no QEMU step and asserting the
+      # resulting image carries an aarch64 binary.
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:

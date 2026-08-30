@@ -12,39 +12,142 @@ permissions:
 jobs:
   build-and-run:
     runs-on: self-hosted
+    # goreleaser cross-compiles four targets and builds two images. Measured
+    # locally at 1m1s warm and 2m33s cold, against 45m. The cap is inherited
+    # from the previous shape of this job rather than re-sized, since it was
+    # already ample and this job does strictly less work than the old one --
+    # it no longer runs `go mod download` and a full compile inside a
+    # container.
     timeout-minutes: 45
-    env:
-      # Tagged per run so two jobs on the same self-hosted runner cannot
-      # remove each other's image in the cleanup step.
-      IMAGE: helixon-platform:ci-${{ github.run_id }}
     steps:
+      # fetch-depth: 0 because goreleaser reads the tag history to derive a
+      # version. A shallow checkout has no tags and it cannot.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # Nothing else in CI compiles this Dockerfile. `go build ./...` does not
-      # read one, and the only other consumer is the release workflow, which
-      # fires on tags. That is how the builder stage drifted to a Go older
-      # than the `go` directive in go.mod and stayed that way: the official
-      # golang images ship GOTOOLCHAIN=local, so a builder older than the
-      # directive cannot download its way out -- `go mod download` fails
-      # before the build step is ever reached.
-      - name: Build the image
-        run: docker build -t "$IMAGE" .
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          # MUST stay false on the self-hosted runner. setup-go@v5 defaults
+          # cache to true, and its post-job cache-save tars go into
+          # uninterruptible sleep on this substrate, pinning the single runner
+          # this repository has until the timeout. One such tar held it for
+          # 5h38m with nine runs queued behind it. ~/go survives between jobs
+          # on a persistent runner anyway, so the cache buys nothing here.
+          cache: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      # This job used to run `docker build .` at the repo root. That gated a
+      # path nobody ships: the root Dockerfile's only release consumer is the
+      # `dockers:` section of .goreleaser.yaml, and goreleaser's build context
+      # is a temp directory holding only the built binaries, the packages, the
+      # dockerfile and any `extra_files` -- never the source tree. So the
+      # repo-root build stayed green for months while the release path could
+      # not build at all, dying on `COPY go.mod go.sum ./` with
+      # `copier: stat: "/go.mod": no such file or directory`. It was never
+      # caught because release.yml fires only on v* tags and has never run.
+      #
+      # So build through goreleaser itself. This is a dry run of release.yml
+      # on every PR: same config, same contexts, same images, publishing and
+      # signing skipped. No QEMU is set up on purpose -- the Dockerfile now
+      # only does FROM/COPY/ENTRYPOINT, which executes no target-architecture
+      # instruction, so the arm64 image builds on an amd64 host with no binfmt
+      # handler present. If that ever stops being true this step fails here
+      # rather than during a release.
+      - name: Build the release artifacts and images
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish,announce,sign
+
+      # `snapshot.version_template` in .goreleaser.yaml pins the snapshot
+      # version to the full commit, so these names are derivable and need no
+      # discovery. Discovery would be a false-green on a persistent runner:
+      # `docker images` returns leftovers from earlier runs, and the gate
+      # would pass having run a stale image.
+      - name: Name the images under test
+        id: img
+        run: |
+          repo=ghcr.io/nfsarch33/helixon-platform
+          echo "amd64=${repo}:ci-${GITHUB_SHA}-amd64" >> "$GITHUB_OUTPUT"
+          echo "arm64=${repo}:ci-${GITHUB_SHA}-arm64" >> "$GITHUB_OUTPUT"
+
+      - name: Assert goreleaser produced both images
+        run: |
+          for img in "${{ steps.img.outputs.amd64 }}" "${{ steps.img.outputs.arm64 }}"; do
+            if docker image inspect "$img" >/dev/null 2>&1; then
+              echo "present: $img"
+            else
+              echo "::error::goreleaser did not produce $img"; exit 1
+            fi
+          done
 
       # Building is not the gate. ENTRYPOINT is resolved when the container
       # STARTS, not when it is built, so an image with an unrunnable entry
       # point -- a wrong path, or a binary that cannot link against the
       # runtime base -- builds perfectly green and fails the moment anyone
-      # runs it. Start the container and assert it produced real output;
-      # exit status alone would accept a binary that printed nothing.
-      - name: Run the image
+      # runs it.
+      #
+      # stdout ONLY, deliberately. The runtime writes a sonic/ast fallback
+      # warning to stderr on every invocation (sonic supports go1.26 and the
+      # module is on go1.27), so folding stderr in here would fail the match
+      # on a perfectly good binary.
+      #
+      # Matching the commit rather than a bare "helixon *" is what makes this
+      # assertion mean something: a stale image, or a placeholder, prints a
+      # version too.
+      - name: Run the amd64 image
         run: |
-          out=$(docker run --rm "$IMAGE" version)
+          out=$(docker run --rm "${{ steps.img.outputs.amd64 }}" version)
           echo "helixon version -> ${out}"
           case "${out}" in
-            "helixon "*) echo "image runs and reports a version" ;;
-            *) echo "::error::image did not report a version; got: ${out}"; exit 1 ;;
+            "helixon ci-${GITHUB_SHA} "*) echo "image runs and reports the commit it was built from" ;;
+            *) echo "::error::image did not report this commit's version; got: ${out}"; exit 1 ;;
           esac
 
-      - name: Remove the image
+      # The arm64 image cannot be run here -- no binfmt handler, and setting
+      # QEMU up just to exec one binary would cost more than it proves. So
+      # assert on what it CONTAINS instead.
+      #
+      # The manifest architecture alone is not enough, and this is not
+      # hypothetical: before `goarch` was pinned in .goreleaser.yaml, BOTH
+      # `dockers:` entries were handed the amd64 binary (unset, the artifact
+      # filter defaults to linux/amd64), and this image had an arm64 manifest
+      # wrapped around an x86-64 executable. It built and would have pushed
+      # green, then crashed on exec for every arm64 consumer. `docker create`
+      # starts nothing, so extracting the binary needs no emulation.
+      #
+      # Paired with the amd64 run above these two assertions are mutually
+      # reinforcing: swap the goarch filters and the arm64 check fails; set
+      # both to arm64 and the amd64 run fails to exec.
+      - name: Assert the arm64 image ships an aarch64 binary
+        run: |
+          arch=$(docker image inspect --format '{{.Architecture}}' "${{ steps.img.outputs.arm64 }}")
+          echo "manifest architecture -> ${arch}"
+          if [ "${arch}" != "arm64" ]; then
+            echo "::error::arm64 image manifest reports ${arch}"; exit 1
+          fi
+
+          cid=$(docker create --platform=linux/arm64 "${{ steps.img.outputs.arm64 }}")
+          docker cp "${cid}:/helixon" "${RUNNER_TEMP}/extracted-arm64"
+          docker rm "${cid}" >/dev/null
+
+          desc=$(file -b "${RUNNER_TEMP}/extracted-arm64")
+          echo "extracted binary -> ${desc}"
+          case "${desc}" in
+            *"ARM aarch64"*) echo "the shipped arm64 binary is aarch64" ;;
+            *) echo "::error::arm64 image ships a non-aarch64 binary: ${desc}"; exit 1 ;;
+          esac
+
+      # No -f. If a concurrent run on this shared runner is mid-`docker run`
+      # against the same tag, an unforced rmi fails harmlessly instead of
+      # pulling the image out from under it.
+      - name: Remove the images
         if: always()
-        run: docker rmi -f "$IMAGE" || true
+        run: |
+          docker rmi "${{ steps.img.outputs.amd64 }}" || true
+          docker rmi "${{ steps.img.outputs.arm64 }}" || true
+          rm -f "${RUNNER_TEMP}/extracted-arm64"
