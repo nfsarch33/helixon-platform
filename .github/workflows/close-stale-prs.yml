@@ -27,6 +27,12 @@ permissions:
 jobs:
   sweep:
     runs-on: ubuntu-latest
+    # Hosted, so this one does not hold the self-hosted runner - but an
+    # uncapped job still burns billed minutes against the 360m default, and a
+    # weekly cron failing that way is not something anyone would notice.
+    # Measured 11s to 17s across 6 runs, apt-get installing gh included. 15m
+    # matches the cap the secrets-scan jobs in this repository already use.
+    timeout-minutes: 15
     steps:
       - name: checkout
         uses: actions/checkout@v4
