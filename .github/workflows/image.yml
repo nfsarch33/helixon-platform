@@ -37,7 +37,27 @@ jobs:
           # on a persistent runner anyway, so the cache buys nothing here.
           cache: false
 
-      - uses: docker/setup-buildx-action@v3
+      # No docker/setup-buildx-action, and no setup-qemu-action either.
+      #
+      # buildx: `/usr/bin/docker` on this runner is a shim that execs podman,
+      # so the action installs a real buildx plugin that never gets consulted
+      # and then dies creating a builder instance:
+      #
+      #   docker buildx create --name builder-... --driver docker-container
+      #   Error: unknown flag: --name
+      #   See 'podman buildx --help'
+      #
+      # No builder instance is needed. `podman buildx build` is supported (it
+      # is podman's own build), and on a real Docker daemon `docker buildx
+      # build` falls back to the default builder, so goreleaser's
+      # `use: buildx` works on both without this step. release.yml carried the
+      # same step and would have failed here identically -- it has simply
+      # never run.
+      #
+      # qemu: the Dockerfile now only does FROM/COPY/ENTRYPOINT, which
+      # executes no target-architecture instruction, so the arm64 image is
+      # assembled with no binfmt handler present. The arm64 assertion below
+      # is what proves that stayed true.
 
       # This job used to run `docker build .` at the repo root. That gated a
       # path nobody ships: the root Dockerfile's only release consumer is the
@@ -50,12 +70,9 @@ jobs:
       # caught because release.yml fires only on v* tags and has never run.
       #
       # So build through goreleaser itself. This is a dry run of release.yml
-      # on every PR: same config, same contexts, same images, publishing and
-      # signing skipped. No QEMU is set up on purpose -- the Dockerfile now
-      # only does FROM/COPY/ENTRYPOINT, which executes no target-architecture
-      # instruction, so the arm64 image builds on an amd64 host with no binfmt
-      # handler present. If that ever stops being true this step fails here
-      # rather than during a release.
+      # on every PR: same config, same contexts, same images, same builder,
+      # publishing and signing skipped. Whatever breaks a release now breaks
+      # here first, on a PR, instead of on a tag nobody can re-cut.
       - name: Build the release artifacts and images
         uses: goreleaser/goreleaser-action@v7
         with:
