@@ -12,6 +12,24 @@ permissions:
 jobs:
   goreleaser:
     runs-on: [self-hosted, linux]
+    # The most generous cap here, and the only one with no measurement behind
+    # it: this workflow fires only on v* tags and has never executed, so there
+    # is no duration to size against.
+    #
+    # Sized from what it would have to do rather than from history. The four
+    # cross-compiled targets are cheap, but the two container images are not:
+    # the root Dockerfile is multi-stage and compiles the binary INSIDE the
+    # image (`go mod download` then a CGO-enabled `go build`), so the arm64
+    # image does that whole build under QEMU emulation. That is the long pole
+    # and it can be tens of minutes.
+    #
+    # 90m keeps the repository's worst-case single-job hold exactly where
+    # sandbox-integration already put it, so this adds no new ceiling while
+    # still cutting an uncapped release hang to a quarter of the 360m
+    # default. Note `[self-hosted, linux]` resolves to the same single runner
+    # every other job here queues behind, so a release hang costs precisely
+    # what a CI hang costs. Worth re-sizing once this has run even once.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:

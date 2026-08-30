@@ -13,6 +13,18 @@ permissions:
 jobs:
   build-and-test:
     runs-on: self-hosted
+    # There is ONE self-hosted runner for this repository, so a job with no
+    # cap holds it for GitHub's 360-minute default and takes the whole
+    # repository's CI offline. A wedged process did exactly that for 5h38m
+    # with nine runs queued behind it. PR #82 removed that particular cause;
+    # these caps bound the cost of the next one, whatever it turns out to be.
+    #
+    # Measured across 29 executed runs: 2m21s fastest, 10m13s median, 11m38s
+    # slowest. Most of that is the 10m per-package deadline `go test` applies,
+    # which internal/agent/livechannel is currently hitting; the real work
+    # (build, vet, coverage) is about 2m. 30m is ~2.5x the slowest run
+    # observed, and matches the cap the sibling repositories use.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -43,6 +55,13 @@ jobs:
 
   security:
     runs-on: self-hosted
+    # The scanners themselves are quick: 22s to 2m11s of real work across 27
+    # executed runs, and 54s green on the merge result that introduced
+    # `cache: false`. The 39m-161m outliers in this job's history were
+    # entirely setup-go's cache-save step, which PR #82 disabled. 15m leaves
+    # room for a cold trivy download and two `go install ...@latest` builds
+    # on a loaded host, and still bounds a hang to minutes.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -75,6 +94,12 @@ jobs:
 
   public-repo-gate:
     runs-on: self-hosted
+    # A checkout plus a grep sweep, and nothing else: 11s fastest, 13s median,
+    # 32s slowest across 29 executed runs, of which the scan step itself is
+    # under a second. 10m is roughly 19x the slowest run observed - ample for
+    # a slow checkout on a busy host, while still bounding a pathological
+    # pattern to minutes rather than six hours.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Scan for blocked terms
