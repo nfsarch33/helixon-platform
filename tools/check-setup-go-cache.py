@@ -410,36 +410,77 @@ def run_mutation_test(workflow_dir: Path) -> int:
         print(f"  {path.name}:{lineno + 1}")
     print()
 
-    if len(pins) < seen:
-        report(
-            "every setup-go step has a mutatable pin",
-            False,
-            f"found {len(pins)} pin line(s) but {seen} setup-go step(s) — a pin is "
-            "not on its own line, so this control cannot reach it",
-        )
+    # `cache: false` is not exclusive to setup-go — a future actions/setup-node
+    # step may carry one too. Such a pin is not this gate's business, so
+    # mutating it is expected to change nothing and is reported as skipped
+    # rather than as a failure. Coverage is asserted afterwards instead: every
+    # setup-go step must have had a pin whose removal was caught.
+    covered = 0
+
+    def mutate_and_check(index: int, path: Path, lineno: int, label: str,
+                         rewrite) -> int:
+        dest = tmp / f"m{index}-{label.split()[0]}"
+        shutil.copytree(workflow_dir, dest)
+        try:
+            target = dest / path.name
+            lines = target.read_text(encoding="utf-8").splitlines()
+            target.write_text(
+                "\n".join(rewrite(lines, lineno)) + "\n", encoding="utf-8"
+            )
+            mutated, _, mutated_errors = check_directory(dest)
+        finally:
+            shutil.rmtree(dest, ignore_errors=True)
+        if mutated_errors:
+            report(
+                f"{label} {path.name}:{lineno + 1} is caught",
+                False,
+                f"mutation made {len(mutated_errors)} workflow(s) unparseable, so "
+                "this control asserted nothing",
+            )
+            return -1
+        return len(mutated)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         for index, (path, lineno) in enumerate(pins):
-            for label, mutate in (
-                ("delete", lambda lines, n: lines[:n] + lines[n + 1:]),
-                ("flip to true", lambda lines, n: lines[:n]
-                    + [lines[n].replace("false", "true")] + lines[n + 1:]),
-            ):
-                dest = tmp / f"m{index}-{label.split()[0]}"
-                shutil.copytree(workflow_dir, dest)
-                target = dest / path.name
-                lines = target.read_text(encoding="utf-8").splitlines()
-                target.write_text(
-                    "\n".join(mutate(lines, lineno)) + "\n", encoding="utf-8"
+            deleted = mutate_and_check(
+                index, path, lineno, "delete",
+                lambda lines, n: lines[:n] + lines[n + 1:],
+            )
+            if deleted == 0:
+                print(
+                    f"skip {path.name}:{lineno + 1}: removing this pin changes no "
+                    "verdict, so it does not guard an actions/setup-go step"
                 )
-                mutated, _, mutated_errors = check_directory(dest)
+                continue
+            if deleted < 0:
+                continue
+            report(
+                f"delete {path.name}:{lineno + 1} is caught", True,
+                f"{deleted} violation(s)",
+            )
+            covered += 1
+
+            flipped = mutate_and_check(
+                index, path, lineno, "flip to true",
+                lambda lines, n: lines[:n]
+                + [lines[n].replace("false", "true")] + lines[n + 1:],
+            )
+            if flipped >= 0:
                 report(
-                    f"{label} {path.name}:{lineno + 1} is caught",
-                    bool(mutated) and not mutated_errors,
-                    f"{len(mutated)} violation(s), {len(mutated_errors)} parse error(s)",
+                    f"flip to true {path.name}:{lineno + 1} is caught",
+                    flipped > 0, f"{flipped} violation(s)",
                 )
-                shutil.rmtree(dest)
+
+        # The one that makes the above mean something: if a setup-go step's pin
+        # is unreachable to this control — folded into a flow mapping, supplied
+        # by an anchor, inherited from a composite action — then it was never
+        # mutated, and the gate's coverage of that step was never demonstrated.
+        report(
+            "every setup-go step has a pin this control can reach",
+            covered == seen,
+            f"{covered} of {seen} setup-go step(s) covered by a mutatable pin",
+        )
 
         empty = tmp / "empty"
         empty.mkdir()
