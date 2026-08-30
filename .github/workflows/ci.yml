@@ -114,3 +114,40 @@ jobs:
             exit 1
           fi
           echo "Public repo gate: PASSED (zero findings)"
+
+  # Guards the availability of the single self-hosted runner this repository
+  # has. actions/setup-go@v5 defaults `cache` to true, and its post-job
+  # cache-save tar goes into uninterruptible sleep (STAT=D, signals inert) on
+  # that runner's substrate — one held the runner for 5h38m on 2026-08-30 with
+  # nine runs queued behind it. PR #81 and #82 pinned `cache: false` on all
+  # four setup-go steps; this job is what stops a fifth from appearing.
+  setup-go-cache-gate:
+    # ubuntu-latest ON PURPOSE, and it is not an optimisation. A gate whose
+    # entire job is protecting the sole self-hosted runner's availability must
+    # not queue behind that runner, and must not be wedgeable by the failure
+    # it exists to detect. It is pure Python and needs no Go toolchain, so it
+    # has no actions/setup-go step of its own to pin.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PyYAML
+        run: pip install --disable-pip-version-check --quiet pyyaml
+
+      # Run the controls BEFORE the gate. A checker that cannot fail turns a
+      # green verdict into a statement about nothing, and that is the exact
+      # way CI has lied in this estate before. --self-test drives synthetic
+      # fixtures in both directions; --mutation-test deletes and flips each
+      # real `cache: false` pin in a scratch copy of .github/workflows and
+      # requires a violation every time.
+      - name: Prove the checker fails on fixtures (self-test)
+        run: python3 tools/check-setup-go-cache.py --self-test
+
+      - name: Prove the checker fails on this repo's workflows (mutation test)
+        run: python3 tools/check-setup-go-cache.py --mutation-test
+
+      - name: "Assert every actions/setup-go step pins cache: false"
+        run: python3 tools/check-setup-go-cache.py
