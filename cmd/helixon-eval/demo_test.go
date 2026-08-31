@@ -7,9 +7,25 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
+
+// itemEnvPrefix is the naming contract for the per-backend item env vars
+// (HLXN per the fleet-wide header/env-var convention).
+const itemEnvPrefix = "HLXN_OP_ITEM_"
+
+// testItemUUID is a syntactically valid but entirely fictional 1Password
+// item UUID: 26 lowercase alphanumerics, which is the shape resolveOPRef
+// enforces. It names no real item.
+const testItemUUID = "abcdefghijklmnopqrstuvwxyz"
+
+// testItemEnv is the env var the runDemoOnce tests resolve through. It is
+// deliberately not one of the real backend env vars so a developer's own
+// exported HLXN_OP_ITEM_MINIMAX cannot influence the result.
+const testItemEnv = "HLXN_OP_ITEM_TESTBACKEND"
 
 // TestNewDemoCmd_Registers verifies the demo subcommand is wired into
 // the root cobra command at v18684-5.
@@ -37,9 +53,11 @@ func TestSupportedBackends_MinimaxAndQwen(t *testing.T) {
 			t.Errorf("backendSpecs missing %q", want)
 			continue
 		}
-		if spec.ItemUUID == "" || len(spec.ItemUUID) != 26 {
-			t.Errorf("backendSpecs[%q].ItemUUID = %q (must be 26-char UUID per 1password-uuid-required.mdc)",
-				want, spec.ItemUUID)
+		if spec.ItemEnv == "" {
+			t.Errorf("backendSpecs[%q].ItemEnv is empty; it must name the env var carrying the item UUID", want)
+		}
+		if spec.FieldID == "" {
+			t.Errorf("backendSpecs[%q].FieldID is empty", want)
 		}
 		if spec.BaseURL == "" {
 			t.Errorf("backendSpecs[%q].BaseURL is empty", want)
@@ -47,6 +65,133 @@ func TestSupportedBackends_MinimaxAndQwen(t *testing.T) {
 		if spec.ModelName == "" {
 			t.Errorf("backendSpecs[%q].ModelName is empty", want)
 		}
+	}
+}
+
+// TestBackendSpecs_CarryNoSecretStoreMap is the regression guard for the
+// change that moved the vault name and the item UUIDs out of this public
+// repository. A vault name plus a set of item UUIDs is an internal map of
+// the secret store; neither is a secret on its own, which is exactly why
+// it is easy to paste one back in.
+//
+// The check is structural rather than a denylist of the specific strings
+// that used to live here: a denylist would have to spell out the very
+// identifiers this change exists to remove, re-committing them to a public
+// repository in the test that guards against them.
+func TestBackendSpecs_CarryNoSecretStoreMap(t *testing.T) {
+	uuidLike := regexp.MustCompile(`^[a-z0-9]{26}$`)
+	envNameLike := regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+
+	for name, spec := range backendSpecs {
+		if uuidLike.MatchString(spec.ItemEnv) {
+			t.Errorf("backendSpecs[%q].ItemEnv is a literal 1Password item UUID; it must name an env var (%s...) instead",
+				name, itemEnvPrefix)
+		}
+		if !envNameLike.MatchString(spec.ItemEnv) {
+			t.Errorf("backendSpecs[%q].ItemEnv = %q is not a valid environment variable name", name, spec.ItemEnv)
+		}
+		if !strings.HasPrefix(spec.ItemEnv, itemEnvPrefix) {
+			t.Errorf("backendSpecs[%q].ItemEnv = %q; want the %q prefix", name, spec.ItemEnv, itemEnvPrefix)
+		}
+		if uuidLike.MatchString(spec.FieldID) {
+			t.Errorf("backendSpecs[%q].FieldID is a literal 1Password item UUID", name)
+		}
+	}
+}
+
+// TestResolveOPRef_Success is the happy path: both env vars exported and
+// the item UUID the right shape.
+func TestResolveOPRef_Success(t *testing.T) {
+	t.Setenv(vaultEnv, "test-vault")
+	t.Setenv(testItemEnv, testItemUUID)
+
+	vault, item, err := resolveOPRef(demoSpec{ItemEnv: testItemEnv})
+	if err != nil {
+		t.Fatalf("resolveOPRef: %v", err)
+	}
+	if vault != "test-vault" {
+		t.Errorf("vault = %q, want test-vault", vault)
+	}
+	if item != testItemUUID {
+		t.Errorf("item = %q, want %q", item, testItemUUID)
+	}
+}
+
+// TestResolveOPRef_TrimsWhitespace covers the common `export VAR="uuid "`
+// paste, which would otherwise produce a 27-char value and a confusing
+// length error.
+func TestResolveOPRef_TrimsWhitespace(t *testing.T) {
+	t.Setenv(vaultEnv, "  test-vault\n")
+	t.Setenv(testItemEnv, "  "+testItemUUID+"\n")
+
+	vault, item, err := resolveOPRef(demoSpec{ItemEnv: testItemEnv})
+	if err != nil {
+		t.Fatalf("resolveOPRef: %v", err)
+	}
+	if vault != "test-vault" || item != testItemUUID {
+		t.Errorf("resolveOPRef did not trim: vault=%q item=%q", vault, item)
+	}
+}
+
+// TestResolveOPRef_VaultUnset confirms there is no baked-in vault default.
+// A default is the internal map this indirection exists to remove.
+func TestResolveOPRef_VaultUnset(t *testing.T) {
+	t.Setenv(vaultEnv, "")
+	t.Setenv(testItemEnv, testItemUUID)
+
+	if _, _, err := resolveOPRef(demoSpec{ItemEnv: testItemEnv}); err == nil {
+		t.Fatal("expected an error when the vault env var is unset, got nil")
+	} else if !strings.Contains(err.Error(), vaultEnv) {
+		t.Errorf("error should name %s so the operator knows what to export, got: %v", vaultEnv, err)
+	}
+}
+
+// TestResolveOPRef_ItemUnset confirms a missing per-backend item UUID is a
+// loud error naming the variable to export.
+func TestResolveOPRef_ItemUnset(t *testing.T) {
+	t.Setenv(vaultEnv, "test-vault")
+	t.Setenv(testItemEnv, "")
+
+	if _, _, err := resolveOPRef(demoSpec{ItemEnv: testItemEnv}); err == nil {
+		t.Fatal("expected an error when the item env var is unset, got nil")
+	} else if !strings.Contains(err.Error(), testItemEnv) {
+		t.Errorf("error should name %s, got: %v", testItemEnv, err)
+	}
+}
+
+// TestResolveOPRef_ItemWrongLength enforces `1password-uuid-required.mdc`
+// on the resolved value: `op read` also accepts a display name, which
+// leaks more than a UUID and is easy to export by mistake.
+func TestResolveOPRef_ItemWrongLength(t *testing.T) {
+	t.Setenv(vaultEnv, "test-vault")
+	t.Setenv(testItemEnv, "Some Item Display Name")
+
+	if _, _, err := resolveOPRef(demoSpec{ItemEnv: testItemEnv}); err == nil {
+		t.Fatal("expected an error for a non-UUID item reference, got nil")
+	}
+}
+
+// TestResolveOPRef_ErrorNeverEchoesValue is the leak guard on the error
+// path. resolveOPRef's error text flows into demoResult.ErrSnippet, which
+// is printed to stdout AND appended to the NDJSON audit stream on disk. An
+// operator who pastes the API key into HLXN_OP_ITEM_* instead of the item
+// UUID must not have that key written to a log file — so the error may
+// report the length but never the value.
+func TestResolveOPRef_ErrorNeverEchoesValue(t *testing.T) {
+	const pastedSecret = "sk-live-not-a-uuid-000000000000000000"
+	t.Setenv(vaultEnv, "test-vault")
+	t.Setenv(testItemEnv, pastedSecret)
+
+	_, _, err := resolveOPRef(demoSpec{ItemEnv: testItemEnv})
+	if err == nil {
+		t.Fatal("expected an error for a non-UUID item reference, got nil")
+	}
+	if strings.Contains(err.Error(), pastedSecret) {
+		t.Errorf("error text echoes the env var value into the audit stream: %v", err)
+	}
+	wantLen := strconv.Itoa(len(pastedSecret))
+	if !strings.Contains(err.Error(), wantLen) {
+		t.Errorf("error should report the observed length (%s) so the operator can debug, got: %v", wantLen, err)
 	}
 }
 
@@ -183,15 +328,25 @@ func TestRunDemoOnce_LLMSuccess(t *testing.T) {
 
 	// Override the spec to point at the stub upstream.
 	spec := demoSpec{
-		ItemUUID:  "test-item-uuid-zzzzzzzzzz",
+		ItemEnv:   testItemEnv,
 		FieldID:   "password",
 		BaseURL:   srv.URL + "/v1",
 		ModelName: "MiniMax-M3",
 	}
 
-	// Swap opReadSecret to a stub that returns a known bearer.
+	// The vault/item reference now comes from the environment, so the test
+	// must export it or runDemoOnce short-circuits at resolveOPRef.
+	t.Setenv(vaultEnv, "test-vault")
+	t.Setenv(testItemEnv, testItemUUID)
+
+	// Swap opReadSecret to a stub that returns a known bearer, and assert it
+	// receives exactly what resolveOPRef produced.
 	origRead := opReadSecretFn
-	opReadSecretFn = func(_, _ string) (string, error) { return "stub-bearer-token", nil }
+	var gotVault, gotItem, gotField string
+	opReadSecretFn = func(vault, item, field string) (string, error) {
+		gotVault, gotItem, gotField = vault, item, field
+		return "stub-bearer-token", nil
+	}
 	defer func() { opReadSecretFn = origRead }()
 
 	home := t.TempDir()
@@ -200,6 +355,10 @@ func TestRunDemoOnce_LLMSuccess(t *testing.T) {
 	res := runDemoOnce(spec, "minimax")
 	if res.Status != "ok" {
 		t.Fatalf("expected status=ok, got %q (err=%q)", res.Status, res.ErrSnippet)
+	}
+	if gotVault != "test-vault" || gotItem != testItemUUID || gotField != "password" {
+		t.Errorf("opReadSecret got (%q, %q, %q), want (test-vault, %q, password)",
+			gotVault, gotItem, gotField, testItemUUID)
 	}
 	if res.TotalTok != 5 {
 		t.Errorf("TotalTok = %d, want 5", res.TotalTok)
@@ -228,15 +387,22 @@ func TestRunDemoOnce_LLMSuccess(t *testing.T) {
 // the 1Password resolver returns an error, the demo surfaces it in
 // Status=op-error and does NOT crash. This is the v18684-5 contract for
 // CI environments where 1Password is unreachable.
+//
+// The env vars are exported so the run reaches opReadSecretFn. Without
+// them resolveOPRef fails first and the test would still see op-error —
+// passing while exercising nothing, so ErrSnippet is asserted too.
 func TestRunDemoOnce_OpErrorWhenNoOpRead(t *testing.T) {
+	t.Setenv(vaultEnv, "test-vault")
+	t.Setenv(testItemEnv, testItemUUID)
+
 	origRead := opReadSecretFn
-	opReadSecretFn = func(_, _ string) (string, error) {
+	opReadSecretFn = func(_, _, _ string) (string, error) {
 		return "", &demoOpError{msg: "simulated op failure"}
 	}
 	defer func() { opReadSecretFn = origRead }()
 
 	res := runDemoOnce(demoSpec{
-		ItemUUID:  "test-item",
+		ItemEnv:   testItemEnv,
 		FieldID:   "password",
 		BaseURL:   "http://localhost:0",
 		ModelName: "MiniMax-M3",
@@ -244,8 +410,41 @@ func TestRunDemoOnce_OpErrorWhenNoOpRead(t *testing.T) {
 	if res.Status != "op-error" {
 		t.Errorf("expected status=op-error, got %q", res.Status)
 	}
-	if res.ErrSnippet == "" {
-		t.Errorf("expected ErrSnippet to capture the op failure")
+	if !strings.Contains(res.ErrSnippet, "simulated op failure") {
+		t.Errorf("ErrSnippet = %q; want the stubbed op failure, not a resolveOPRef error", res.ErrSnippet)
+	}
+}
+
+// TestRunDemoOnce_OpErrorWhenVaultUnset covers the new failure mode this
+// change introduces: an operator who has not exported the vault gets a
+// clean op-error naming the variable, not a panic or a silent `op read`
+// against the wrong vault.
+func TestRunDemoOnce_OpErrorWhenVaultUnset(t *testing.T) {
+	t.Setenv(vaultEnv, "")
+	t.Setenv(testItemEnv, testItemUUID)
+
+	origRead := opReadSecretFn
+	called := false
+	opReadSecretFn = func(_, _, _ string) (string, error) {
+		called = true
+		return "should-not-be-reached", nil
+	}
+	defer func() { opReadSecretFn = origRead }()
+
+	res := runDemoOnce(demoSpec{
+		ItemEnv:   testItemEnv,
+		FieldID:   "password",
+		BaseURL:   "http://localhost:0",
+		ModelName: "MiniMax-M3",
+	}, "minimax")
+	if res.Status != "op-error" {
+		t.Errorf("expected status=op-error, got %q", res.Status)
+	}
+	if called {
+		t.Error("opReadSecret was called despite an unresolved vault reference")
+	}
+	if !strings.Contains(res.ErrSnippet, vaultEnv) {
+		t.Errorf("ErrSnippet = %q; want it to name %s", res.ErrSnippet, vaultEnv)
 	}
 }
 
