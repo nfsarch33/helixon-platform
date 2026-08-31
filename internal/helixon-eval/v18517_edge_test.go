@@ -67,6 +67,11 @@ func TestRun_ConflictResolution_LastWriteWins(t *testing.T) {
 	if reg.Len() != 1 {
 		t.Fatalf("want Len=1 after re-run, got %d", reg.Len())
 	}
+	// Exact equality is deliberate, not an oversight. This assertion
+	// was flaky until mean() was made to sum in sorted-key order; the
+	// fix is in the scorer, so comparing with a tolerance here would
+	// only hide a genuine nondeterminism bug. See
+	// scoring_determinism_test.go for the dedicated coverage.
 	if second.Score != firstScore {
 		t.Fatalf("want deterministic score, got %v vs %v", second.Score, firstScore)
 	}
