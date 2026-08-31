@@ -117,9 +117,28 @@ func (c *Channel) Publish(ev Event) {
 	}
 }
 
-// Subscribe registers a WebSocket connection as a new subscriber. Returns
-// the Subscriber handle (used to unregister) or an error if the handshake
-// fails.
+// teardown signals the subscriber's loops to exit and closes its connection.
+// It is idempotent and safe to call from any goroutine.
+//
+// Callers must not hold Channel.mu when calling teardown, and must not take
+// Channel.mu from inside the once-func. sync.Once is itself a lock -- a second
+// caller blocks inside Do until the first caller's function returns -- so a
+// path that holds mu while entering the Once deadlocks against a path that
+// holds the Once while taking mu. Close and Unsubscribe both did exactly that
+// and hung. Every mutation of the subscriber set now happens under mu and is
+// finished before the Once is entered.
+func (s *Subscriber) teardown() {
+	s.closeOnce.Do(func() {
+		close(s.done)
+		_ = s.conn.Close()
+	})
+}
+
+// Subscribe registers a WebSocket connection as a new subscriber and returns
+// the Subscriber handle (used to unregister). If the channel is already
+// closed, the returned Subscriber is already torn down: its done channel is
+// closed and the connection is closed, so callers blocking on sub.done return
+// immediately.
 func (c *Channel) Subscribe(conn *websocket.Conn) *Subscriber {
 	sub := &Subscriber{
 		id:   nextSubscriberID.Add(1),
@@ -127,29 +146,41 @@ func (c *Channel) Subscribe(conn *websocket.Conn) *Subscriber {
 		ch:   make(chan Event, c.cfg.ChannelBuffer),
 		done: make(chan struct{}),
 	}
+
 	c.mu.Lock()
+	if c.closed.Load() {
+		// Close has already swept the subscriber set. Registering now would
+		// put SubscriberCount back above zero after Close returned, and would
+		// run c.wg.Add against the c.wg.Wait in Close -- a WaitGroup misuse
+		// panic. Close sets c.closed before it takes c.mu, so this check under
+		// c.mu cannot miss a Close that is already under way.
+		c.mu.Unlock()
+		sub.teardown()
+		return sub
+	}
 	c.subs[sub] = struct{}{}
-	c.mu.Unlock()
 	c.subCnt.Add(1)
-	c.wg.Add(1)
+	// Both loops join the WaitGroup under c.mu, so the Add is ordered before
+	// the c.wg.Wait in Close, which only runs after acquiring c.mu.
+	c.wg.Add(2)
+	c.mu.Unlock()
+
 	go c.readLoop(sub)
-	c.wg.Add(1)
 	go c.writeLoop(sub)
 	return sub
 }
 
-// Unsubscribe removes a subscriber and closes its channel.
+// Unsubscribe removes a subscriber from the fan-out set and tears it down.
+// It is idempotent.
 func (c *Channel) Unsubscribe(sub *Subscriber) {
-	sub.closeOnce.Do(func() {
-		c.mu.Lock()
-		if _, ok := c.subs[sub]; ok {
-			delete(c.subs, sub)
-			c.subCnt.Add(-1)
-		}
-		c.mu.Unlock()
-		close(sub.done)
-		_ = sub.conn.Close()
-	})
+	c.mu.Lock()
+	if _, ok := c.subs[sub]; ok {
+		delete(c.subs, sub)
+		c.subCnt.Add(-1)
+	}
+	c.mu.Unlock()
+	// Outside the lock: see the ordering note on teardown.
+	sub.teardown()
 }
 
 // SubscriberCount returns the current number of active subscribers.
@@ -169,22 +200,30 @@ func (c *Channel) WaitForSubscribers(n int, timeout time.Duration) {
 	}
 }
 
-// Close stops accepting new subscribers and closes all active ones.
+// Close stops accepting new subscribers, closes all active ones, and waits for
+// their read and write loops to exit. It is idempotent.
 func (c *Channel) Close() {
 	if c.closed.Swap(true) {
 		return
 	}
 	close(c.stopCh)
+
+	// Snapshot and clear the subscriber set under the lock, then release it.
+	// The teardown below takes each subscriber's closeOnce; running it here
+	// under c.mu is the lock-order inversion that deadlocked Close against
+	// Unsubscribe. See the ordering note on teardown.
 	c.mu.Lock()
+	subs := make([]*Subscriber, 0, len(c.subs))
 	for sub := range c.subs {
-		sub.closeOnce.Do(func() {
-			_ = sub.conn.Close()
-			close(sub.done)
-		})
-		delete(c.subs, sub)
-		c.subCnt.Add(-1)
+		subs = append(subs, sub)
 	}
+	c.subs = make(map[*Subscriber]struct{})
+	c.subCnt.Store(0)
 	c.mu.Unlock()
+
+	for _, sub := range subs {
+		sub.teardown()
+	}
 	c.wg.Wait()
 }
 
