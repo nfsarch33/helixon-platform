@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -149,10 +151,10 @@ func TestServiceMap_MinimaxQuotaHasThreeOrdinalKeys(t *testing.T) {
 		if e.Extract != "" {
 			t.Errorf("entry %d must be a direct field read, got Extract=%q", i, e.Extract)
 		}
-		if seenItems[e.Item] {
-			t.Errorf("entry %d reuses item %q; the three plans must be distinct", i, e.Item)
+		if seenItems[e.ItemEnv] {
+			t.Errorf("entry %d reuses item ref %q; the three plans must be distinct", i, e.ItemEnv)
 		}
-		seenItems[e.Item] = true
+		seenItems[e.ItemEnv] = true
 	}
 }
 
@@ -169,9 +171,14 @@ func TestServiceMap_MinimaxQuotaKeyOneMatchesEngramFallback(t *testing.T) {
 	if !ok || len(engram) == 0 {
 		t.Fatal("engramd missing")
 	}
-	if quota[0].Item != engram[0].Item {
-		t.Errorf("quota key 1 item %q != engramd embed-fallback item %q; if this is now intentional, update the comment in serviceMap",
-			quota[0].Item, engram[0].Item)
+	// Comparing the item REFERENCE (the variable name) rather than a literal
+	// UUID is what keeps this coupling enforceable now that the UUIDs live in
+	// the environment: sharing one variable makes the two entries resolve to
+	// the same item by construction, and this test fails the moment someone
+	// gives either its own variable.
+	if quota[0].ItemEnv != engram[0].ItemEnv {
+		t.Errorf("quota key 1 item ref %q != engramd embed-fallback item ref %q; if this is now intentional, update the comment in serviceMap",
+			quota[0].ItemEnv, engram[0].ItemEnv)
 	}
 }
 
@@ -185,6 +192,7 @@ func TestServiceMap_MinimaxQuotaKeyOneMatchesEngramFallback(t *testing.T) {
 // behavior of the five services already wired to the permissive path.
 func TestBootstrapServiceEnv_StrictFailsWhenNothingResolves(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "") // every opRead now fails fast
+	provisionOPEnv(t)
 	out := t.TempDir() + "/strict.env"
 
 	err := bootstrapServiceEnv("fleet-agent", out, 2, true)
@@ -206,6 +214,7 @@ func TestBootstrapServiceEnv_StrictFailsWhenNothingResolves(t *testing.T) {
 // do today.
 func TestBootstrapServiceEnv_NonStrictPreservesLegacyBehaviour(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	out := t.TempDir() + "/legacy.env"
 
 	if err := bootstrapServiceEnv("fleet-agent", out, 2, false); err != nil {
@@ -237,6 +246,7 @@ func TestBootstrapServiceEnv_UnknownServiceIsRejected(t *testing.T) {
 // credentials and must never be group- or world-readable.
 func TestBootstrapServiceEnv_OutputIsOwnerOnly(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	out := t.TempDir() + "/perm.env"
 	if err := bootstrapServiceEnv("fleet-agent", out, 2, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -297,22 +307,23 @@ func TestServiceMap_FleetAgentUsesRouterToken(t *testing.T) {
 	var routerTokenItem string
 	for _, re := range serviceMap["llm-router"] {
 		if re.EnvVar == "LLM_ROUTER_TOKEN" {
-			routerTokenItem = re.Item
+			routerTokenItem = re.ItemEnv
 		}
 	}
-	if routerTokenItem == "" || e.Item != routerTokenItem {
-		t.Errorf("fleet-agent token item %q must match llm-router's LLM_ROUTER_TOKEN item %q", e.Item, routerTokenItem)
+	if routerTokenItem == "" || e.ItemEnv != routerTokenItem {
+		t.Errorf("fleet-agent token item ref %q must match llm-router's LLM_ROUTER_TOKEN item ref %q", e.ItemEnv, routerTokenItem)
 	}
 }
 
-// routerTokenItem returns the 1Password item the llm-router service reads
-// for its own client-auth bearer. Every service that CALLS the router must
-// read the same item; a helper keeps the tests from re-deriving it.
+// routerTokenItem returns the item REFERENCE (the environment variable name)
+// the llm-router service reads for its own client-auth bearer. Every service
+// that CALLS the router must read the same item; a helper keeps the tests
+// from re-deriving it.
 func routerTokenItem(t *testing.T) string {
 	t.Helper()
 	for _, e := range serviceMap["llm-router"] {
 		if e.EnvVar == "LLM_ROUTER_TOKEN" {
-			return e.Item
+			return e.ItemEnv
 		}
 	}
 	t.Fatal("llm-router serviceMap lacks LLM_ROUTER_TOKEN; every router caller pins to it")
@@ -351,12 +362,9 @@ func TestServiceMap_RouterCallersShareOneToken(t *testing.T) {
 			if e.EnvVar != tc.envVar {
 				t.Errorf("%s EnvVar = %q, want %q (%s)", tc.service, e.EnvVar, tc.envVar, tc.why)
 			}
-			if e.Item != want {
-				t.Errorf("%s item %q != llm-router's LLM_ROUTER_TOKEN item %q; router callers must not diverge from the router",
-					tc.service, e.Item, want)
-			}
-			if e.Vault != "HelixonSafe" {
-				t.Errorf("%s vault = %q, want HelixonSafe", tc.service, e.Vault)
+			if e.ItemEnv != want {
+				t.Errorf("%s item ref %q != llm-router's LLM_ROUTER_TOKEN item ref %q; router callers must not diverge from the router",
+					tc.service, e.ItemEnv, want)
 			}
 			// _extract is the drift mechanism that once crash-looped the
 			// fleet agent 300+ times while secrets-bootstrap exited 0: the
@@ -380,6 +388,7 @@ func TestServiceMap_RouterCallersShareOneToken(t *testing.T) {
 // Reaching the render path at all is what this asserts.
 func TestBootstrapServiceEnv_EvospinedIsAKnownService(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "") // no op CLI needed; every read fails fast
+	provisionOPEnv(t)
 	out := t.TempDir() + "/evospined.env"
 
 	if err := bootstrapServiceEnv("evospined", out, 2, false); err != nil {
@@ -409,8 +418,8 @@ func TestServiceMap_LLMRouterCarriesGatewayToken(t *testing.T) {
 		if e.Field == "_extract" || e.Extract != "" {
 			t.Errorf("gateway token must be a direct field read, got Field=%q Extract=%q", e.Field, e.Extract)
 		}
-		if e.Vault != "HelixonSafe" {
-			t.Errorf("gateway token vault = %q, want HelixonSafe", e.Vault)
+		if !strings.HasPrefix(e.ItemEnv, itemEnvPrefix) {
+			t.Errorf("gateway token item ref = %q, want the %q prefix", e.ItemEnv, itemEnvPrefix)
 		}
 	}
 	if !found {
@@ -432,17 +441,177 @@ func TestResolveField(t *testing.T) {
 	}
 }
 
+// testItemEnv / testFieldEnv are the variable names the unit tests provision.
+// They are deliberately NOT any real entry's variable, so a test can never
+// accidentally depend on an operator's actual environment.
+const (
+	testItemEnv  = "HLXN_OP_ITEM_UNIT_TEST"
+	testFieldEnv = "HLXN_OP_FIELD_UNIT_TEST"
+	// A syntactically valid 26-char item UUID that addresses nothing.
+	testItemUUID  = "aaaaaaaaaaaaaaaaaaaaaaaaaa"
+	testFieldUUID = "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+)
+
+// provisionOPEnv gives a test the environment a real host gets from
+// %h/.config/helixon/op-items.env. Tests that render an env file must call
+// it: without a provisioned map the tool now fails closed by design, which
+// is the whole point of the change.
+func provisionOPEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv(vaultEnv, "unit-test-vault")
+	t.Setenv(testItemEnv, testItemUUID)
+	t.Setenv(testFieldEnv, testFieldUUID)
+	for _, entries := range serviceMap {
+		for _, e := range entries {
+			if e.ItemEnv != "" {
+				t.Setenv(e.ItemEnv, testItemUUID)
+			}
+			if e.FieldEnv != "" {
+				t.Setenv(e.FieldEnv, testFieldUUID)
+			}
+		}
+	}
+}
+
 func TestFormatEnvLine_OpReadFails(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	e := EnvEntry{
-		EnvVar: "TEST_VAR",
-		Vault:  "vault",
-		Item:   "item",
-		Field:  "password",
+		EnvVar:  "TEST_VAR",
+		ItemEnv: testItemEnv,
+		Field:   "password",
 	}
-	line := formatEnvLine(e, 1)
+	line, err := formatEnvLine(e, 1)
+	if err != nil {
+		t.Fatalf("a failed op read is not a configuration error: %v", err)
+	}
 	if !strings.Contains(line, "# TEST_VAR=<unavailable:") {
 		t.Errorf("expected unavailable marker, got %q", line)
+	}
+}
+
+// TestFormatEnvLine_UnresolvedRefIsFatal is the fail-closed guard. An
+// unprovisioned host must not get a renderable line: the previous outage in
+// this estate was a unit whose ExecStartPre succeeded having resolved
+// nothing, so the service started with no credential and crash-looped
+// unalerted. A configuration error has to be an error, not a comment.
+func TestFormatEnvLine_UnresolvedRefIsFatal(t *testing.T) {
+	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
+	t.Setenv(vaultEnv, "unit-test-vault")
+	t.Setenv(testItemEnv, "") // provisioned nowhere
+
+	_, err := formatEnvLine(EnvEntry{EnvVar: "TEST_VAR", ItemEnv: testItemEnv, Field: "password"}, 1)
+	if err == nil {
+		t.Fatal("an unset item reference must be a hard error, not a rendered comment line")
+	}
+	if !strings.Contains(err.Error(), testItemEnv) {
+		t.Errorf("error must name the variable the operator has to export, got: %v", err)
+	}
+}
+
+// TestResolveEntryRef_ErrorNeverEchoesValue: resolveEntryRef's errors reach
+// stderr and the caller's error string. An operator who pastes an API key
+// into HLXN_OP_ITEM_* must have it reported by LENGTH, never by value.
+func TestResolveEntryRef_ErrorNeverEchoesValue(t *testing.T) {
+	const pastedSecret = "sk-live-not-a-uuid-0000000000000000"
+	t.Setenv(vaultEnv, "unit-test-vault")
+	t.Setenv(testItemEnv, pastedSecret)
+
+	_, _, _, err := resolveEntryRef(&EnvEntry{EnvVar: "TEST_VAR", ItemEnv: testItemEnv, Field: "password"})
+	if err == nil {
+		t.Fatal("expected an error for a non-UUID item reference")
+	}
+	if strings.Contains(err.Error(), pastedSecret) {
+		t.Errorf("error text echoes the value into stderr and the env file: %v", err)
+	}
+	if !strings.Contains(err.Error(), strconv.Itoa(len(pastedSecret))) {
+		t.Errorf("error should report the observed length so the operator can debug, got: %v", err)
+	}
+}
+
+// TestResolveEntryRef_VaultHasNoDefault: a baked-in default vault is the
+// internal map this change removes, and a WRONG default is worse than none --
+// it would point `op read` at whatever vault carries that name in the
+// caller's account.
+func TestResolveEntryRef_VaultHasNoDefault(t *testing.T) {
+	t.Setenv(vaultEnv, "")
+	t.Setenv(testItemEnv, testItemUUID)
+
+	_, _, _, err := resolveEntryRef(&EnvEntry{EnvVar: "TEST_VAR", ItemEnv: testItemEnv, Field: "password"})
+	if err == nil {
+		t.Fatal("an unset vault must be an error; there must be no default")
+	}
+	if !strings.Contains(err.Error(), vaultEnv) {
+		t.Errorf("error must name %s, got: %v", vaultEnv, err)
+	}
+}
+
+// TestServiceMap_CarriesNoSecretStoreMap is the structural regression guard,
+// and it is deliberately structural rather than a denylist of the nine
+// identifiers this change removed: a denylist would have to re-commit them to
+// a PUBLIC repository inside the very test that guards against them.
+func TestServiceMap_CarriesNoSecretStoreMap(t *testing.T) {
+	uuidLike := regexp.MustCompile(`^[a-z0-9]{26}$`)
+	envNameLike := regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+
+	for service, entries := range serviceMap {
+		for i, e := range entries {
+			if e.ItemEnv == "" {
+				t.Errorf("%s[%d] (%s) has no ItemEnv; every entry must reference its item through the environment", service, i, e.EnvVar)
+				continue
+			}
+			if uuidLike.MatchString(e.ItemEnv) {
+				t.Errorf("%s[%d] ItemEnv is a literal item UUID; it must name a %s* variable", service, i, itemEnvPrefix)
+			}
+			if !envNameLike.MatchString(e.ItemEnv) || !strings.HasPrefix(e.ItemEnv, itemEnvPrefix) {
+				t.Errorf("%s[%d] ItemEnv = %q; want a variable name with the %q prefix", service, i, e.ItemEnv, itemEnvPrefix)
+			}
+			if uuidLike.MatchString(e.Field) {
+				t.Errorf("%s[%d] Field is a literal 26-char identifier; use FieldEnv so it lives in the environment", service, i)
+			}
+			if e.FieldEnv != "" && !strings.HasPrefix(e.FieldEnv, fieldEnvPrefix) {
+				t.Errorf("%s[%d] FieldEnv = %q; want the %q prefix", service, i, e.FieldEnv, fieldEnvPrefix)
+			}
+		}
+	}
+}
+
+// TestSourceCarriesNoVaultName reads this package's own source and fails if
+// a vault name literal reappears. serviceMap alone cannot catch a vault
+// baked into a helper or a default.
+// It scans the TEST file too, not just main.go. A guard that exempts itself
+// leaves the obvious hiding place open, and the fixtures here are exactly
+// where a real id would be pasted "just for a test".
+func TestSourceCarriesNoVaultName(t *testing.T) {
+	// Assembled from fragments on purpose. Written as plain literals these
+	// patterns match THEMSELVES once this file is in scope, and the guard
+	// reports a leak that is only its own source.
+	vaultLike := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)` + "helixon" + `\s*` + "safe"),
+		regexp.MustCompile(`(?i)` + "cursor" + "_" + "ironclaw"),
+	}
+	quotedID := regexp.MustCompile(`"[a-z0-9]{26}"`)
+
+	for _, name := range []string{"main.go", "main_test.go"} {
+		b, err := os.ReadFile(name) //nolint:gosec // fixed, in-package filenames
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		for _, re := range vaultLike {
+			if re.Match(b) {
+				t.Errorf("%s contains a vault name literal (%s); the vault must come from %s", name, re, vaultEnv)
+			}
+		}
+		for _, m := range quotedID.FindAllString(string(b), -1) {
+			id := strings.Trim(m, `"`)
+			// The synthetic fixtures are a single repeated character; a real
+			// 1Password id is not, so allowing them costs nothing.
+			if strings.Count(id, string(id[0])) == len(id) {
+				continue
+			}
+			t.Errorf("%s contains a quoted 26-char identifier %q; item and field ids must come from the environment", name, m)
+		}
 	}
 }
 
@@ -453,14 +622,17 @@ func TestFormatEnvLine_ExtractFailure(t *testing.T) {
 	// placeholder. Instead we verify that when opRead fails AND Extract is set,
 	// we still get the unavailable marker (extract is never reached).
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	e := EnvEntry{
 		EnvVar:  "TEST_VAR",
-		Vault:   "vault",
-		Item:    "item",
+		ItemEnv: testItemEnv,
 		Field:   "_extract",
 		Extract: `^does-not-match=(.+)$`,
 	}
-	line := formatEnvLine(e, 1)
+	line, err := formatEnvLine(e, 1)
+	if err != nil {
+		t.Fatalf("a failed op read is not a configuration error: %v", err)
+	}
 	if !strings.Contains(line, "# TEST_VAR=<unavailable:") {
 		t.Errorf("expected unavailable marker, got %q", line)
 	}
@@ -535,6 +707,7 @@ func TestPrintValueAndExport_WithExport(t *testing.T) {
 // of strict mode would be lost at the boundary that matters.
 func TestDispatch_StrictServiceFailsLoudly(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	out := t.TempDir() + "/dispatch-strict.env"
 
 	rc := dispatch(cliArgs{ServiceName: "minimax-quota", OutPath: out, TimeoutSec: 2, Strict: true})
@@ -550,6 +723,7 @@ func TestDispatch_StrictServiceFailsLoudly(t *testing.T) {
 // path must keep its current exit code so no existing unit changes behavior.
 func TestDispatch_NonStrictServiceStillSucceeds(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	out := t.TempDir() + "/dispatch-legacy.env"
 
 	if rc := dispatch(cliArgs{ServiceName: "minimax-quota", OutPath: out, TimeoutSec: 2}); rc != 0 {
@@ -691,6 +865,7 @@ func TestOpReadWithExecutor_Timeout(t *testing.T) {
 
 func TestOpRead_TokenMissing(t *testing.T) {
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	_, err := opRead("v", "i", "f", 5)
 	if err == nil || !strings.Contains(err.Error(), "OP_SERVICE_ACCOUNT_TOKEN not set") {
 		t.Errorf("expected token missing error, got %v", err)
@@ -741,7 +916,7 @@ func TestParentDir_Variants(t *testing.T) {
 }
 
 func TestFormatEnvLineFromValue_Success(t *testing.T) {
-	e := EnvEntry{EnvVar: "FOO", Vault: "v", Item: "i", Field: "f"}
+	e := EnvEntry{EnvVar: "FOO", ItemEnv: testItemEnv, Field: "f"}
 	line := formatEnvLineFromValue(e, "bar")
 	if line != `FOO="bar"`+"\n" {
 		t.Errorf("got %q, want %q", line, `FOO="bar"`+"\n")
@@ -750,8 +925,8 @@ func TestFormatEnvLineFromValue_Success(t *testing.T) {
 
 func TestFormatEnvLineFromValue_WithExtract(t *testing.T) {
 	e := EnvEntry{
-		EnvVar: "KEY1",
-		Vault:  "v", Item: "i", Field: "_extract",
+		EnvVar:  "KEY1",
+		ItemEnv: testItemEnv, Field: "_extract",
 		Extract: `^export \w+=(\S+)$`,
 	}
 	line := formatEnvLineFromValue(e, "export KEY1=secret123")
@@ -766,8 +941,8 @@ func TestFormatEnvLineFromValue_ExtractMismatch(t *testing.T) {
 	os.Stderr = w
 	defer func() { os.Stderr = old }()
 	e := EnvEntry{
-		EnvVar: "KEYX",
-		Vault:  "v", Item: "i", Field: "_extract",
+		EnvVar:  "KEYX",
+		ItemEnv: testItemEnv, Field: "_extract",
 		Extract: `^nomatch=(.+)$`,
 	}
 	line := formatEnvLineFromValue(e, "no-match-content")
@@ -788,12 +963,13 @@ func TestBootstrapServiceEnv_Success(t *testing.T) {
 	oldMap := serviceMap
 	serviceMap = map[string][]EnvEntry{
 		"_test_svc": {
-			{EnvVar: "MY_KEY", Vault: "v", Item: "i", Field: "f"},
+			{EnvVar: "MY_KEY", ItemEnv: testItemEnv, Field: "f"},
 		},
 	}
 	t.Cleanup(func() { serviceMap = oldMap })
 
 	t.Setenv("OP_SERVICE_ACCOUNT_TOKEN", "")
+	provisionOPEnv(t)
 	old := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w

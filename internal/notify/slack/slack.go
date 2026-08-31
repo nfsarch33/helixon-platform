@@ -5,8 +5,9 @@
 // (Config + New + Send + metrics integration + helpers) so the orchestrator
 // pattern from telegram.go ports over without translation.
 //
-// Reference: 1Password item SENTRUX_SLACK_WEBHOOK (uuid ri4vhb25sijurxudb3ddjicsza)
-// in vault HelixonSafe.
+// Reference: the SENTRUX_SLACK_WEBHOOK 1Password item. Its id and the
+// vault come from HLXN_OP_ITEM_SLACK_WEBHOOK and HLXN_OP_VAULT -- this
+// repository is public and does not carry either.
 //
 // Usage:
 //

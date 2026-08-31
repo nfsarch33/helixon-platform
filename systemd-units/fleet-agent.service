@@ -6,6 +6,12 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=%h/Code/helixon-platform
+# The vault name and item UUIDs secrets-bootstrap resolves come from this
+# file, not from the (public) repository. NO dash prefix: the reference is
+# REQUIRED, so a host that has not been provisioned fails at unit start with
+# a legible systemd error instead of starting the agent with no credential.
+# Provision it from systemd-units/op-items.env.example.
+EnvironmentFile=%h/.config/helixon/op-items.env
 ExecStartPre=/bin/sh -c 'export OP_SERVICE_ACCOUNT_TOKEN=$(cat %h/.config/op/service-account-token) && /home/jaslian/local/bin/secrets-bootstrap --service fleet-agent --out /run/user/%U/fleet-agent-env'
 EnvironmentFile=-/run/user/%U/fleet-agent-env
 ExecStart=/home/jaslian/local/bin/helixon serve --config %h/.config/helixon/wsl1-fleet-agent.yaml --http-addr 127.0.0.1:8686

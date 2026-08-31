@@ -24,8 +24,14 @@ import (
 // newStubOpClient returns an onepassword.Client pointed at the supplied
 // httptest server. The stub server's handler is invoked once per Resolve
 // call; tests assert on call counts.
+// It also provisions the vault reference, because ResolveTelegramBotToken
+// now reads it from the environment rather than from a constant in the
+// package. Without it the resolver fails before reaching the stub server --
+// which is the correct behaviour for an unprovisioned host, and the reason
+// this has to be set explicitly rather than defaulted.
 func newStubOpClient(t *testing.T, srvURL, secret string) *onepassword.Client { //nolint:revive // unused-parameter required by interface
 	t.Helper()
+	t.Setenv(onepassword.VaultEnv, "test-vault")
 	return &onepassword.Client{
 		Token:    "fake-token-for-test",
 		Endpoint: srvURL,
@@ -45,7 +51,12 @@ func TestNewFromOpWithResolver_ResolvesAndReturnsClient(t *testing.T) {
 	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, wantToken)
-	cl, err := NewFromOpWithResolver(context.Background(), resolver, onepassword.TelegramBot1UUID, "123456789")
+	t.Setenv(onepassword.TelegramBot1ItemEnv, testItemUUID)
+	itemUUID, err := onepassword.ResolveItem(onepassword.TelegramBot1ItemEnv)
+	if err != nil {
+		t.Fatalf("ResolveItem: %v", err)
+	}
+	cl, err := NewFromOpWithResolver(context.Background(), resolver, itemUUID, "123456789")
 	if err != nil {
 		t.Fatalf("NewFromOpWithResolver: %v", err)
 	}
@@ -60,15 +71,30 @@ func TestNewFromOpWithResolver_ResolvesAndReturnsClient(t *testing.T) {
 	}
 }
 
-// TestNewFromOpWithResolver_AllThreeBots verifies the constructor works
-// with each of the three known Telegram bot item UUIDs.
+// testItemUUID is a syntactically valid 26-char item id that addresses
+// nothing. The real ids are supplied by the operator's environment and are
+// deliberately absent from this repository, so tests synthesise their own
+// rather than depending on an operator's actual vault.
+const testItemUUID = "aaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+// TestNewFromOpWithResolver_AllThreeBots verifies the constructor works for
+// each of the three Telegram bot items, resolved the way production resolves
+// them: through the environment variable that names the item.
 func TestNewFromOpWithResolver_AllThreeBots(t *testing.T) {
-	for _, uuid := range []string{
-		onepassword.TelegramBot1UUID,
-		onepassword.TelegramBot2UUID,
-		onepassword.TelegramBot3UUID,
+	for i, itemEnv := range []string{
+		onepassword.TelegramBot1ItemEnv,
+		onepassword.TelegramBot2ItemEnv,
+		onepassword.TelegramBot3ItemEnv,
 	} {
-		t.Run(uuid, func(t *testing.T) {
+		t.Run(itemEnv, func(t *testing.T) {
+			// Distinct per bot so a constructor that ignored its argument
+			// and always read bot 1 would still fail this test.
+			synthetic := string(rune('a'+i)) + testItemUUID[1:]
+			t.Setenv(itemEnv, synthetic)
+			uuid, err := onepassword.ResolveItem(itemEnv)
+			if err != nil {
+				t.Fatalf("ResolveItem(%s): %v", itemEnv, err)
+			}
 			wantToken := "tok:" + uuid
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`"` + wantToken + `"`))
@@ -118,7 +144,7 @@ func TestNewFromOpWithResolver_VaultErrorIsTransient(t *testing.T) {
 	defer func() { srv.Close() }()
 
 	resolver := newStubOpClient(t, srv.URL, "")
-	_, err := NewFromOpWithResolver(context.Background(), resolver, onepassword.TelegramBot1UUID, "999")
+	_, err := NewFromOpWithResolver(context.Background(), resolver, testItemUUID, "999")
 	if err == nil {
 		t.Fatal("expected error from vault 500")
 	}

@@ -24,8 +24,17 @@ import (
 // newStubOpClient returns an onepassword.Client pointed at the supplied
 // httptest server. The stub server's handler is invoked once per Resolve
 // call; tests assert on call counts.
+//
+// It also provisions the 1Password reference environment, because
+// ResolveSlackWebhook now reads the vault and item id from there rather than
+// from constants in the package. That is deliberately fail-closed: without
+// this the resolver errors before it reaches the stub server, which is
+// exactly what an unprovisioned host should experience. The fixtures address
+// nothing.
 func newStubOpClient(t *testing.T, srvURL, secret string) *onepassword.Client { //nolint:revive // unused-parameter required by interface
 	t.Helper()
+	t.Setenv(onepassword.VaultEnv, "test-vault")
+	t.Setenv(onepassword.SlackWebhookItemEnv, "dddddddddddddddddddddddddd")
 	return &onepassword.Client{
 		Token:    "fake-token-for-test",
 		Endpoint: srvURL,

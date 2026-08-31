@@ -8,7 +8,7 @@
 //     embed credentials in env files, k8s secrets, or argv — violating
 //     1password-uuid-required.mdc and no-shell-leak.mdc.
 //   - CF-2026-0708-010 + v14271-04: 3 Telegram bot tokens + 1 Slack webhook
-//     live in the HelixonSafe vault. The notify packages now load them
+//     live in the configured vault. The notify packages now load them
 //     through this resolver so the integration test (and any production
 //     call site) can construct a Telegram/Slack client from a 1Password
 //     item UUID alone.
@@ -25,12 +25,23 @@
 //     ResolveSlackWebhook) so call sites cannot accidentally swap bot
 //     tokens and webhook URLs.
 //
-// 1Password item inventory (v18654-4 / v18664-4):
+// 1Password references (v18793):
 //
-//	telegramBot1UUID = "gbqnlvhkop6lfsx4czf5gp6nga"   // Telegram Bot - Fleet Agent 1
-//	telegramBot2UUID = "czdbviw37zsfk7e23clly2bvw4"   // Telegram Bot - Fleet Agent 2
-//	telegramBot3UUID = "7plsotwmnuc4s3kevyvstaoqua"   // Telegram Bot - Cursor WSL1
-//	slackWebhookUUID = "ri4vhb25sijurxudb3ddjicsza"   // SENTRUX_SLACK_WEBHOOK
+//	This repository is PUBLIC, so the vault name and the notify items' UUIDs
+//	are NOT in this file. A vault plus a set of item ids is an internal map
+//	of the secret store -- not a secret in itself, since reading an item
+//	still needs vault access, but exactly what public-repo-gate exists to
+//	keep out. cmd/helixon-eval moved to this scheme in #90 and
+//	cmd/secrets-bootstrap alongside this change.
+//
+//	The operator supplies them at run time; ResolveVault and ResolveItem
+//	read and validate them:
+//
+//	  HLXN_OP_VAULT                    vault name, no default
+//	  HLXN_OP_ITEM_TELEGRAM_BOT1       Telegram Bot - Fleet Agent 1
+//	  HLXN_OP_ITEM_TELEGRAM_BOT2       Telegram Bot - Fleet Agent 2
+//	  HLXN_OP_ITEM_TELEGRAM_BOT3       Telegram Bot - Cursor WSL1
+//	  HLXN_OP_ITEM_SLACK_WEBHOOK       SENTRUX_SLACK_WEBHOOK
 package onepassword
 
 import (
@@ -58,20 +69,66 @@ var ErrInvalidUUID = errors.New("onepassword: item UUID required (use 26-char UU
 // ErrInvalidField is returned when the caller passes an empty field ID.
 var ErrInvalidField = errors.New("onepassword: field ID required")
 
-// Item UUIDs for the four notify-related items in HelixonSafe.
+// Environment variables naming the four notify-related items. These are
+// variable NAMES, never item ids: the id itself is supplied by the operator's
+// environment so it does not sit in a public repository.
 const (
-	// TelegramBot1UUID is the first Telegram bot token (Fleet Agent 1).
-	TelegramBot1UUID = "gbqnlvhkop6lfsx4czf5gp6nga"
-	// TelegramBot2UUID is the second Telegram bot token (Fleet Agent 2).
-	TelegramBot2UUID = "czdbviw37zsfk7e23clly2bvw4"
-	// TelegramBot3UUID is the third Telegram bot token (Cursor WSL1).
-	TelegramBot3UUID = "7plsotwmnuc4s3kevyvstaoqua"
-	// SlackWebhookUUID is the Slack Incoming Webhook URL item.
-	SlackWebhookUUID = "ri4vhb25sijurxudb3ddjicsza"
+	// TelegramBot1ItemEnv names the first Telegram bot token (Fleet Agent 1).
+	TelegramBot1ItemEnv = "HLXN_OP_ITEM_TELEGRAM_BOT1"
+	// TelegramBot2ItemEnv names the second Telegram bot token (Fleet Agent 2).
+	TelegramBot2ItemEnv = "HLXN_OP_ITEM_TELEGRAM_BOT2"
+	// TelegramBot3ItemEnv names the third Telegram bot token (Cursor WSL1).
+	TelegramBot3ItemEnv = "HLXN_OP_ITEM_TELEGRAM_BOT3"
+	// SlackWebhookItemEnv names the Slack Incoming Webhook URL item.
+	SlackWebhookItemEnv = "HLXN_OP_ITEM_SLACK_WEBHOOK"
+
+	// VaultEnv names the variable carrying the vault. There is deliberately
+	// no DefaultVault any more: a baked-in default is the internal map this
+	// indirection removes, and a WRONG default is worse than none -- it
+	// would address whatever vault happens to carry that name in the
+	// caller's account.
+	VaultEnv = "HLXN_OP_VAULT"
+
+	// ItemEnvPrefix is asserted by a regression test so a future constant
+	// cannot quietly reintroduce a literal id.
+	ItemEnvPrefix = "HLXN_OP_ITEM_"
+
+	// itemUUIDLen is the length of a 1Password item UUID. Checked so a
+	// display name -- which `op read` also accepts, and which discloses more
+	// than a UUID does -- cannot be substituted by accident.
+	itemUUIDLen = 26
 )
 
-// DefaultVault is the canonical vault for helixon-platform notify secrets.
-const DefaultVault = "HelixonSafe"
+// ResolveVault returns the configured vault name.
+//
+// Unset is an error rather than a fallback, for the reason on VaultEnv.
+func ResolveVault() (string, error) {
+	v := strings.TrimSpace(os.Getenv(VaultEnv))
+	if v == "" {
+		return "", fmt.Errorf("onepassword: %s is unset; export the vault name before resolving secrets", VaultEnv)
+	}
+	return v, nil
+}
+
+// ResolveItem returns the item id held by the named environment variable.
+//
+// The error reports a malformed value by LENGTH and never by value: these
+// errors reach logs, and an operator who pastes a bot token into
+// HLXN_OP_ITEM_* must not have it written to one.
+func ResolveItem(env string) (string, error) {
+	if env == "" {
+		return "", errors.New("onepassword: no environment variable named for this item")
+	}
+	id := strings.TrimSpace(os.Getenv(env))
+	if id == "" {
+		return "", fmt.Errorf("onepassword: %s is unset; export the 1Password item UUID", env)
+	}
+	if len(id) != itemUUIDLen {
+		return "", fmt.Errorf("onepassword: %s holds %d characters; expected a %d-character item UUID (display names are not accepted): %w",
+			env, len(id), itemUUIDLen, ErrInvalidUUID)
+	}
+	return id, nil
+}
 
 // Field names used in the Telegram and Slack 1Password items.
 //
@@ -185,10 +242,18 @@ func (c *Client) ResolveSecret(ctx context.Context, vault, itemUUID, fieldID str
 }
 
 // ResolveTelegramBotToken resolves a Telegram bot token from a Telegram bot
-// 1Password item UUID (e.g. TelegramBot1UUID). Field name is "password"
-// per BotFather's wire format (username=handle, password=token).
+// 1Password item UUID (obtain it with ResolveItem(TelegramBot1ItemEnv) or a
+// sibling). Field name is "password" per BotFather's wire format
+// (username=handle, password=token).
+//
+// The vault comes from the environment, so an unprovisioned caller gets a
+// named error here rather than a lookup against a vault this file guessed.
 func (c *Client) ResolveTelegramBotToken(ctx context.Context, itemUUID string) (string, error) {
-	return c.ResolveSecret(ctx, DefaultVault, itemUUID, FieldBotToken)
+	vault, err := ResolveVault()
+	if err != nil {
+		return "", err
+	}
+	return c.ResolveSecret(ctx, vault, itemUUID, FieldBotToken)
 }
 
 // ResolveSlackWebhook resolves the Slack incoming webhook URL from the
@@ -196,7 +261,15 @@ func (c *Client) ResolveTelegramBotToken(ctx context.Context, itemUUID string) (
 // value is not an https://hooks.slack.com/ URL — defence-in-depth against
 // accidentally resolving a non-Slack secret into the Slack client.
 func (c *Client) ResolveSlackWebhook(ctx context.Context) (string, error) {
-	url, err := c.ResolveSecret(ctx, DefaultVault, SlackWebhookUUID, FieldWebhookURL)
+	vault, err := ResolveVault()
+	if err != nil {
+		return "", err
+	}
+	itemUUID, err := ResolveItem(SlackWebhookItemEnv)
+	if err != nil {
+		return "", err
+	}
+	url, err := c.ResolveSecret(ctx, vault, itemUUID, FieldWebhookURL)
 	if err != nil {
 		return "", err
 	}
