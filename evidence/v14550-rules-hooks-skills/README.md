@@ -1,4 +1,4 @@
-# runx-public-repo-gate: allow-file fleet_host_alias,network_topology
+# runx-public-repo-gate: allow-file fleet_host_alias,network_topology,personal_path_id
 # Sprint v14550 — Cursor Rules Sweep + Hooks Sync
 
 ## Summary

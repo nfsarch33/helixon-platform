@@ -116,4 +116,4 @@ coverage 90.0%; all scores above 0.7 threshold.
 - Retro: `sprint-retros/v17809-eval-rubric.md`
 - Source: `internal/helixon-eval/tasks.go`
 - Tests: `internal/helixon-eval/{tasks,helpers,registry}_test.go`
-- Worktree: `/home/jason/runs/worktrees/helixon-platform/feat-v17809-eval-rubric`
+- Worktree: `/home/<operator>/runs/worktrees/helixon-platform/feat-v17809-eval-rubric`

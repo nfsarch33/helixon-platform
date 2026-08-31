@@ -1,3 +1,4 @@
+# runx-public-repo-gate: allow-file vendor_ref -- a ruleset names the things it detects
 # Custom Gitleaks ruleset (extends Gitleaks defaults).
 # Source of truth: cursor-global-kb/templates/gitleaks.toml (v18725-3).
 # Run: gitleaks detect --config .gitleaks.toml --source .

@@ -97,7 +97,7 @@ func TestAgent_ProcessToolCall(t *testing.T) {
 ### 3.1 Local
 
 ```bash
-cd /home/jason/helixon-platform
+cd /home/<operator>/helixon-platform
 go test -race -run TestAgent ./internal/helixon/...
 ```
 
