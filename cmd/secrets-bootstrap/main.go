@@ -13,33 +13,90 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
 )
 
-const version = "1.2.0"
+const version = "1.3.0"
+
+// The vault name and every item UUID are deliberately NOT in this file.
+// This repository is PUBLIC, and a vault name plus a set of item UUIDs is
+// an internal map of the secret store: it says which vault exists, which
+// items are in it, and what each one is for. Neither is a secret on its
+// own -- reading an item still requires vault access, and an item UUID is
+// an immutable identifier that cannot be rotated -- but the map is exactly
+// what the `public-repo-gate` job exists to keep out. cmd/helixon-eval
+// moved to this scheme in #90; this is the same change for the tool that
+// actually renders production credentials.
+//
+// The operator supplies them at run time:
+//
+//	HLXN_OP_VAULT            vault name, shared by every entry
+//	HLXN_OP_ITEM_<NAME>      26-char item UUID
+//	HLXN_OP_FIELD_<NAME>     field ID, only where the field must be
+//	                         referenced by ID rather than by label
+//
+// Both systemd units that invoke this tool load those from
+// %h/.config/helixon/op-items.env via a NON-optional EnvironmentFile, so a
+// host that has not been provisioned fails at unit start with a legible
+// systemd error instead of rendering a credential-free env file.
+const (
+	// vaultEnv names the variable carrying the 1Password vault.
+	//
+	// It has no default on purpose. A baked-in default is the internal map
+	// this indirection removes, and a WRONG default is worse than none: it
+	// would point `op read` at whatever vault happens to carry that name in
+	// the caller's account. Unset is a loud, immediate error.
+	vaultEnv = "HLXN_OP_VAULT"
+
+	// itemEnvPrefix / fieldEnvPrefix are asserted by a structural test so a
+	// future entry cannot quietly reintroduce a literal.
+	itemEnvPrefix  = "HLXN_OP_ITEM_"
+	fieldEnvPrefix = "HLXN_OP_FIELD_"
+
+	// opItemUUIDLen is the length of a 1Password item UUID. Enforced so a
+	// display name -- which `op read` also accepts, and which leaks more
+	// than a UUID does -- cannot be substituted by accident.
+	opItemUUIDLen = 26
+)
 
 type EnvEntry struct {
-	EnvVar  string
-	Vault   string
-	Item    string
-	Field   string
-	Extract string // if set, apply this regex to op-read notesPlain value (use first capture group)
+	EnvVar string
+	// ItemEnv is the NAME of the environment variable holding this entry's
+	// 26-char item UUID -- never the UUID itself.
+	//
+	// Entries that must resolve to the SAME 1Password item share one
+	// ItemEnv. That is load-bearing, not cosmetic: engramd's paid embedding
+	// fallback and minimax-quota's key 1 are the same item, and all three
+	// llm-cluster-router callers authenticate with the same bearer. Keying
+	// on the item's identity rather than on the destination variable name
+	// makes those couplings impossible to break by editing one site, and
+	// keeps the tests that pin them meaningful.
+	ItemEnv string
+	// FieldEnv, when set, names the variable holding a field ID. Used only
+	// where the field cannot be addressed by label; Field carries the
+	// literal label otherwise. A label is not an identifier, so labels stay
+	// in the file.
+	FieldEnv string
+	Field    string
+	Extract  string // if set, apply this regex to op-read notesPlain value (use first capture group)
 }
 
 var serviceMap = map[string][]EnvEntry{
 	"engramd": {
-		{EnvVar: "ENGRAM_EMBED_KEY", Vault: "HelixonSafe", Item: "ripotpfq43jzlreor4zo2ay734", Field: "api-key"},
+		{EnvVar: "ENGRAM_EMBED_KEY", ItemEnv: "HLXN_OP_ITEM_MINIMAX_1", Field: "api-key"},
 	},
 	"sprintboard-api": {
-		{EnvVar: "SPRINTBOARD_API_TOKEN", Vault: "HelixonSafe", Item: "w7uspwgtg4y5gh6m4fdnxtu6lu", Field: "password"},
+		{EnvVar: "SPRINTBOARD_API_TOKEN", ItemEnv: "HLXN_OP_ITEM_SPRINTBOARD", Field: "password"},
 	},
 	"llm-router": {
-		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
+		{EnvVar: "LLM_ROUTER_TOKEN", ItemEnv: "HLXN_OP_ITEM_LLM_ROUTER", Field: "password"},
 		// v18774: the router's minimax-m3 node now goes through the
 		// HelixChannel edge (auth_header: X-HLXN-Token in the router
 		// config) instead of straight to the provider. The config
@@ -47,10 +104,10 @@ var serviceMap = map[string][]EnvEntry{
 		// router REFUSES TO BOOT when an auth_header node's key
 		// expands empty -- this entry is load-bearing for llm-router
 		// startup, not an optional extra.
-		{EnvVar: "HELIXCHANNEL_GATEWAY_TOKEN", Vault: "HelixonSafe", Item: "w4lshnyh2yfzhvcyf6ezspyhv4", Field: "token"},
+		{EnvVar: "HELIXCHANNEL_GATEWAY_TOKEN", ItemEnv: "HLXN_OP_ITEM_HELIXCHANNEL_GATEWAY", Field: "token"},
 	},
 	"svcregistryd": {
-		{EnvVar: "SVCREGISTRY_TOKEN", Vault: "HelixonSafe", Item: "62ruxw2zud5fp7jpxgi2cgjb64", Field: "password"},
+		{EnvVar: "SVCREGISTRY_TOKEN", ItemEnv: "HLXN_OP_ITEM_SVCREGISTRY", Field: "password"},
 	},
 	// v18774: the fleet agent's provider is the local llm-cluster-router
 	// (openai-compat, base_url http://127.0.0.1:8787/v1), so the only
@@ -63,7 +120,7 @@ var serviceMap = map[string][]EnvEntry{
 	// on "api_key env var OPENAI_API_KEY is not set" without a single
 	// alert. A direct field read cannot drift the same way.
 	"fleet-agent": {
-		{EnvVar: "LLM_ROUTER_TOKEN", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
+		{EnvVar: "LLM_ROUTER_TOKEN", ItemEnv: "HLXN_OP_ITEM_LLM_ROUTER", Field: "password"},
 	},
 	// v18778: evospined (the EvoSpine DRL runtime) is the THIRD caller of
 	// the local llm-cluster-router, and the only one secrets-bootstrap did
@@ -90,7 +147,7 @@ var serviceMap = map[string][]EnvEntry{
 	// so a set-but-wrong key passes config validation and fails only
 	// per-request. Startup success proves nothing here.
 	"evospined": {
-		{EnvVar: "OPENAI_API_KEY", Vault: "HelixonSafe", Item: "hfri3ziy6cjfec4xha7wkfkkri", Field: "password"},
+		{EnvVar: "OPENAI_API_KEY", ItemEnv: "HLXN_OP_ITEM_LLM_ROUTER", Field: "password"},
 	},
 	// v18776: per-key MiniMax coding-plan quota polling. The collector
 	// (`helix-dev-tools minimax-quota`) labels its metrics by ORDINAL
@@ -103,21 +160,25 @@ var serviceMap = map[string][]EnvEntry{
 	// key 1 drains faster than keys 2 and 3, and a test pins it so the
 	// relationship cannot be broken by accident.
 	"minimax-quota": {
-		{EnvVar: "MINIMAX_API_KEY_1", Vault: "HelixonSafe", Item: "ripotpfq43jzlreor4zo2ay734", Field: "api-key"},
-		{EnvVar: "MINIMAX_API_KEY_2", Vault: "HelixonSafe", Item: "hblg7fxbhxnlmnv3us3i6jo2wu", Field: "api-key"},
-		{EnvVar: "MINIMAX_API_KEY_3", Vault: "HelixonSafe", Item: "jdxsktex2y2euuuul4g6r5e6fa", Field: "api-key"},
+		{EnvVar: "MINIMAX_API_KEY_1", ItemEnv: "HLXN_OP_ITEM_MINIMAX_1", Field: "api-key"},
+		{EnvVar: "MINIMAX_API_KEY_2", ItemEnv: "HLXN_OP_ITEM_MINIMAX_2", Field: "api-key"},
+		{EnvVar: "MINIMAX_API_KEY_3", ItemEnv: "HLXN_OP_ITEM_MINIMAX_3", Field: "api-key"},
 	},
 	// v18776: the Alertmanager-to-email bridge, which exists because the
 	// Slack webhook this fleet alerted through had been revoked and every
 	// notification failed silently for the whole retained journal.
 	//
-	// The Field here is a 1Password FIELD ID, not a label, and that is
+	// The field here is a 1Password FIELD ID, not a label, and that is
 	// deliberate: this item's field is labeled "api key" WITH A SPACE,
 	// and `op read op://vault/item/api key` cannot resolve a spaced
-	// label. The ID is stable and unambiguous. A test rejects any Field
-	// containing a space so this cannot regress.
+	// label. The ID is stable and unambiguous. A test rejects any resolved
+	// field containing a space so this cannot regress.
+	//
+	// Because that ID is a 26-char identifier like an item UUID, it moves
+	// to the environment too (FieldEnv) rather than sitting in a public
+	// file. Entries whose field is an ordinary label keep it inline.
 	"alert-notifier": {
-		{EnvVar: "RESEND_API_KEY", Vault: "HelixonSafe", Item: "pwjkp2gii6cnaqwwj4fmesdxd4", Field: "t6x353nppiwc4spgc4mkpjenyy"},
+		{EnvVar: "RESEND_API_KEY", ItemEnv: "HLXN_OP_ITEM_RESEND", FieldEnv: "HLXN_OP_FIELD_RESEND"},
 	},
 }
 
@@ -200,9 +261,47 @@ func dispatch(a cliArgs) int {
 }
 
 // printUsage emits the standard usage banner to the given writer.
+//
+// Rendered into one buffer and written once, rather than as ~20 separate
+// Fprint calls. Each of those is a separate unchecked error return, and a
+// banner is not worth twenty errcheck exemptions.
 func printUsage(w *os.File) {
-	fmt.Fprintln(w, "usage: secrets-bootstrap <vault> <item> <field> [--export VAR]")
-	fmt.Fprintln(w, "       secrets-bootstrap --service NAME --out FILE [--strict] [--list]")
+	var b strings.Builder
+	b.WriteString("usage: secrets-bootstrap <vault> <item> <field> [--export VAR]\n")
+	b.WriteString("       secrets-bootstrap --service NAME --out FILE [--strict] [--list]\n\n")
+	b.WriteString("--service mode resolves its 1Password references from the environment.\n")
+	b.WriteString("Tell the operator what to export rather than making them read the source:\n\n")
+	fmt.Fprintf(&b, "  %s\n", vaultEnv)
+	b.WriteString("      1Password vault name, shared by every entry. No default.\n")
+	fmt.Fprintf(&b, "  %s<NAME>\n", itemEnvPrefix)
+	fmt.Fprintf(&b, "      %d-character item UUID. Entries that must resolve to the same\n", opItemUUIDLen)
+	b.WriteString("      item share one variable.\n")
+	fmt.Fprintf(&b, "  %s<NAME>\n", fieldEnvPrefix)
+	b.WriteString("      Field ID, only where the field cannot be addressed by label.\n\n")
+	b.WriteString("The variables each service needs, in the form it needs them:\n")
+	for _, name := range sortedServiceNames() {
+		fmt.Fprintf(&b, "  %s:\n", name)
+		for _, e := range serviceMap[name] {
+			if e.FieldEnv != "" {
+				fmt.Fprintf(&b, "      %s <- %s + %s\n", e.EnvVar, e.ItemEnv, e.FieldEnv)
+				continue
+			}
+			fmt.Fprintf(&b, "      %s <- %s (field %q)\n", e.EnvVar, e.ItemEnv, e.Field)
+		}
+	}
+	_, _ = io.WriteString(w, b.String())
+}
+
+// sortedServiceNames gives the usage banner and --list a stable order.
+// Ranging a map directly made both outputs reorder between runs, which
+// turns any diff of them into noise.
+func sortedServiceNames() []string {
+	names := make([]string, 0, len(serviceMap))
+	for name := range serviceMap {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // printValueAndExport emits the secret value and optional export statement.
@@ -215,9 +314,56 @@ func printValueAndExport(val, exportVar string) {
 
 // listServiceNames prints all known service names to stdout (extracted for testability).
 func listServiceNames() {
-	for name := range serviceMap {
+	for _, name := range sortedServiceNames() {
 		fmt.Println(name)
 	}
+}
+
+// resolveEntryRef turns an EnvEntry's env-var NAMES into the concrete
+// vault/item/field triple, validating as it goes.
+//
+// Every error here is a CONFIGURATION error -- an operator who has not
+// provisioned %h/.config/helixon/op-items.env, or who exported a display
+// name where a UUID belongs. That is categorically different from an
+// op-read failure, which can be a transient vault problem, and the two are
+// handled differently on purpose: see bootstrapServiceEnv.
+//
+// Errors report the offending value by LENGTH and never by value. An
+// operator who pastes an API key into HLXN_OP_ITEM_* must not have it
+// echoed into the env file, the journal, or stderr.
+func resolveEntryRef(e *EnvEntry) (vault, item, field string, err error) {
+	vault = strings.TrimSpace(os.Getenv(vaultEnv))
+	if vault == "" {
+		return "", "", "", fmt.Errorf("%s is unset; export the 1Password vault name (see %%h/.config/helixon/op-items.env)", vaultEnv)
+	}
+	if e.ItemEnv == "" {
+		return "", "", "", fmt.Errorf("entry %s has no ItemEnv; every entry must name the variable carrying its item UUID", e.EnvVar)
+	}
+	item = strings.TrimSpace(os.Getenv(e.ItemEnv))
+	if item == "" {
+		return "", "", "", fmt.Errorf("%s is unset; export the 1Password item UUID for %s", e.ItemEnv, e.EnvVar)
+	}
+	if len(item) != opItemUUIDLen {
+		return "", "", "", fmt.Errorf("%s holds %d characters; expected a %d-character 1Password item UUID (display names are not accepted)",
+			e.ItemEnv, len(item), opItemUUIDLen)
+	}
+
+	field = e.Field
+	if e.FieldEnv != "" {
+		field = strings.TrimSpace(os.Getenv(e.FieldEnv))
+		if field == "" {
+			return "", "", "", fmt.Errorf("%s is unset; export the 1Password field ID for %s", e.FieldEnv, e.EnvVar)
+		}
+	}
+	if field == "" {
+		return "", "", "", fmt.Errorf("entry %s resolves to an empty field", e.EnvVar)
+	}
+	if strings.ContainsAny(field, " \t") {
+		// `op read op://vault/item/api key` cannot resolve a spaced label;
+		// the field ID must be used instead.
+		return "", "", "", fmt.Errorf("entry %s resolves to a field containing whitespace; use the field ID, not the label", e.EnvVar)
+	}
+	return vault, item, field, nil
 }
 
 func opRead(vault, item, field string, timeoutSec int) (string, error) {
@@ -316,9 +462,21 @@ func bootstrapServiceEnv(name, outPath string, timeoutSec int, strict bool) erro
 	fmt.Fprintf(w, "# Generated by secrets-bootstrap %s at %s for service %q\n", version, time.Now().UTC().Format(time.RFC3339), name)
 	var unresolved []string
 	for _, e := range entries {
-		line := formatEnvLine(e, timeoutSec)
-		// formatEnvLine signals failure by returning a comment line
-		// rather than an assignment; that is the only signal available
+		line, cfgErr := formatEnvLine(e, timeoutSec)
+		if cfgErr != nil {
+			// A missing or malformed item reference means this host was
+			// never provisioned. Publishing a partial file here is how the
+			// last outage stayed invisible: the unit's ExecStartPre would
+			// be satisfied and the service would start with no credential.
+			// Fail closed, leave nothing behind, and name the variable.
+			_ = w.Flush()
+			_ = f.Close()
+			_ = os.Remove(tmpPath)
+			fmt.Fprintf(os.Stderr, "config: %s: %v\n", name, redact(cfgErr.Error()))
+			return fmt.Errorf("config: %s: %w", name, cfgErr)
+		}
+		// formatEnvLine signals a failed op read by returning a comment
+		// line rather than an assignment; that is the only signal available
 		// without changing its contract, which other callers rely on.
 		if strings.HasPrefix(line, "# ") {
 			unresolved = append(unresolved, e.EnvVar)
@@ -365,13 +523,24 @@ func resolveField(field string) string {
 // formatEnvLine renders a single EnvEntry as a quoted KEY="value" line (or a
 // "# KEY=<unavailable>" comment when the op read fails). Exposed for tests
 // that do not want to call opRead for real.
-func formatEnvLine(e EnvEntry, timeoutSec int) string {
-	val, err := opRead(e.Vault, e.Item, resolveField(e.Field), timeoutSec)
+//
+// The returned error is non-nil ONLY for a configuration error -- an
+// unresolvable item reference. That is fatal for the whole run regardless
+// of --strict, because it means the host was never provisioned: retrying
+// cannot fix it, and every other entry in the service will fail the same
+// way. A failed op read is NOT fatal here; it keeps the pre-existing
+// comment-line behaviour that --strict governs.
+func formatEnvLine(e EnvEntry, timeoutSec int) (string, error) {
+	vault, item, field, err := resolveEntryRef(&e)
+	if err != nil {
+		return "", err
+	}
+	val, err := opRead(vault, item, resolveField(field), timeoutSec)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "skip %s: %v\n", e.EnvVar, redact(err.Error()))
-		return fmt.Sprintf("# %s=<unavailable: %s>\n", e.EnvVar, redact(err.Error()))
+		return fmt.Sprintf("# %s=<unavailable: %s>\n", e.EnvVar, redact(err.Error())), nil
 	}
-	return formatEnvLineFromValue(e, val)
+	return formatEnvLineFromValue(e, val), nil
 }
 
 // formatEnvLineFromValue renders the env line given a successfully read value.

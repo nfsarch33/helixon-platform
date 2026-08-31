@@ -21,12 +21,14 @@ import (
 
 // NewFromOp resolves a Telegram bot token from 1Password and returns a
 // fully-configured Client. The supplied item UUID must be one of the
-// Telegram bot items in the HelixonSafe vault
-// (onepassword.TelegramBot1UUID / Bot2UUID / Bot3UUID).
+// Telegram bot items in the configured vault, obtained via
+// onepassword.ResolveItem(onepassword.TelegramBot1ItemEnv) or a sibling.
+// The ids come from the environment, not from this repository.
 //
 // Example:
 //
-//	tg, err := telegram.NewFromOp(ctx, onepassword.TelegramBot1UUID, "123456789")
+//	itemUUID, _ := onepassword.ResolveItem(onepassword.TelegramBot1ItemEnv)
+//	tg, err := telegram.NewFromOp(ctx, itemUUID, "123456789")
 //	if err != nil { return err }
 //	err = tg.SendMessage(ctx, "Hello from Helixon!")
 //

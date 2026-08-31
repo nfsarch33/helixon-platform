@@ -5,7 +5,8 @@
 //
 // Usage:
 //
-//	tg, err := telegram.NewFromOp("gbqnlvhkop6lfsx4czf5gp6nga")
+//	itemUUID, _ := onepassword.ResolveItem(onepassword.TelegramBot1ItemEnv)
+//	tg, err := telegram.NewFromOp(ctx, itemUUID, chatID)
 //	err = tg.SendMessage(ctx, "Hello from Helixon!")
 package telegram
 

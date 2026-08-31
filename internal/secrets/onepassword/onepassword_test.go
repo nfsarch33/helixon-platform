@@ -9,10 +9,13 @@
 // the full 26-character UUID, never the display name. The known UUIDs
 // (v18654-4 inventory):
 //
-//   - gbqnlvhkop6lfsx4czf5gp6nga — Telegram Bot - Fleet Agent 1
-//   - czdbviw37zsfk7e23clly2bvw4 — Telegram Bot - Fleet Agent 2
-//   - 7plsotwmnuc4s3kevyvstaoqua — Telegram Bot - Cursor WSL1
-//   - ri4vhb25sijurxudb3ddjicsza — SENTRUX_SLACK_WEBHOOK
+//   - HLXN_OP_ITEM_TELEGRAM_BOT1 — Telegram Bot - Fleet Agent 1
+//   - HLXN_OP_ITEM_TELEGRAM_BOT2 — Telegram Bot - Fleet Agent 2
+//   - HLXN_OP_ITEM_TELEGRAM_BOT3 — Telegram Bot - Cursor WSL1
+//   - HLXN_OP_ITEM_SLACK_WEBHOOK — SENTRUX_SLACK_WEBHOOK
+//
+// The ids themselves are supplied by the operator environment; these tests
+// use synthetic 26-char fixtures that address nothing.
 //
 // Item field conventions (verified by `op item get <uuid>`):
 //
@@ -31,6 +34,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -49,8 +55,16 @@ type fakeOpServer struct {
 
 // newFakeServer returns an httptest.Server that emulates the SDK's Resolve
 // HTTP boundary. The resolver under test should hit it once per Resolve call.
+// newFakeServer also provisions the reference environment. The typed helpers
+// (ResolveTelegramBotToken, ResolveSlackWebhook) now read the vault and the
+// Slack item id from there instead of from package constants, so an
+// unprovisioned test fails before it reaches this server -- which is the
+// behaviour an unprovisioned host gets, and the reason it is set explicitly
+// rather than defaulted. Both fixtures address nothing.
 func newFakeServer(t *testing.T, expectedVault, expectedItem, expectedField, secret string, forceErr error) (*httptest.Server, *fakeOpServer) { //nolint:revive // unused-parameter required by interface
 	t.Helper()
+	t.Setenv(VaultEnv, expectedVault)
+	t.Setenv(SlackWebhookItemEnv, slackWebhookUUID)
 	fs := &fakeOpServer{forceError: forceErr}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:revive // unused-parameter required by interface
 		fs.mu.Add(1)
@@ -88,10 +102,10 @@ func withFakeOpClient(t *testing.T, endpoint string) *Client {
 // vault/item/field tuple resolves to the underlying secret string.
 func TestResolveSecret_ReturnsSecretFromVault(t *testing.T) {
 	const want = "123456789:AAG-real-bot-token"
-	srv, fs := newFakeServer(t, "HelixonSafe", "gbqnlvhkop6lfsx4czf5gp6nga", "password", want, nil)
+	srv, fs := newFakeServer(t, "test-vault", "aaaaaaaaaaaaaaaaaaaaaaaaaa", "password", want, nil)
 	c := withFakeOpClient(t, srv.URL)
 
-	got, err := c.ResolveSecret(context.Background(), "HelixonSafe", "gbqnlvhkop6lfsx4czf5gp6nga", "password")
+	got, err := c.ResolveSecret(context.Background(), "test-vault", "aaaaaaaaaaaaaaaaaaaaaaaaaa", "password")
 	if err != nil {
 		t.Fatalf("ResolveSecret: %v", err)
 	}
@@ -108,7 +122,7 @@ func TestResolveSecret_ReturnsSecretFromVault(t *testing.T) {
 // 1password-uuid-required rule).
 func TestResolveSecret_EmptyItemUUIDReturnsError(t *testing.T) {
 	c := &Client{Token: "fake"}
-	_, err := c.ResolveSecret(context.Background(), "HelixonSafe", "", "password")
+	_, err := c.ResolveSecret(context.Background(), "test-vault", "", "password")
 	if err == nil {
 		t.Fatal("expected error for empty item UUID")
 	}
@@ -121,7 +135,7 @@ func TestResolveSecret_EmptyItemUUIDReturnsError(t *testing.T) {
 // are rejected (defence-in-depth for the @-in-field rule).
 func TestResolveSecret_EmptyFieldReturnsError(t *testing.T) {
 	c := &Client{Token: "fake"}
-	_, err := c.ResolveSecret(context.Background(), "HelixonSafe", "ri4vhb25sijurxudb3ddjicsza", "")
+	_, err := c.ResolveSecret(context.Background(), "test-vault", "dddddddddddddddddddddddddd", "")
 	if err == nil {
 		t.Fatal("expected error for empty field")
 	}
@@ -130,10 +144,10 @@ func TestResolveSecret_EmptyFieldReturnsError(t *testing.T) {
 // TestResolveSecret_VaultNetworkErrorIsTransient verifies that HTTP failures
 // surface as a typed error the caller can wrap with ErrTransient / retry.
 func TestResolveSecret_VaultNetworkErrorIsTransient(t *testing.T) {
-	srv, _ := newFakeServer(t, "HelixonSafe", "ri4vhb25sijurxudb3ddjicsza", "webhook_url", "", errors.New("vault unreachable"))
+	srv, _ := newFakeServer(t, "test-vault", "dddddddddddddddddddddddddd", "webhook_url", "", errors.New("vault unreachable"))
 	c := withFakeOpClient(t, srv.URL)
 
-	_, err := c.ResolveSecret(context.Background(), "HelixonSafe", "ri4vhb25sijurxudb3ddjicsza", "webhook_url")
+	_, err := c.ResolveSecret(context.Background(), "test-vault", "dddddddddddddddddddddddddd", "webhook_url")
 	if err == nil {
 		t.Fatal("expected error on vault failure")
 	}
@@ -149,7 +163,7 @@ func TestResolveSecret_VaultNetworkErrorIsTransient(t *testing.T) {
 func TestResolveSecret_UsesFullUUIDNotDisplayName(t *testing.T) {
 	c := &Client{Token: "fake"}
 	// Display names are rejected; only 26-character UUIDs pass.
-	_, err := c.ResolveSecret(context.Background(), "HelixonSafe", "Telegram Bot - Fleet Agent 1", "password")
+	_, err := c.ResolveSecret(context.Background(), "test-vault", "Telegram Bot - Fleet Agent 1", "password")
 	if err == nil {
 		t.Fatal("expected error for display name (must use UUID)")
 	}
@@ -163,15 +177,15 @@ func TestResolveSecret_UsesFullUUIDNotDisplayName(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 const (
-	telegramBot1UUID = "gbqnlvhkop6lfsx4czf5gp6nga"
-	telegramBot2UUID = "czdbviw37zsfk7e23clly2bvw4"
-	telegramBot3UUID = "7plsotwmnuc4s3kevyvstaoqua"
-	slackWebhookUUID = "ri4vhb25sijurxudb3ddjicsza"
+	telegramBot1UUID = "aaaaaaaaaaaaaaaaaaaaaaaaaa"
+	telegramBot2UUID = "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+	telegramBot3UUID = "cccccccccccccccccccccccccc"
+	slackWebhookUUID = "dddddddddddddddddddddddddd"
 )
 
 func TestResolveTelegramBotToken_ReturnsPasswordField(t *testing.T) {
 	const want = "999:AAHbypass-tok"
-	srv, _ := newFakeServer(t, "HelixonSafe", telegramBot1UUID, "password", want, nil)
+	srv, _ := newFakeServer(t, "test-vault", telegramBot1UUID, "password", want, nil)
 	c := withFakeOpClient(t, srv.URL)
 
 	got, err := c.ResolveTelegramBotToken(context.Background(), telegramBot1UUID)
@@ -189,7 +203,7 @@ func TestResolveTelegramBotToken_ThreeBotsAllResolvable(t *testing.T) {
 	for _, uuid := range []string{telegramBot1UUID, telegramBot2UUID, telegramBot3UUID} {
 		t.Run(uuid, func(t *testing.T) {
 			want := "tok:" + uuid
-			srv, _ := newFakeServer(t, "HelixonSafe", uuid, "password", want, nil)
+			srv, _ := newFakeServer(t, "test-vault", uuid, "password", want, nil)
 			c := withFakeOpClient(t, srv.URL)
 
 			got, err := c.ResolveTelegramBotToken(context.Background(), uuid)
@@ -209,7 +223,7 @@ func TestResolveTelegramBotToken_ThreeBotsAllResolvable(t *testing.T) {
 
 func TestResolveSlackWebhook_ReturnsWebhookURLField(t *testing.T) {
 	const want = "https://hooks.slack.com/services/T000/B000/XXX"
-	srv, _ := newFakeServer(t, "HelixonSafe", slackWebhookUUID, "webhook_url", want, nil)
+	srv, _ := newFakeServer(t, "test-vault", slackWebhookUUID, "webhook_url", want, nil)
 	c := withFakeOpClient(t, srv.URL)
 
 	got, err := c.ResolveSlackWebhook(context.Background())
@@ -225,7 +239,7 @@ func TestResolveSlackWebhook_ReturnsWebhookURLField(t *testing.T) {
 // expected https://hooks.slack.com/ prefix per the slack package validation.
 func TestResolveSlackWebhook_RejectsNonHTTPS(t *testing.T) {
 	const bad = "http://hooks.slack.com/services/T000/B000/XXX"
-	srv, _ := newFakeServer(t, "HelixonSafe", slackWebhookUUID, "webhook_url", bad, nil)
+	srv, _ := newFakeServer(t, "test-vault", slackWebhookUUID, "webhook_url", bad, nil)
 	c := withFakeOpClient(t, srv.URL)
 
 	_, err := c.ResolveSlackWebhook(context.Background())
@@ -268,5 +282,93 @@ func TestNewClient_AcceptsNonEmptyToken(t *testing.T) {
 	}
 	if c.Token == "" {
 		t.Fatal("client token should be populated")
+	}
+}
+
+// TestPackageCarriesNoSecretStoreMap is the regression guard for v18793.
+//
+// It is structural -- no literal 26-char id, no vault name anywhere in the
+// package's own source -- rather than a denylist of the four ids removed.
+// A denylist would have to re-commit them to a PUBLIC repository inside the
+// very test that guards against them, which is the trap this whole change
+// exists to get out of.
+func TestPackageCarriesNoSecretStoreMap(t *testing.T) {
+	uuidLike := regexp.MustCompile(`"[a-z0-9]{26}"`)
+	// Assembled from fragments on purpose. Written as plain literals, these
+	// patterns match THEMSELVES -- this file is one of the files scanned --
+	// and the guard reports a leak that is only its own source. That is the
+	// same self-match that makes a scanner trip over its own rule set.
+	vaultLike := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)` + "helixon" + `\s*` + "safe"),
+		regexp.MustCompile(`(?i)` + "cursor" + "_" + "ironclaw"),
+	}
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("read package dir: %v", err)
+	}
+	var scanned int
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") {
+			continue
+		}
+		b, readErr := os.ReadFile(name) //nolint:gosec // package-local .go files
+		if readErr != nil {
+			t.Fatalf("read %s: %v", name, readErr)
+		}
+		scanned++
+		// The synthetic fixtures are a run of one repeated character. A real
+		// 1Password id is not, so allowing them costs nothing.
+		for _, m := range uuidLike.FindAllString(string(b), -1) {
+			id := strings.Trim(m, `"`)
+			if strings.Count(id, string(id[0])) == len(id) {
+				continue // synthetic fixture, e.g. "aaaa...a"
+			}
+			t.Errorf("%s carries a literal 26-char id %q; item ids must come from %s*", name, m, ItemEnvPrefix)
+		}
+		for _, re := range vaultLike {
+			if re.Match(b) {
+				t.Errorf("%s carries a vault name literal (%s); the vault must come from %s", name, re, VaultEnv)
+			}
+		}
+	}
+	// Without this the test would pass vacuously if the directory walk broke.
+	if scanned == 0 {
+		t.Fatal("scanned no .go files; the guard proved nothing")
+	}
+}
+
+// TestResolveItem_ErrorNeverEchoesValue: these errors reach logs. An operator
+// who pastes a bot token into HLXN_OP_ITEM_* must have it reported by LENGTH,
+// never by value.
+func TestResolveItem_ErrorNeverEchoesValue(t *testing.T) {
+	const pastedSecret = "1234567890:AAH-this-is-a-real-looking-bot-token"
+	t.Setenv(TelegramBot1ItemEnv, pastedSecret)
+
+	_, err := ResolveItem(TelegramBot1ItemEnv)
+	if err == nil {
+		t.Fatal("expected an error for a non-UUID item reference")
+	}
+	if strings.Contains(err.Error(), pastedSecret) {
+		t.Errorf("error echoes the value into the log: %v", err)
+	}
+	if !strings.Contains(err.Error(), strconv.Itoa(len(pastedSecret))) {
+		t.Errorf("error should report the observed length so the operator can debug, got: %v", err)
+	}
+	if !errors.Is(err, ErrInvalidUUID) {
+		t.Errorf("error should wrap ErrInvalidUUID so callers can classify it, got: %v", err)
+	}
+}
+
+// TestResolveVault_NoDefault: a baked-in default is the map this change
+// removes, and a wrong one would address whatever vault carries that name in
+// the caller's account.
+func TestResolveVault_NoDefault(t *testing.T) {
+	t.Setenv(VaultEnv, "")
+	if _, err := ResolveVault(); err == nil {
+		t.Fatal("an unset vault must be an error; there must be no default")
+	} else if !strings.Contains(err.Error(), VaultEnv) {
+		t.Errorf("error must name %s so the operator knows what to export, got: %v", VaultEnv, err)
 	}
 }
