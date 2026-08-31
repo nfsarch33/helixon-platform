@@ -144,18 +144,54 @@ description = "v18790: AWS access key ID only, no secret access key anywhere in 
 targetRules = ["aws-access-token", "aws-access-key"]
 paths = ['''^evidence/v14568-slack-webhook/1p-items\.json$''']
 
+# Finding 8: a bearer token in a v14571 evidence capture of a fleet-agent
+# environment file, for a third-party AI gateway the organisation no longer
+# uses.
+#
+# Closed on 2026-08-31 by operator decision, as an accepted exception rather
+# than a rewrite. The gateway is not reachable from the public internet -- it
+# sits behind that vendor's VPN -- and the organisation has since stopped using
+# the vendor, so the recorded value cannot be exercised by a reader of this
+# repository. The value is not present at HEAD: the file was redacted in v18721
+# and only the historical blob matches.
+#
+# History was deliberately NOT rewritten. A filter-repo pass would change every
+# commit id after the capture -- breaking existing clones, pinned deployment
+# revisions and any commit cited in an ADR -- and it would not un-publish
+# anything, because unreachable objects stay fetchable by id until the host
+# garbage-collects them. Rewriting buys nothing here that the network boundary
+# does not already provide.
+#
+# Scoped to this single path, deliberately not a fingerprint: a fingerprint is
+# commit:file:rule:line and stops matching at the next commit that shifts the
+# line, silently un-suppressing the finding. Both rules stay live everywhere
+# else in the tree, so the same token shape committed anywhere other than this
+# one evidence file still fails the gate.
+#
+# TWO rules are named, and the second is not redundant. That line is matched by
+# the bespoke zdai-bearer rule AND by the default generic-api-key entropy rule.
+# Suppressing only zdai-bearer moves the finding rather than closing it: the
+# scan still reports one finding, on the same file and the same line, under the
+# other rule. Measured -- before: 1 zdai-bearer, after zdai-bearer alone: 1
+# generic-api-key, identical path and line. Compare the finding SET, never the
+# count; the count is 1 either way and hides the swap.
+[[allowlists]]
+description = "v18790: historical evidence capture for a decommissioned third-party AI gateway; accepted 2026-08-31, history deliberately not rewritten"
+targetRules = ["zdai-bearer", "generic-api-key"]
+paths = ['''^evidence/v14571-fleet-agent-live/fleet-agent\.env$''']
+
 # ---------------------------------------------------------------------------
-# ONE FINDING IS DELIBERATELY NOT SUPPRESSED.
+# EVERY PUBLISHED FINDING IS NOW ACCOUNTED FOR.
 #
-# It is a true positive awaiting remediation, so it is left to fail the gate.
-# Suppressing it would convert unfinished remediation into a green check, which
-# is the failure this whole file exists to prevent.
+# The five entries above cover all eight findings the repaired gate reported,
+# and every one of them is rule+path scoped, so this file suppresses named
+# findings on named paths and nothing else. Before adding another: confirm the
+# finding against a PRISTINE CLONE, never a developer checkout, and never add a
+# suppression for a credential that is still exercisable -- that converts
+# unfinished remediation into a green check, which is the failure this file
+# exists to prevent.
 #
-# Details are deliberately not recorded here: this repository is public, and a
-# comment naming the path and commit of an unremediated finding is a signpost
-# that outlives the fix. Run the scan to see it, and track the remediation in
-# the private tracker rather than in this file.
-#
-# When it is remediated, replace this note with a rule+path entry above that
-# records the date and who confirmed it -- not a fingerprint.
+# Details of any unremediated finding stay out of this file: the repository is
+# public, and a comment naming the path and commit of one is a signpost that
+# outlives the fix. Track those in the private tracker instead.
 # ---------------------------------------------------------------------------
