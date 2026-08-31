@@ -11,9 +11,19 @@
 #   - gh-pat          : github_pat_*/gh[pour]_*_... variants
 #   - openai-anthropic: sk- prefixed keys (OpenAI/Anthropic/MiniMax)
 #
-# All rules are allowlistable via .gitleaksignore using the *fingerprint* hash,
-# never the rule ID. Never blanket-suppress entire files unless they are
-# genuine test fixtures with synthetic secrets.
+# HOW TO SUPPRESS A VERIFIED FALSE POSITIVE (revised v18790)
+#
+# Use a rule+path scoped [[allowlists]] entry in this file. Do NOT use
+# .gitleaksignore fingerprints: a gitleaks fingerprint is
+# "<commit>:<path>:<rule>:<line>", so it is invalidated by the very next commit
+# that shifts the line, or by any history rewrite. The entry then stops matching
+# and the finding silently returns -- or, worse, the stale line keeps a real
+# finding suppressed at a line number that now holds different content.
+#
+# Every entry below states which of the 8 published findings it covers and why
+# that value is not a credential. "It is in a test" is not a rationale; "the
+# value is 22 characters of zeroes and the test asserts it is REJECTED" is.
+# Never blanket-suppress a path without naming the rule it applies to.
 
 [extend]
 useDefault = true
@@ -53,3 +63,99 @@ id = "openai-anthropic"
 description = "OpenAI / Anthropic / MiniMax-style API key"
 regex = '''sk-(live-|test-)?[A-Za-z0-9]{20,}'''
 tags = ["secret", "llm"]
+
+# ---------------------------------------------------------------------------
+# Triage of the published history (v18790)
+#
+# Once the download defect was fixed the full-history scan reported 8 findings
+# over 4 commits reachable from main. Each was classified against the blob as it
+# exists in history -- not as it reads at HEAD, because later sanitisation
+# commits redacted these files in place and HEAD therefore says nothing about
+# what is published.
+#
+# Seven are allowlisted below. The eighth is a real credential and is
+# deliberately NOT suppressed; see the note at the end of this file.
+#
+# A caution for whoever extends this list: scanning a developer checkout
+# reports far more than this. That object store carries filter-branch backups
+# under refs/original/* plus unpushed branches and tags, and gitleaks walks
+# refs. Measured on one workstation the same scan reported 90 findings against
+# 8 in a fresh clone. Confirm against a pristine clone before adding an entry,
+# or you will be allowlisting paths the public repository does not contain.
+# ---------------------------------------------------------------------------
+
+# Findings 1-3: synthetic Slack tokens and an idempotency key in unit tests.
+#
+# bot_test.go pins that an app-level token is REJECTED -- the table entry is
+# {"app-level token rejected", ..., ErrAppLevelToken} -- so the value exists
+# precisely to be refused. Both fixtures are structurally incapable of being
+# real: 22 and 32 characters against a genuine xapp- token's ~60, with bodies of
+# literal zeroes ("xapp-1-A0-000-...", "xapp-1-A000-00...").
+#
+# The generic-api-key hit in slack_cli_test.go is not a token at all: it is the
+# argument to --idempotency-key, a sprint identifier that trips the default
+# entropy rule. Scoped to generic-api-key so a real xapp-/xoxb- token committed
+# to this file would still be caught by slack-app-token.
+[[allowlists]]
+description = "v18790: synthetic Slack app tokens asserted to be rejected (cmd/notify + internal/notify/slack tests)"
+targetRules = ["slack-app-token"]
+paths = [
+  '''^cmd/notify/slack_cli_test\.go$''',
+  '''^internal/notify/slack/bot_test\.go$''',
+]
+
+[[allowlists]]
+description = "v18790: --idempotency-key sprint identifier in a CLI test, not a credential"
+targetRules = ["generic-api-key"]
+paths = ['''^cmd/notify/slack_cli_test\.go$''']
+
+# Findings 4-6: a GitLab runner token PREFIX and the token's SHA-256, recorded
+# deliberately as evidence that the token was reachable, in place of the token.
+#
+# The evidence states the token is 56 characters; what is published is the first
+# ~20-23 of them plus token_sha256. A 20-character prefix leaves ~36 characters
+# unknown, so the token is not recoverable, and a SHA-256 is a digest, not a
+# credential. TruffleHog's Gitlab detector does fire on the fragment and does
+# NOT verify it, which is the expected result for a partial token.
+#
+# Scoped to generic-api-key on purpose: glrt-runner is left live against these
+# paths, so if a FULL token is ever committed here it still fails the gate.
+[[allowlists]]
+description = "v18790: 20-of-56-char glrt prefix and token_sha256 digest recorded as evidence; glrt-runner rule stays live on these paths"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^evidence/v14565-runner-online/README\.md$''',
+  '''^evidence/v14565-runner-online/runner-status\.json$''',
+]
+
+# Finding 7: an AWS access key ID with no secret access key.
+#
+# This is the additional_information field of a 1Password item listing, which
+# renders an item's username -- here an IAM access key ID. A key ID is an
+# identifier, not a credential; it is unusable without the secret access key,
+# and a search of every commit reachable from main for a secret-access-key
+# shaped value alongside it returns zero matches. (The only other AKIA in the
+# history is AKIAIOSFODNN7EXAMPLE, AWS's own documentation placeholder.)
+#
+# Rotating the key pair is still worthwhile hygiene -- a published key ID names
+# a live IAM principal -- but it is not a disclosure of secret material.
+[[allowlists]]
+description = "v18790: AWS access key ID only, no secret access key anywhere in history; identifier not credential"
+targetRules = ["aws-access-token", "aws-access-key"]
+paths = ['''^evidence/v14568-slack-webhook/1p-items\.json$''']
+
+# ---------------------------------------------------------------------------
+# ONE FINDING IS DELIBERATELY NOT SUPPRESSED.
+#
+# It is a true positive awaiting remediation, so it is left to fail the gate.
+# Suppressing it would convert unfinished remediation into a green check, which
+# is the failure this whole file exists to prevent.
+#
+# Details are deliberately not recorded here: this repository is public, and a
+# comment naming the path and commit of an unremediated finding is a signpost
+# that outlives the fix. Run the scan to see it, and track the remediation in
+# the private tracker rather than in this file.
+#
+# When it is remediated, replace this note with a rule+path entry above that
+# records the date and who confirmed it -- not a fingerprint.
+# ---------------------------------------------------------------------------
