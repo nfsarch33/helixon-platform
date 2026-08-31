@@ -37,8 +37,23 @@ ANNOTATION_SCAN_LINES="${PUBLIC_REPO_GATE_HEADER_LINES:-5}"
 cd "$ROOT" 2>/dev/null || { echo "::error::gate cannot enter ${ROOT}"; exit 2; }
 command -v grep >/dev/null 2>&1 || { echo "::error::grep unavailable"; exit 2; }
 
+# This list is the gate's blast radius. A file whose extension is absent is
+# not scanned at all, and therefore can never produce a finding -- which is a
+# different and quieter failure than a pattern that does not match.
+#
+# .csv/.tsv were missing until v18792, and a 70-row export of the secret
+# store's item inventory sat under evidence/ for seven weeks without ever
+# reaching this gate. The sibling .json export from the same sprint HAD been
+# sanitised, because .json was on this list: the scrub tracked the scanner
+# rather than the risk. Adding a data format here is cheap; leaving one out is
+# silent, so prefer adding.
+#
+# Tabular exports are exactly the shape an inventory takes, which is why they
+# are worth scanning even though today's RULES are unlikely to match one --
+# see the note on secret_ref below.
 INCLUDES=(--include='*.go' --include='*.yaml' --include='*.yml' --include='*.md'
-          --include='*.json' --include='*.toml' --include='*.sh')
+          --include='*.json' --include='*.toml' --include='*.sh'
+          --include='*.csv' --include='*.tsv')
 
 # category|pattern|description
 #
