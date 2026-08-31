@@ -62,15 +62,26 @@ func (r *Report) Aggregate(reg *Registry, sprint string, threshold float64) {
 	for model, group := range byModel {
 		r.ModelStats[model] = summarize(group)
 	}
-	// Overall: mean of all per-model mean scores.
+	// Overall: mean of all per-model mean scores, summed in sorted
+	// model order for the same reason mean() sorts its keys — map
+	// iteration order is randomised and float64 addition is not
+	// associative. Here the stakes are higher than one ULP on a
+	// reported number: OverallScore feeds the Pass verdict, so a run
+	// sitting exactly on the threshold could pass and fail on
+	// identical input.
 	if len(r.ModelStats) == 0 {
 		r.OverallScore = 0
 		r.Pass = false
 		return
 	}
+	models := make([]Model, 0, len(r.ModelStats))
+	for m := range r.ModelStats {
+		models = append(models, m)
+	}
+	sort.Slice(models, func(i, j int) bool { return models[i] < models[j] })
 	var sum float64
-	for _, s := range r.ModelStats {
-		sum += s.MeanScore
+	for _, m := range models {
+		sum += r.ModelStats[m].MeanScore
 	}
 	r.OverallScore = sum / float64(len(r.ModelStats))
 	r.Pass = r.OverallScore >= threshold
