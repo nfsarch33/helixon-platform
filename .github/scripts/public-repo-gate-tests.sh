@@ -126,6 +126,39 @@ rc="$(run_gate "$TMP/r")"
 [ "$rc" = "1" ] && ok "T8b a resolved vault+item reference IS a finding" \
                 || nope "T8b exited ${rc}, want 1 -- the narrowing went too far"
 
+# ---------------------------------------------------------------------------
+# T9: the extension list is a real boundary, pinned in both directions.
+#
+# The gate's INCLUDES decide what is scanned at all. A format that is missing
+# produces zero findings no matter what it contains, which reads exactly like
+# a clean file. That is how a 70-row export of the secret store's item
+# inventory lived under evidence/ for seven weeks: .csv and .tsv were not on
+# the list. T9a pins that they now are.
+#
+# T9b is the honest half. It asserts the CURRENT boundary rather than a
+# desirable one: .txt is still unscanned, so a violation there is still
+# missed. It is here so that the gate's real blast radius is written down and
+# a future reader can see what widening it would buy, instead of inferring
+# completeness from a green run.
+# ---------------------------------------------------------------------------
+fixture
+printf 'id,ref\n1,op://HelixonSafe/n2ecpwlnkpjsabcdefghijklmn/password\n' >"$TMP/r/i.csv"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T9a a violation in a .csv IS a finding" \
+                || nope "T9a exited ${rc}, want 1 -- .csv is not being scanned"
+
+fixture
+printf 'id\tref\n1\top://HelixonSafe/n2ecpwlnkpjsabcdefghijklmn/password\n' >"$TMP/r/j.tsv"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T9b a violation in a .tsv IS a finding" \
+                || nope "T9b exited ${rc}, want 1 -- .tsv is not being scanned"
+
+fixture
+printf 'op://HelixonSafe/n2ecpwlnkpjsabcdefghijklmn/password\n' >"$TMP/r/k.txt"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "0" ] && ok "T9c KNOWN LIMIT: .txt is still outside the gate's blast radius" \
+                || nope "T9c exited ${rc}, want 0 -- if .txt was added, update this test"
+
 echo
 echo "PASS: $PASS, FAIL: $FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
