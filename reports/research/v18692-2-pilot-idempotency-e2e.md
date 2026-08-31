@@ -118,7 +118,7 @@ race detection.
 
 ## References
 
-- Plan: `/home/jason/.cursor/plans/helixon_v18691-v18694_pilot%2Bqa%2Breality%2Bworkspace_e406210d.plan.md`
+- Plan: `/home/<operator>/.cursor/plans/helixon_v18691-v18694_pilot%2Bqa%2Breality%2Bworkspace_e406210d.plan.md`
 - Existing infrastructure: `internal/rtx/rtx.go`, `internal/costobs/costobs.go`,
   `internal/tenantid/tenantid.go`, `internal/choosehook/choosehook.go`.
 - v18692-1 report: `reports/research/v18692-1-live-llm-e2e.md`.

@@ -94,58 +94,17 @@ jobs:
 
   public-repo-gate:
     runs-on: self-hosted
-    # A checkout plus a grep sweep, and nothing else: 11s fastest, 13s median,
-    # 32s slowest across 29 executed runs, of which the scan step itself is
-    # under a second. 10m is roughly 19x the slowest run observed - ample for
-    # a slow checkout on a busy host, while still bounding a pathological
-    # pattern to minutes rather than six hours.
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
+      # The gate lives in a script so it can be run and tested locally:
+      # .github/scripts/public-repo-gate-tests.sh. The previous inline version
+      # suppressed findings with `grep -v 'public-repo-gate'`, which drops the
+      # annotation LINE rather than the annotated FILE -- so the allow-file
+      # headers this repository carries did nothing, and the gate could not pass.
       - name: Scan for blocked terms
-        run: |
-          echo "Scanning for blocked terms..."
-          BLOCKED=0
+        run: .github/scripts/public-repo-gate.sh
 
-          # Critical patterns: never allowed anywhere (excluding CI config itself)
-          for pattern in \
-            '/home/jason' '/Users/jason' \
-            'zendesk' 'zd-gateway' 'jlianzendesk' \
-            'op://' '1password' \
-            'HOMEBREW_GITHUB_API_TOKEN' 'VENDIR_GITHUB_API_TOKEN' \
-            'ssh-rsa ' 'BEGIN RSA PRIVATE' 'BEGIN OPENSSH PRIVATE' \
-            'wsl1-travel' ; do
-            if grep -rn --include='*.go' --include='*.yaml' --include='*.yml' --include='*.md' \
-                 --include='*.json' --include='*.toml' --include='*.sh' \
-                 -E "$pattern" . 2>/dev/null | grep -v '.git/' | grep -v 'public-repo-gate' | grep -v 'node_modules/'; then
-              echo "::error::Blocked term found: $pattern"
-              BLOCKED=1
-            fi
-          done
-
-          # Private IPs: blocked in production code, allowed in test fixtures
-          for pattern in \
-            '192\.168\.' '10\.0\.' '172\.(1[6-9]|2[0-9]|3[01])\.' ; do
-            if grep -rn --include='*.go' --include='*.yaml' --include='*.yml' --include='*.md' \
-                 --include='*.json' --include='*.toml' --include='*.sh' \
-                 -E "$pattern" . 2>/dev/null | grep -v '.git/' | grep -v 'public-repo-gate' | grep -v 'node_modules/' | grep -v '_test.go:'; then
-              echo "::error::Private IP in non-test code: $pattern"
-              BLOCKED=1
-            fi
-          done
-
-          if [ "$BLOCKED" -eq 1 ]; then
-            echo "::error::Public repo gate FAILED. Remove all blocked terms before merging."
-            exit 1
-          fi
-          echo "Public repo gate: PASSED (zero findings)"
-
-  # Guards the availability of the single self-hosted runner this repository
-  # has. actions/setup-go@v5 defaults `cache` to true, and its post-job
-  # cache-save tar goes into uninterruptible sleep (STAT=D, signals inert) on
-  # that runner's substrate — one held the runner for 5h38m on 2026-08-30 with
-  # nine runs queued behind it. PR #81 and #82 pinned `cache: false` on all
-  # four setup-go steps; this job is what stops a fifth from appearing.
   setup-go-cache-gate:
     # ubuntu-latest ON PURPOSE, and it is not an optimisation. A gate whose
     # entire job is protecting the sole self-hosted runner's availability must
