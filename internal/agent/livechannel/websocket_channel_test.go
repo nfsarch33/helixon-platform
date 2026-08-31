@@ -46,6 +46,11 @@ func TestChannel_PublishAndReceive(t *testing.T) {
 	client, _ := dial(t, wsURL)
 	defer func() { _ = client.Close() }()
 
+	// Wait for the server side to register the subscriber. Publish drops
+	// events when the set is empty, so publishing before ServeWS has
+	// subscribed races the handler and loses the event.
+	ch.WaitForSubscribers(1, 2*time.Second)
+
 	// Publish an event from the server side.
 	ch.Publish(Event{
 		Type:      EventAgentStarted,
