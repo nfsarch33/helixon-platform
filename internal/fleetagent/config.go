@@ -14,19 +14,19 @@ import (
 // and the peer allowlist (replaces the implicit allowlist sourced from
 // svcregistryd in v0.1.0).
 type Config struct {
-	NodeID        string   `yaml:"node_id"`
-	HostKeyPath   string   `yaml:"host_key_path"`
-	RegistryURL   string   `yaml:"registry_url"`
-	HTTPAddr      string   `yaml:"http_addr"`
-	PeerAllowlist []string `yaml:"peer_allowlist"`
-	HeartbeatEvery string  `yaml:"heartbeat_every,omitempty"`
+	NodeID         string   `yaml:"node_id"`
+	HostKeyPath    string   `yaml:"host_key_path"`
+	RegistryURL    string   `yaml:"registry_url"`
+	HTTPAddr       string   `yaml:"http_addr"`
+	PeerAllowlist  []string `yaml:"peer_allowlist"`
+	HeartbeatEvery string   `yaml:"heartbeat_every,omitempty"`
 }
 
 // ErrConfigNotFound is returned by LoadConfig when the file is missing.
 var ErrConfigNotFound = errors.New("agent config not found")
 
 func LoadConfig(path string) (Config, error) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) //nolint:gosec // G304 operator-configured agent config path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Config{}, ErrConfigNotFound
@@ -42,7 +42,7 @@ func LoadConfig(path string) (Config, error) {
 
 func SaveConfig(path string, c Config) error {
 	if dir := filepath.Dir(path); dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("mkdir %s: %w", dir, err)
 		}
 	}

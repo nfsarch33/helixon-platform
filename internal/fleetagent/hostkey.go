@@ -27,7 +27,7 @@ func EnsureHostKey(path string, force bool) (ed25519.PrivateKey, ed25519.PublicK
 	}
 
 	if !force {
-		if b, err := os.ReadFile(path); err == nil {
+		if b, err := os.ReadFile(path); err == nil { //nolint:gosec // G304 operator-configured host key path
 			if priv, perr := parseEd25519PrivatePEM(b); perr == nil {
 				return priv, priv.Public().(ed25519.PublicKey), ErrHostKeyExists
 			}
@@ -42,7 +42,7 @@ func EnsureHostKey(path string, force bool) (ed25519.PrivateKey, ed25519.PublicK
 	}
 
 	if dir := filepath.Dir(path); dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, nil, fmt.Errorf("mkdir %s: %w", dir, err)
 		}
 	}

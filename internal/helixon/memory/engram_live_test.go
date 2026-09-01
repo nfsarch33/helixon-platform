@@ -29,7 +29,7 @@ func liveEngramURL(t *testing.T) string {
 		baseURL = "http://127.0.0.1:8280"
 	}
 	probe := &http.Client{Timeout: 2 * time.Second}
-	resp, err := probe.Get(baseURL + "/healthz")
+	resp, err := probe.Get(baseURL + "/healthz") //nolint:gosec // G704 ENGRAM_URL is operator test config; defaults to loopback
 	if err != nil {
 		t.Skipf("engram daemon not reachable at %s: %v", baseURL, err)
 	}

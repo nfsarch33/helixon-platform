@@ -105,8 +105,8 @@ func ndjsonPath() string {
 // effort — never fails the test.
 func appendNDJSON(r LiveCallResult) {
 	p := ndjsonPath()
-	_ = os.MkdirAll(filepath.Dir(p), 0o755)
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	_ = os.MkdirAll(filepath.Dir(p), 0o750)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644) //nolint:gosec // G304 env/home-derived trend stream path (test observability)
 	if err != nil {
 		return
 	}

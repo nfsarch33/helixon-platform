@@ -31,11 +31,11 @@ func TestInstall_FreshInstallCreatesConfigAndKey(t *testing.T) {
 	assert.Equal(t, keyPath, res.HostKeyPath)
 	assert.False(t, res.HostKeyRegenerated)
 
-	b, err := os.ReadFile(cfgPath)
+	b, err := os.ReadFile(cfgPath) //nolint:gosec // G304 reads the test's own t.TempDir artifact
 	require.NoError(t, err)
 	assert.Contains(t, string(b), "node_id:")
 
-	envBytes, err := os.ReadFile(filepath.Join(dir, "agent.env"))
+	envBytes, err := os.ReadFile(filepath.Join(dir, "agent.env")) //nolint:gosec // G304 reads the test's own t.TempDir artifact
 	require.NoError(t, err)
 	assert.Contains(t, string(envBytes), "HELIXON_NODE_ID=")
 }
@@ -70,7 +70,7 @@ func TestEnsureHostKey_GeneratesValidPEM(t *testing.T) {
 	assert.Equal(t, ed25519.PrivateKeySize, len(priv))
 	assert.Equal(t, ed25519.PublicKeySize, len(pub))
 
-	b, err := os.ReadFile(keyPath)
+	b, err := os.ReadFile(keyPath) //nolint:gosec // G304 reads the test's own t.TempDir artifact
 	require.NoError(t, err)
 	block, _ := pem.Decode(b)
 	require.NotNil(t, block)
