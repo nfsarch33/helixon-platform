@@ -292,15 +292,29 @@ func (a *Agent) recordVerifierOutcome(name, payload string, toolErr error, resul
 	return result.VerifierFailures >= a.cfg.Completion.MaxConsecutiveFailures
 }
 
-// checkRunTermination returns ErrTimeout when ctx is done and ErrBudgetExhaust
-// when the in+out token sum is greater than MaxTokens. iter and maxIter are
-// reserved for the future iterations-overflow guard.
+// checkRunTermination returns ErrBudgetExhaust when the in+out token sum is
+// greater than MaxTokens, and ErrTimeout when ctx is done. iter and maxIter
+// are reserved for the future iterations-overflow guard.
+//
+// The budget is checked FIRST, and the order is load-bearing. Under load a run
+// crosses both limits before the same check: the tokens were spent before the
+// clock ran out, so budget exhaustion is the true stop reason — and the two
+// verdicts travel different roads from here. A timeout is classified
+// retryable and re-runs the work; a blown budget is a policy stop, and
+// re-running it re-pays every call the budget already refused. The reason also
+// feeds the escalations metric, and separating budget_exhausted from timeout
+// there is the point of having the label. The budget verdict is decidable from
+// numbers the loop already holds; ctx.Err() merely reports what the clock did
+// in the meantime, so it goes second.
 func checkRunTermination(ctx context.Context, r *RunResult, iter, maxTokens, maxIter int) error { //nolint:revive // unused-parameter required by interface
+	if err := checkTokenBudget(r, maxTokens); err != nil {
+		return err
+	}
 	if ctx.Err() != nil {
 		r.Err = ErrTimeout
 		return ErrTimeout
 	}
-	return checkTokenBudget(r, maxTokens)
+	return nil
 }
 
 // checkTokenBudget returns ErrBudgetExhaust when the in+out token sum is
