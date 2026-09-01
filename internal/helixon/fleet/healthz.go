@@ -21,8 +21,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // Win1Service describes one central service on win1/wsl1.
@@ -57,13 +58,20 @@ func resolveWin1Host(_ context.Context) (string, error) {
 	return canonicalWin1Host, nil
 }
 
+// maxConcurrentProbes caps the health-probe fan-out. Probes are cheap, but a
+// bound that exists only because "the caller controls the slice length" is a
+// bound nobody can audit from the code; eight in flight keeps a large service
+// registry from dialing everything at once.
+const maxConcurrentProbes = 8
+
 // ProbeWin1Services probes each service in parallel, respecting per-probe
 // timeout. Returns a slice (length == len(services)) in input order.
 // Empty/nil input returns a non-nil empty slice.
 //
-// Concurrency model: bounded via WaitGroup; per-probe runs in its own
-// goroutine but the HTTP client's per-request timeout bounds each one.
-// No unbounded fan-out: caller controls slice length.
+// Concurrency model: errgroup with SetLimit(maxConcurrentProbes) — bounded
+// fan-out pattern 2 per the harness-engineering defaults, with the bound
+// explicit in the manifest. Each goroutine writes only its own index, and a
+// failed probe is a result, not an error, so the group never short-circuits.
 func ProbeWin1Services(ctx context.Context, services []Win1Service, perProbeTimeout time.Duration) []ProbeResult {
 	if len(services) == 0 {
 		return []ProbeResult{}
@@ -73,16 +81,15 @@ func ProbeWin1Services(ctx context.Context, services []Win1Service, perProbeTime
 	}
 
 	results := make([]ProbeResult, len(services))
-	var wg sync.WaitGroup
-	wg.Add(len(services))
-
+	var g errgroup.Group
+	g.SetLimit(maxConcurrentProbes)
 	for i, svc := range services {
-		go func(idx int, s Win1Service) {
-			defer wg.Done()
-			results[idx] = probeOne(ctx, s, perProbeTimeout)
-		}(i, svc)
+		g.Go(func() error {
+			results[i] = probeOne(ctx, svc, perProbeTimeout)
+			return nil
+		})
 	}
-	wg.Wait()
+	_ = g.Wait() // probes never return errors; Wait is for completion only
 	return results
 }
 

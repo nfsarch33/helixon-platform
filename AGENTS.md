@@ -48,7 +48,7 @@ internal/
     channel/           Channel adapters (MCP stdio, REPL, webhook)
     controlplane/      SprintBoard client, heartbeat monitor, A2A client
     dashboard/         HTTP dashboard views
-    fleet/             Fleet task handler, delegation, reports, retry logic
+    fleet/             Fleet task handler, delegation, reports, retry logic, durable task store (SQLite lease/reclaim)
     memory/            Engram, Mem0, workspace, hybrid memory
     platform/          HTTP/SSE platform server
     safety/            Cost guards, validation, sanitisation
@@ -71,6 +71,7 @@ internal/
 | `Registry` | `tooldispatch` | Thread-safe tool registration and dispatch |
 | `TracedExecutor` | `tooldispatch` | NDJSON agentrace decorator |
 | `Handler` | `fleet` | Concurrent fleet task handler with retry |
+| `TaskStore` | `fleet` | Durable task state: CAS claim, TTL lease, reclaim sweeper |
 | `HybridSearcher` | `memory` | Engram vector + FTS5 blended search |
 | `Provider` | `llm` | LLM provider interface (Complete, Stream) |
 | `Server` | `platform` | HTTP/SSE platform server |
