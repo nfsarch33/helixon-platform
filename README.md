@@ -290,6 +290,29 @@ report := fleet.GenerateDailyReport("fleet-1", handler.ListTasks(), dayStart, da
 fmt.Println(fleet.FormatReport(report))
 ```
 
+### Durable task state (crash-safe)
+
+Backing the handler with a `TaskStore` makes task state survive restarts:
+submissions, results, and leases live in SQLite instead of process memory. A
+task claimed by a worker that dies is reclaimed by lease expiry and re-run;
+a worker whose lease was taken over has its result refused, so the same task
+can never complete twice.
+
+```go
+store, _ := fleet.NewTaskStore(ctx, "/var/lib/helixon/fleet-tasks.db")
+defer store.Close()
+
+handler := fleet.NewHandler(executor, sprintboardClient, fleet.HandlerConfig{
+    MaxConcurrent: 4,
+    Store:         store,        // durable path on
+    LeaseTTL:      time.Minute,  // a claim survives this long without renewal
+})
+
+// Reclaims expired leases (crash + restart recovery). Stop it on shutdown.
+stop := handler.StartLeaseSweeper(ctx)
+defer stop()
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
