@@ -1,22 +1,14 @@
 // runx-public-repo-gate: allow-file fleet_host_alias
-// Package fleet — win1 central services hook-up (v18687-1).
+// Service-probe MECHANICS tests: ProbeResult shape, timeout behavior on
+// unreachable targets, and empty-input handling — synthetic targets only.
 //
-// RED tests that verify the 4 central services reachable on win1/wsl1:
-//
-//   - Engram              :8280
-//   - SprintBoard         :8765
-//   - svcregistryd        :8786
-//   - llm-cluster-router  :8787
-//
-// Each probe returns a ProbeResult with Reachable, Latency, HTTPStatus, Error.
-// TestWin1Hookup_AllServicesReachable asserts all 4 return HTTP 200 within 3s.
-//
-// These tests are run from the wsl3 host using the runx ssh jump surface to
-// reach win1/wsl1. They are intentionally tolerant: when win1 is offline,
-// they record the failure honestly (per DRL-8.20-r4 honest KPI scoreboard)
-// rather than skip or fabricate GREEN.
-//
-// Run with: go test -race -count=1 ./internal/helixon/fleet/... -run TestWin1
+// The LIVE reachability gate for the fleet's central services moved out of
+// this repository's CI (v18801) into the private operations doctor suite,
+// which runs on the host where those probes are meaningful. A public test
+// that probes internal endpoints couples CI verdicts to production service
+// state and publishes internal topology; the probe table it used also
+// cited an inventory file that does not exist here and had drifted from
+// the deployed ports, turning every CI run red once stale listeners ended.
 package fleet
 
 import (
@@ -28,43 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// Default win1 service endpoints. Each value is the canonical fleet
-// listening address per inventory/services/registry.yaml.
-var defaultWin1Services = []Win1Service{
-	{Name: "engram", Address: "100.84.108.92:8280", HealthPath: "/healthz"},
-	{Name: "sprintboard", Address: "100.84.108.92:8765", HealthPath: "/healthz"},
-	{Name: "svcregistryd", Address: "100.84.108.92:8786", HealthPath: "/healthz"},
-	{Name: "llm-cluster-router", Address: "100.84.108.92:8787", HealthPath: "/healthz"},
-}
-
-// TestWin1Hookup_AllServicesReachable is the RED test for v18687-1.
-// It asserts all 4 central services reachable on win1/wsl1 within 3s,
-// returning HTTP 200 on /healthz.
-func TestWin1Hookup_AllServicesReachable(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	results := ProbeWin1Services(ctx, defaultWin1Services, 3*time.Second)
-
-	require.Len(t, results, 4, "expected 4 probe results")
-
-	// All 4 services MUST be reachable for GREEN status.
-	for _, r := range results {
-		t.Logf("win1 probe: %-22s addr=%s reachable=%v http=%d latency=%s err=%v",
-			r.Service, r.Address, r.Reachable, r.HTTPStatus, r.Latency, r.Error)
-
-		if !r.Reachable {
-			t.Errorf("FAIL: %s at %s NOT reachable (err=%v latency=%s)",
-				r.Service, r.Address, r.Error, r.Latency)
-			continue
-		}
-		assert.Equal(t, http.StatusOK, r.HTTPStatus,
-			"%s must return HTTP 200 on /healthz", r.Service)
-		assert.Less(t, r.Latency, 3*time.Second,
-			"%s latency must be under 3s", r.Service)
-	}
-}
 
 // TestWin1Hookup_ProbeResultShape validates the ProbeResult struct
 // fields used by the report aggregator.
