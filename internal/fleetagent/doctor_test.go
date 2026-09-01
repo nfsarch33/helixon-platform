@@ -22,7 +22,7 @@ func TestDoctor_RunsScriptAndCapturesOutput(t *testing.T) {
 	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "fake-doctor.sh")
-	require.NoError(t, os.WriteFile(script, []byte("#!/usr/bin/env bash\necho hello world\nexit 0\n"), 0o755))
+	require.NoError(t, os.WriteFile(script, []byte("#!/usr/bin/env bash\necho hello world\nexit 0\n"), 0o600))
 
 	res, err := Doctor(context.Background(), DoctorOptions{
 		ScriptPath: script,
@@ -39,7 +39,7 @@ func TestDoctor_ReportsFailure(t *testing.T) {
 	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "fail-doctor.sh")
-	require.NoError(t, os.WriteFile(script, []byte("#!/usr/bin/env bash\necho boom 1>&2\nexit 7\n"), 0o755))
+	require.NoError(t, os.WriteFile(script, []byte("#!/usr/bin/env bash\necho boom 1>&2\nexit 7\n"), 0o600))
 
 	res, err := Doctor(context.Background(), DoctorOptions{
 		ScriptPath: script,

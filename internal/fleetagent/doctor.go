@@ -41,7 +41,7 @@ func Doctor(ctx context.Context, opts DoctorOptions) (DoctorResult, error) {
 		opts.ScriptPath = defaultDoctorScript()
 	}
 
-	cmd := exec.CommandContext(ctx, "bash", opts.ScriptPath)
+	cmd := exec.CommandContext(ctx, "bash", opts.ScriptPath) //nolint:gosec // G204 compiled-in default or caller-set doctor script path; never network input
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

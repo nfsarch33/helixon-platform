@@ -75,7 +75,7 @@ func runVerify(o verifyOptions) int {
 		"args":          args,
 	}
 
-	if _, err := os.Stat(binaryPath); err != nil {
+	if _, err := os.Stat(binaryPath); err != nil { //nolint:gosec // G703 operator env-derived self-test binary path
 		auditEvent["result"] = "binary_missing"
 		auditEvent["error"] = err.Error()
 		out, _ := json.MarshalIndent(auditEvent, "", "  ")
@@ -103,7 +103,7 @@ func runVerify(o verifyOptions) int {
 // invokeBinary runs binaryPath with args, returning combined output and the
 // non-nil error from CombinedOutput on failure. Extracted for testability.
 func invokeBinary(binaryPath string, args []string) ([]byte, error) {
-	cmd := exec.Command(binaryPath, args...)
+	cmd := exec.Command(binaryPath, args...) //nolint:gosec // G204 operator env-derived self-test binary; exec-style args
 	cmd.Env = os.Environ()
 	return cmd.CombinedOutput()
 }

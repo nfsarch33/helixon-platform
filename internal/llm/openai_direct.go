@@ -216,7 +216,7 @@ func (c *OpenAIDirectClient) executeWithRetry(ctx context.Context, req *http.Req
 			}
 		}
 
-		retryReq, err := http.NewRequestWithContext(ctx, req.Method, req.URL.String(), bytes.NewReader(bodyBytes))
+		retryReq, err := http.NewRequestWithContext(ctx, req.Method, req.URL.String(), bytes.NewReader(bodyBytes)) //nolint:gosec // G704 retries the caller's own request; URL comes from client config
 		if err != nil {
 			return nil, fmt.Errorf("build retry request: %w", err)
 		}

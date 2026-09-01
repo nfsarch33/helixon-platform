@@ -97,8 +97,8 @@ func appendBurstResult(r BurstResult) {
 		home, _ := os.UserHomeDir()
 		p = filepath.Join(home, "logs", "runx", "pilot-idempotency.ndjson")
 	}
-	_ = os.MkdirAll(filepath.Dir(p), 0o755)
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	_ = os.MkdirAll(filepath.Dir(p), 0o750)                              //nolint:gosec // G703 env/home-derived trend stream path (test observability)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644) //nolint:gosec // G304 env/home-derived trend stream path (test observability)
 	if err != nil {
 		return
 	}
@@ -114,7 +114,7 @@ func appendBurstResult(r BurstResult) {
 func appendBudgetAlert(tenantID string, spent, limit float64, day string) {
 	home, _ := os.UserHomeDir()
 	p := filepath.Join(home, "logs", "runx", "daily-budget-alerts.ndjson")
-	_ = os.MkdirAll(filepath.Dir(p), 0o755)
+	_ = os.MkdirAll(filepath.Dir(p), 0o750)
 	entry := map[string]any{
 		"ts":        time.Now().UTC().Format(time.RFC3339Nano),
 		"event":     "daily_budget_alert",
@@ -125,7 +125,7 @@ func appendBudgetAlert(tenantID string, spent, limit float64, day string) {
 		"over_usd":  spent - limit,
 		"hostname":  hostnameOrEmptyLocal(),
 	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644) //nolint:gosec // G304 env/home-derived trend stream path (test observability)
 	if err != nil {
 		return
 	}
@@ -317,7 +317,7 @@ func TestDailyBudgetAlert_FiresOverDollar(t *testing.T) {
 	// Verify the alert file exists and has at least one row for this tenant
 	home, _ := os.UserHomeDir()
 	alertPath := filepath.Join(home, "logs", "runx", "daily-budget-alerts.ndjson")
-	data, err := os.ReadFile(alertPath)
+	data, err := os.ReadFile(alertPath) //nolint:gosec // G304 home-derived alerts path (test observability)
 	if err != nil {
 		t.Fatalf("read alerts file %q: %v", alertPath, err)
 	}

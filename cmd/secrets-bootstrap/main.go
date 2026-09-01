@@ -411,7 +411,7 @@ func opReadWithExecutor(ref string, timeoutSec int, run opExecutor) (string, err
 // defaultOpExecutor returns a real opExecutor that invokes the `op` CLI.
 func defaultOpExecutor(token, ref string) opExecutor {
 	return func() ([]byte, error) {
-		cmd := exec.Command("op", "read", ref)
+		cmd := exec.Command("op", "read", ref) //nolint:gosec // G204 fixed argv; ref is an operator-config secret reference
 		cmd.Env = append(os.Environ(), "OP_SERVICE_ACCOUNT_TOKEN="+token)
 		return cmd.Output()
 	}
