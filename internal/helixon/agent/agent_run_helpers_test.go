@@ -39,6 +39,24 @@ func TestCheckRunTermination_OK(t *testing.T) {
 	}
 }
 
+// TestCheckRunTermination_BudgetWinsWhenBothLimitsCrossed pins the decision
+// order (v18801). Under load a run can be over budget AND past its deadline at
+// the same check. The verdict must be ErrBudgetExhaust: retry classification
+// treats a timeout as retryable and a blown budget as terminal, so reporting
+// ErrTimeout here re-runs — and re-pays — a run that policy already stopped.
+func TestCheckRunTermination_BudgetWinsWhenBothLimitsCrossed(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r := &RunResult{TokensIn: 60, TokensOut: 50}
+	if err := checkRunTermination(ctx, r, 0, 100, 10); !errors.Is(err, ErrBudgetExhaust) {
+		t.Errorf("got %v, want ErrBudgetExhaust when both limits are crossed", err)
+	}
+	if !errors.Is(r.Err, ErrBudgetExhaust) {
+		t.Errorf("RunResult.Err should record budget exhaustion, got %v", r.Err)
+	}
+}
+
 // TestCheckTokenBudget_Boundary pins the boundary the contract states: the
 // budget is exhausted when the token sum is GREATER than MaxTokens, so
 // spending exactly the budget is still inside it.
