@@ -42,7 +42,12 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test
-        run: go test -race -cover -coverprofile=coverage.txt -count=1 ./...
+        # -shuffle=on randomises test and subtest order so ordering assumptions
+        # cannot hide behind declaration order. The agent loop's turn-ordering
+        # defect (fixed in #78) was only reproducible under shuffle; this keeps
+        # that class of regression visible. A failure prints the seed, and
+        # `go test -shuffle=<seed>` replays it.
+        run: go test -race -shuffle=on -cover -coverprofile=coverage.txt -count=1 ./...
       - name: Coverage check
         run: |
           total=$(go tool cover -func=coverage.txt | grep total | awk '{print $3}' | tr -d '%')
