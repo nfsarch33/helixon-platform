@@ -11,11 +11,14 @@ package memory
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,13 +39,69 @@ func liveEngramURL(t *testing.T) string {
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:8280"
 	}
-	if reason := liveProbe(baseURL); reason != "" {
-		if liveRequired() {
-			t.Fatalf("%s is set: %s", liveRequiredEnv, reason)
-		}
-		t.Skip(reason)
+	skip, fatal := liveGate(baseURL, liveRequired())
+	if fatal != "" {
+		t.Fatalf("%s is set: %s", liveRequiredEnv, fatal)
+	}
+	if skip != "" {
+		t.Skip(skip)
 	}
 	return baseURL
+}
+
+// liveGate decides what the roundtrip does before it starts:
+//   - daemon unreachable or /healthz not 200: fail when required, else skip;
+//   - daemon reachable but reporting ITSELF degraded (its /metrics.json health
+//     verdict, e.g. an embedder that is not answering): skip even when
+//     required, quoting the daemon's reason. Add blocks on the embedder, so
+//     the roundtrip cannot tell a wire-schema drift from a starved embedder,
+//     and a starved embedder is the daemon's own health signal to raise, not
+//     this gate's. Measured on a loaded host: primary embedder timing out at
+//     its 30s budget and falling through, then the fallback timing out too.
+//   - healthy: run.
+func liveGate(baseURL string, required bool) (skip, fatal string) {
+	if reason := liveProbe(baseURL); reason != "" {
+		if required {
+			return "", reason
+		}
+		return reason, ""
+	}
+	if reason := daemonDegraded(baseURL); reason != "" {
+		return "engram daemon reachable but degraded; roundtrip skipped: " + reason, ""
+	}
+	return "", ""
+}
+
+// daemonDegraded returns "" when the daemon's own health verdict is ok, else
+// the verdict with every non-ok subsystem. The verdict endpoint runs the
+// daemon's subsystem probes (including one embedder call), so the budget
+// covers a slow embedder; a verdict that cannot be obtained is itself a
+// degraded state.
+func daemonDegraded(baseURL string) string {
+	client := &http.Client{Timeout: 90 * time.Second}
+	resp, err := client.Get(baseURL + "/metrics.json") //nolint:gosec // G704 ENGRAM_URL is operator test config; defaults to loopback
+	if err != nil {
+		return "health verdict unavailable: " + err.Error()
+	}
+	defer resp.Body.Close() //nolint:errcheck
+	var verdict struct {
+		Status     string            `json:"status"`
+		Subsystems map[string]string `json:"subsystems"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&verdict); err != nil {
+		return "health verdict undecodable: " + err.Error()
+	}
+	if verdict.Status == "ok" {
+		return ""
+	}
+	bad := make([]string, 0, len(verdict.Subsystems))
+	for name, state := range verdict.Subsystems {
+		if state != "ok" {
+			bad = append(bad, name+"="+state)
+		}
+	}
+	sort.Strings(bad)
+	return fmt.Sprintf("status=%s %s", verdict.Status, strings.Join(bad, " "))
 }
 
 // liveRequired reports whether an unreachable daemon must fail the test
@@ -138,4 +197,68 @@ func TestEngramClient_LiveAddGetDelete(t *testing.T) {
 	require.NoError(t, client.Delete(ctx, mem.ID))
 	_, err = client.Get(ctx, mem.ID)
 	require.ErrorIs(t, err, ErrMemoryNotFound, "record must be gone after delete")
+}
+
+// fakeDaemon serves /healthz and a /metrics.json verdict for the gate tests.
+func fakeDaemon(t *testing.T, healthz int, verdict string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/healthz":
+			w.WriteHeader(healthz)
+		case "/metrics.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(verdict))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// TestLiveGate_UnreachableFailsOnlyWhenRequired: the required flag decides
+// between skip and failure for a daemon that does not answer at all.
+func TestLiveGate_UnreachableFailsOnlyWhenRequired(t *testing.T) {
+	closed := httptest.NewServer(http.NotFoundHandler())
+	url := closed.URL
+	closed.Close()
+
+	skip, fatal := liveGate(url, true)
+	assert.Empty(t, skip)
+	assert.Contains(t, fatal, "not reachable")
+
+	skip, fatal = liveGate(url, false)
+	assert.Contains(t, skip, "not reachable")
+	assert.Empty(t, fatal)
+}
+
+// TestLiveGate_DegradedDaemonSkipsEvenWhenRequired: a daemon that reports
+// its embedder down is a skip with the daemon's reason, never a failure -
+// the roundtrip would only be measuring the embedder.
+func TestLiveGate_DegradedDaemonSkipsEvenWhenRequired(t *testing.T) {
+	srv := fakeDaemon(t, http.StatusOK,
+		`{"memory_count":6,"status":"degraded","subsystems":{"embedder":"error: context deadline exceeded","history_store":"ok","vector_store":"ok"}}`)
+	skip, fatal := liveGate(srv.URL, true)
+	assert.Empty(t, fatal)
+	assert.Contains(t, skip, "degraded")
+	assert.Contains(t, skip, "embedder=error: context deadline exceeded")
+	assert.NotContains(t, skip, "history_store", "only non-ok subsystems are quoted")
+}
+
+// TestLiveGate_HealthyRuns: a healthy verdict lets the roundtrip run.
+func TestLiveGate_HealthyRuns(t *testing.T) {
+	srv := fakeDaemon(t, http.StatusOK, `{"memory_count":6,"status":"ok","subsystems":{"embedder":"ok","history_store":"ok","vector_store":"ok"}}`)
+	skip, fatal := liveGate(srv.URL, true)
+	assert.Empty(t, skip)
+	assert.Empty(t, fatal)
+}
+
+// TestLiveGate_UndecodableVerdictIsDegraded: a daemon that answers /healthz
+// but cannot produce a verdict is not trusted to run the roundtrip.
+func TestLiveGate_UndecodableVerdictIsDegraded(t *testing.T) {
+	srv := fakeDaemon(t, http.StatusOK, `not json`)
+	skip, fatal := liveGate(srv.URL, true)
+	assert.Empty(t, fatal)
+	assert.Contains(t, skip, "undecodable")
 }
