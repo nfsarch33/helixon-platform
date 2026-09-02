@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -202,7 +201,7 @@ func TestWithStorePragmasMergesWithCallerPragmas(t *testing.T) {
 // cascade and still writes at synchronous=NORMAL.
 func TestCallerPragmaDsnStillGetsTheStoreDefaults(t *testing.T) {
 	ctx := context.Background()
-	dsn := filepath.Join(t.TempDir(), "merged.db") + "?_pragma=busy_timeout(10000)"
+	dsn := testDBPath(t, "merged.db") + "?_pragma=busy_timeout(10000)"
 	store, err := NewSessionStore(ctx, dsn)
 	require.NoError(t, err)
 	defer func() { _ = store.Close() }()

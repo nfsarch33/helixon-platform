@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"database/sql"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -101,7 +100,7 @@ func TestWithStorePragmasRespectsExistingQuery(t *testing.T) {
 // test did not hand-configure.
 func TestForeignKeyCascadeIsEnforced(t *testing.T) {
 	ctx := context.Background()
-	dsn := filepath.Join(t.TempDir(), "fk.db")
+	dsn := testDBPath(t, "fk.db")
 	store, err := NewSessionStore(ctx, dsn)
 	require.NoError(t, err)
 	defer func() { _ = store.Close() }()

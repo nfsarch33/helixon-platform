@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"database/sql"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -164,7 +163,7 @@ func TestListTurnsOrderSurvivesWholeSecondStamp(t *testing.T) {
 // rowid rather than from the created_at stamps, which are already inverted.
 func TestListTurnsSeqBackfilledForLegacyDatabase(t *testing.T) {
 	ctx := context.Background()
-	dsn := filepath.Join(t.TempDir(), "legacy.db")
+	dsn := testDBPath(t, "legacy.db")
 
 	// Build the old schema and populate it directly, bypassing the store.
 	legacy, err := sql.Open("sqlite", dsn)
@@ -225,7 +224,7 @@ CREATE TABLE turns (
 // column, must not renumber anything, and must leave order intact.
 func TestMigrationIsIdempotent(t *testing.T) {
 	ctx := context.Background()
-	dsn := filepath.Join(t.TempDir(), "idempotent.db")
+	dsn := testDBPath(t, "idempotent.db")
 
 	store, err := NewSessionStore(ctx, dsn)
 	require.NoError(t, err)
