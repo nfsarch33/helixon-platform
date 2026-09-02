@@ -33,11 +33,11 @@ python3 tools/evospine/run-cycle.py --repo OWNER/REPO [--dry-run]
 | hypothesize | Heuristic: ≥3 stale → "weekly cron"; 0 → "no action"; else "monitor" | Hypothesis text + evidence |
 | patch | v14520: observational only (no file edits) | Hypothesis text |
 | eval | Run `pytest tests/` subset | Pass/fail summary |
-| commit | Append cycle record to `evospine-cycles.ndjson` + `git commit` | Commit SHA |
+| commit | Append cycle record to `~/logs/runx/evospine-cycles.ndjson` (state, shared with `eval ab --cycle-record`; status `complete` or `failed`, exit code follows) | Commit SHA |
 
 ## 4. Outputs
 
-- `evospine-cycles.ndjson`: one JSON record per cycle.
+- `~/logs/runx/evospine-cycles.ndjson`: one JSON record per cycle, with an insertion `seq`; the copy committed at the repo root is the historical v14549 ledger, no longer written.
 - `git log` shows `evospine: cycle <id>` commits.
 - Triage ledger (`docs/repo-hygiene-2026-08.ndjson`) references
   the cycle's hypothesis.
