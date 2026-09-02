@@ -491,6 +491,14 @@ func (r *Runtime) RecoverInterruptedRuns(ctx context.Context) (RecoveryStats, er
 	return st, nil
 }
 
+// Store exposes the session/run store for read-only consumers such as the
+// operator console. Nil before Init.
+func (r *Runtime) Store() *agent.SessionStore { return r.store }
+
+// Memory exposes the hybrid memory searcher when one was configured; nil
+// otherwise, which the console reports as "memory not configured".
+func (r *Runtime) Memory() *memory.HybridSearcher { return r.memory }
+
 // buildTicketPoller constructs the serve-mode poller when the feature flag is
 // on. It runs during Configure, not Run, so a misconfiguration (no board, a
 // per-ticket budget shorter than the agent's own timeout) fails at start-up

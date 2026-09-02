@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -356,4 +357,78 @@ func TestAppendRunTurn_ZombieIsRefused(t *testing.T) {
 	require.True(t, ok)
 	_, err = store.AppendRunTurn(ctx, "run-1", "worker-b", sid, RoleAssistant, "after the end", nil, "", 0, 0)
 	assert.ErrorIs(t, err, ErrLeaseLost, "a finished run accepts no more turns")
+}
+
+// TestListRuns_NewestFirstFilteredAndCapped: the console's run list is newest
+// first, filterable by status, and capped.
+func TestListRuns_NewestFirstFilteredAndCapped(t *testing.T) {
+	ctx := context.Background()
+	store, clock := newClockedStore(t, time.Date(2026, 9, 3, 3, 0, 0, 0, time.UTC))
+	sid := newRunSession(t, store)
+	for i := 1; i <= 4; i++ {
+		clock.Add(time.Second)
+		if _, _, err := store.StartRun(ctx, fmt.Sprintf("run-%d", i), sid, "q", nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ok, err := store.ClaimRun(ctx, "run-2", "w", time.Minute)
+	require.NoError(t, err)
+	require.True(t, ok)
+	ok, err = store.FinishRun(ctx, "run-2", "w", RunCompleted, &RunResult{TokensIn: 10, TokensOut: 5}, nil)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	all, err := store.ListRuns(ctx, RunFilter{})
+	require.NoError(t, err)
+	require.Len(t, all, 4)
+	assert.Equal(t, []string{"run-4", "run-3", "run-2", "run-1"}, []string{all[0].ID, all[1].ID, all[2].ID, all[3].ID})
+
+	done, err := store.ListRuns(ctx, RunFilter{Status: RunCompleted})
+	require.NoError(t, err)
+	require.Len(t, done, 1)
+	assert.Equal(t, "run-2", done[0].ID)
+
+	capped, err := store.ListRuns(ctx, RunFilter{Limit: 2})
+	require.NoError(t, err)
+	assert.Len(t, capped, 2)
+}
+
+// TestRunUsage_SumsTokensByStatusSince: costs come from the runs table, per
+// status, and only for runs created at or after the window start.
+func TestRunUsage_SumsTokensByStatusSince(t *testing.T) {
+	ctx := context.Background()
+	start := time.Date(2026, 9, 3, 3, 0, 0, 0, time.UTC)
+	store, clock := newClockedStore(t, start)
+	sid := newRunSession(t, store)
+	finish := func(id string, status RunStatus, in, out int) {
+		t.Helper()
+		_, _, err := store.StartRun(ctx, id, sid, "q", nil)
+		require.NoError(t, err)
+		ok, err := store.ClaimRun(ctx, id, "w", time.Minute)
+		require.NoError(t, err)
+		require.True(t, ok)
+		ok, err = store.FinishRun(ctx, id, "w", status, &RunResult{TokensIn: in, TokensOut: out}, nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+	finish("old", RunCompleted, 100, 50)
+	clock.Add(2 * time.Hour)
+	finish("new-ok", RunCompleted, 30, 20)
+	finish("new-bad", RunFailed, 7, 3)
+	_, _, err := store.StartRun(ctx, "new-live", sid, "q", nil)
+	require.NoError(t, err)
+
+	u, err := store.RunUsage(ctx, start.Add(time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, 3, u.Runs)
+	assert.Equal(t, 1, u.Completed)
+	assert.Equal(t, 1, u.Failed)
+	assert.Equal(t, 1, u.Running)
+	assert.Equal(t, 37, u.TokensIn)
+	assert.Equal(t, 23, u.TokensOut)
+
+	all, err := store.RunUsage(ctx, time.Time{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, all.Runs)
+	assert.Equal(t, 137, all.TokensIn)
 }
