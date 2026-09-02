@@ -1,0 +1,57 @@
+name: Console
+
+# The operator console (web/console) is a Next.js static export embedded into
+# the helixon binary behind the `console` build tag (docs/adr/0004). This job
+# proves three things on every change to it: the app type-checks, lints and
+# passes its unit tests; it builds to a static export; and the binary built
+# with the tag serves that export at /console/ (the Go test only runs with
+# the tag, so a green run means the embed is real, not skipped).
+
+on:
+  pull_request:
+    paths:
+      - "web/console/**"
+      - "cmd/helixon/consolefs/**"
+      - ".github/workflows/console.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/console/**"
+      - "cmd/helixon/consolefs/**"
+      - ".github/workflows/console.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  console:
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web/console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: install (locked)
+        run: npm ci --no-audit --no-fund
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: lint
+        run: npx eslint .
+      - name: unit tests
+        run: npx vitest run
+      - name: build the static export and stage it for embedding
+        run: npm run build:embed
+      - name: the embedded route serves the export (-tags console)
+        working-directory: .
+        run: go test -tags console -race -count=1 ./cmd/helixon/consolefs/
+      - name: the default build names the rebuild step
+        working-directory: .
+        run: go test -race -count=1 ./cmd/helixon/consolefs/

@@ -29,6 +29,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/nfsarch33/helixon-platform/cmd/helixon/consolefs"
 	"github.com/nfsarch33/helixon-platform/internal/helixon"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agentmetrics"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/builtins"
@@ -360,13 +361,15 @@ func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Write
 		mem = m
 	}
 	dashboard.MountConsole(mux, rt.Store(), mem, &ccfg)
+	// The console UI itself (web/console), embedded behind -tags console.
+	mux.Handle(consolefs.Prefix, consolefs.Handler())
 	srv := &http.Server{Addr: dashboardAddr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			fmt.Fprintf(os.Stderr, "dashboard server: %v\n", err)
 		}
 	}()
-	fmt.Fprintf(out, "helixon: dashboard at http://%s/api/v1/dashboard\n", dashboardAddr)
+	_, _ = fmt.Fprintf(out, "helixon: dashboard at http://%s/api/v1/dashboard, console at http://%s/console/\n", dashboardAddr, dashboardAddr)
 	return srv
 }
 
