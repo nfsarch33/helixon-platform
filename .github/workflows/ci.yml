@@ -47,6 +47,13 @@ jobs:
         # defect (fixed in #78) was only reproducible under shuffle; this keeps
         # that class of regression visible. A failure prints the seed, and
         # `go test -shuffle=<seed>` replays it.
+        #
+        # HLXN_ENGRAM_LIVE_REQUIRED turns the memory package's live daemon
+        # roundtrip from a skip into a failure when the daemon does not answer.
+        # The runner shares a host with the daemon, so a skip here would be a
+        # gate that cannot fail: wire-schema drift would read as green.
+        env:
+          HLXN_ENGRAM_LIVE_REQUIRED: "1"
         run: go test -race -shuffle=on -cover -coverprofile=coverage.txt -count=1 ./...
       - name: Coverage check
         run: |

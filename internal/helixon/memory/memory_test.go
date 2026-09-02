@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -162,15 +161,10 @@ func TestWorkspaceReadAll(t *testing.T) {
 }
 
 func TestHybridSearcherFTSOnly(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "hybrid.db")
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
-
-	_, _ = db.Exec("PRAGMA journal_mode=WAL")
+	db := openTempSQLite(t)
 
 	searcher := NewHybridSearcher(db, nil, HybridSearchConfig{}, nil)
-	err = searcher.EnsureSchema(context.Background())
+	err := searcher.EnsureSchema(context.Background())
 	require.NoError(t, err)
 
 	err = searcher.IndexLocal(context.Background(), "doc1", "kubernetes pod scheduling algorithms")
@@ -219,19 +213,14 @@ func TestHybridSearcherMerge(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	dbPath := filepath.Join(t.TempDir(), "merge.db")
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
-
-	_, _ = db.Exec("PRAGMA journal_mode=WAL")
+	db := openTempSQLite(t)
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{
 		FTSWeight:    0.3,
 		VectorWeight: 0.7,
 	}, nil)
-	err = searcher.EnsureSchema(context.Background())
+	err := searcher.EnsureSchema(context.Background())
 	require.NoError(t, err)
 
 	_ = searcher.IndexLocal(context.Background(), "l1", "shared content")
@@ -281,10 +270,7 @@ func TestHybridSearcherWrite_GreenPathMirrorsLocal(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	dbPath := filepath.Join(t.TempDir(), "write.db")
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
+	db := openTempSQLite(t)
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL}, nil)
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)
@@ -318,10 +304,7 @@ func TestHybridSearcherWrite_CanonicalFailureBlocks(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	dbPath := filepath.Join(t.TempDir(), "fail.db")
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
+	db := openTempSQLite(t)
 
 	engram := NewEngramClient(EngramConfig{BaseURL: srv.URL, MaxRetries: 1}, nil)
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)

@@ -16,8 +16,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -136,16 +134,17 @@ func stubWireRecord(m Memory) map[string]any {
 	}
 }
 
+// openTempSQLite opens a throwaway in-memory mirror through OpenLocalIndex.
+// These tests are about hybrid-search semantics, not the disk: with a file
+// under t.TempDir() every SQLite statement rode the host's write path, and
+// under the full-suite race run that alone overran the tests' contexts
+// (EnsureSchema past 10s, an end-to-end write past 30s). The file-backed
+// opener is pinned separately in localindex_test.go.
 func openTempSQLite(t *testing.T) *sql.DB {
 	t.Helper()
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "memories.db")
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err, "open sqlite at %s", dbPath)
-	t.Cleanup(func() {
-		_ = db.Close()
-		_ = os.RemoveAll(dir)
-	})
+	db, err := OpenLocalIndex(context.Background(), MemoryIndexDSN)
+	require.NoError(t, err, "open in-memory local index")
+	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
 

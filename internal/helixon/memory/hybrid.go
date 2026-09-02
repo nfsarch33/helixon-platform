@@ -224,7 +224,11 @@ func (h *HybridSearcher) IndexLocal(ctx context.Context, id, content string) err
 	return err
 }
 
-// EnsureSchema creates the local FTS5 tables if they don't exist.
+// EnsureSchema creates the local FTS5 tables if they don't exist. The four
+// statements run in one transaction: at SQLite's default journal settings
+// each autocommit DDL is its own fsync barrier, and under load this call
+// alone has overrun a 10s context. Open the handle with OpenLocalIndex so
+// every connection carries WAL and synchronous=NORMAL as well.
 func (h *HybridSearcher) EnsureSchema(ctx context.Context) error {
 	const ddl = `
 CREATE TABLE IF NOT EXISTS local_memories (
@@ -249,8 +253,15 @@ CREATE TRIGGER IF NOT EXISTS local_memories_ad AFTER DELETE ON local_memories BE
 	VALUES ('delete', old.rowid, old.content, old.id);
 END;
 `
-	_, err := h.db.ExecContext(ctx, ddl)
-	return err
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("local index schema: begin: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, ddl); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("local index schema: %w", err)
+	}
+	return tx.Commit()
 }
 
 func (h *HybridSearcher) ftsSearch(ctx context.Context, query string) ([]HybridResult, error) {
