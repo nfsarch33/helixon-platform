@@ -500,6 +500,97 @@ func (s *SessionStore) AppendRunTurn(ctx context.Context, runID, owner, sessionI
 	return turn, nil
 }
 
+// RunFilter narrows ListRuns. A zero filter lists every run, newest first.
+type RunFilter struct {
+	// Status keeps only runs in this state ("" = any).
+	Status RunStatus
+	// Limit caps the result (<= 0 = 100).
+	Limit int
+}
+
+// ListRuns returns runs newest first (created_at, then rowid, so two runs
+// created in the same clock tick keep insertion order).
+func (s *SessionStore) ListRuns(ctx context.Context, f RunFilter) ([]RunRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	q := `SELECT ` + runColumns + ` FROM runs`
+	args := []any{}
+	if f.Status != "" {
+		q += ` WHERE status = ?`
+		args = append(args, string(f.Status))
+	}
+	q += ` ORDER BY created_at DESC, rowid DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list runs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []RunRecord
+	for rows.Next() {
+		r, err := scanRun(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan run: %w", err)
+		}
+		out = append(out, *r)
+	}
+	return out, rows.Err()
+}
+
+// RunUsage is what the runs since a point in time cost: counts by status
+// and the provider-reported tokens they consumed.
+type RunUsage struct {
+	Since      time.Time `json:"since"`
+	Runs       int       `json:"runs"`
+	Running    int       `json:"running"`
+	Completed  int       `json:"completed"`
+	Failed     int       `json:"failed"`
+	NeedsHuman int       `json:"needs_human"`
+	TokensIn   int       `json:"tokens_in"`
+	TokensOut  int       `json:"tokens_out"`
+}
+
+// RunUsage sums the runs created at or after since. A zero since counts
+// every run. Tokens are the counts FinishRun recorded, so a run still in
+// flight contributes zero until it ends.
+func (s *SessionStore) RunUsage(ctx context.Context, since time.Time) (RunUsage, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	u := RunUsage{Since: since.UTC()}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT status, COUNT(*), COALESCE(SUM(tokens_in), 0), COALESCE(SUM(tokens_out), 0) FROM runs WHERE created_at >= ? GROUP BY status`,
+		since.UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return u, fmt.Errorf("run usage: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var status string
+		var n, in, out int
+		if err := rows.Scan(&status, &n, &in, &out); err != nil {
+			return u, fmt.Errorf("run usage: scan: %w", err)
+		}
+		u.Runs += n
+		u.TokensIn += in
+		u.TokensOut += out
+		switch RunStatus(status) {
+		case RunRunning:
+			u.Running += n
+		case RunCompleted:
+			u.Completed += n
+		case RunFailed:
+			u.Failed += n
+		case RunNeedsHuman:
+			u.NeedsHuman += n
+		}
+	}
+	return u, rows.Err()
+}
+
 // appendTurnTx is AppendTurn's body against an explicit transaction, so a run
 // row and its user turn can be committed together. The caller holds s.mu.
 func appendTurnTx(ctx context.Context, tx *sql.Tx, sessionID string, role Role, content string, toolCalls json.RawMessage, toolCallID string, tokensIn, tokensOut int, now time.Time) (*Turn, error) {
