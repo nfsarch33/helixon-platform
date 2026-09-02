@@ -182,9 +182,13 @@ END;
 	}
 	// Created after ensureTurnSeq so it also lands on databases that predate the
 	// column. This is the index ListTurns reads.
-	_, err := db.ExecContext(ctx,
-		`CREATE INDEX IF NOT EXISTS idx_turns_session_seq ON turns(session_id, seq)`)
-	return err
+	if _, err := db.ExecContext(ctx,
+		`CREATE INDEX IF NOT EXISTS idx_turns_session_seq ON turns(session_id, seq)`); err != nil {
+		return err
+	}
+	// Durable runs and their steps (runstore.go); IF NOT EXISTS, so a database
+	// from before they existed gains them on open.
+	return migrateRuns(ctx, db)
 }
 
 // ensureTurnSeq adds turns.seq to databases created before it existed and

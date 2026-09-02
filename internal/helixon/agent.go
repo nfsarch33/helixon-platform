@@ -286,6 +286,21 @@ func (r *Runtime) Run(ctx context.Context) error {
 
 	var wg sync.WaitGroup
 
+	// Runs whose worker died (this process, last time) are finished first, so
+	// a ticket left claimed by a crash is completed or escalated instead of
+	// sitting claimed until a human notices.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		stats, err := r.RecoverInterruptedRuns(ctx)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			r.logger.Warn("run recovery stopped early", slog.String("error", err.Error()))
+		}
+		r.logger.Info("run recovery finished",
+			slog.Int("dead_lettered", stats.DeadLettered), slog.Int("resumed", stats.Resumed),
+			slog.Int("completed", stats.Completed), slog.Int("escalated", stats.Escalated), slog.Int("failed", stats.Failed))
+	}()
+
 	if r.sprintCtl != nil {
 		wg.Add(1)
 		go func() {
@@ -414,6 +429,68 @@ func (r *Runtime) HandleMessage(ctx context.Context, msg IncomingMessage) (strin
 	return result.FinalContent, nil
 }
 
+// RecoveryStats summarizes one RecoverInterruptedRuns sweep.
+type RecoveryStats struct {
+	DeadLettered int
+	Resumed      int
+	Completed    int
+	Escalated    int
+	Failed       int
+}
+
+// RecoverInterruptedRuns finishes every run whose lease has lapsed: runs that
+// spent their attempt budget are dead-lettered, the rest are resumed from the
+// durable log by the same agent loop, and a ticket run's outcome is reported
+// to the board through the poller's one report path (complete with evidence,
+// or escalate). It runs at start-up and may be called by an operator command.
+// Runs are handled sequentially: recovery competes with live work for the
+// same model and tool budgets, and a burst of parallel resumes after a fleet
+// restart is the one thing this must not become.
+func (r *Runtime) RecoverInterruptedRuns(ctx context.Context) (RecoveryStats, error) {
+	var st RecoveryStats
+	if r.store == nil || r.agent == nil {
+		return st, errors.New("helixon: recovery needs an initialized runtime")
+	}
+	dead, err := r.store.DeadLetterExhausted(ctx, r.agent.MaxRunAttempts())
+	if err != nil {
+		return st, fmt.Errorf("dead-letter exhausted runs: %w", err)
+	}
+	st.DeadLettered = dead
+	runs, err := r.store.ListInterruptedRuns(ctx)
+	if err != nil {
+		return st, fmt.Errorf("list interrupted runs: %w", err)
+	}
+	for i := range runs {
+		run := &runs[i]
+		if ctx.Err() != nil {
+			return st, ctx.Err()
+		}
+		res, runErr := r.agent.Resume(ctx, run.ID)
+		if errors.Is(runErr, agent.ErrLeaseHeld) || errors.Is(runErr, agent.ErrRunFinished) {
+			continue // another worker took it, or finished it, between the listing and the claim
+		}
+		st.Resumed++
+		final := ""
+		if res != nil {
+			final = res.FinalContent
+		}
+		if runErr == nil {
+			st.Completed++
+		} else {
+			st.Failed++
+		}
+		if tid := run.Meta["ticket_id"]; tid != "" && r.poller != nil {
+			if r.poller.ReportRecovered(ctx, tid, final, runErr) {
+				st.Escalated++
+			}
+		}
+		r.logger.Info("recovered interrupted run", slog.String("run_id", run.ID),
+			slog.String("ticket_id", run.Meta["ticket_id"]), slog.Int("attempts", run.Attempts),
+			slog.Bool("completed", runErr == nil))
+	}
+	return st, nil
+}
+
 // buildTicketPoller constructs the serve-mode poller when the feature flag is
 // on. It runs during Configure, not Run, so a misconfiguration (no board, a
 // per-ticket budget shorter than the agent's own timeout) fails at start-up
@@ -478,7 +555,11 @@ func (r *Runtime) runTicketWork(ctx context.Context, ticket controlplane.Ticket)
 	}
 	prompt := TicketPrompt(ticket)
 	prompt = r.withRecalledContext(ctx, prompt)
-	result, runErr := r.agent.Run(ctx, sess.ID, prompt)
+	// A durable run carrying the ticket id, so a worker that dies mid-ticket
+	// leaves something RecoverInterruptedRuns can finish and report.
+	result, runErr := r.agent.RunDurable(ctx, agent.NewRunID(), sess.ID, prompt, map[string]string{
+		"channel": "ticket", "ticket_id": ticket.ID,
+	})
 	final := ""
 	if result != nil {
 		final = result.FinalContent

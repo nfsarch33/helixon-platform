@@ -411,32 +411,57 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 
 	// A detached context: the parent is alive, but the per-ticket deadline may
 	// have fired, and the report must still get out.
-	reportCtx, reportCancel := context.WithTimeout(context.WithoutCancel(parent), 30*time.Second)
+	p.report(context.WithoutCancel(parent), ticket, result, err, started)
+}
+
+// report posts a run's outcome to the board: escalate on error or on empty
+// evidence, complete otherwise. It is the ONE report path, shared by a live
+// ticket run and by a run the recovery sweep finished after a crash, so both
+// use the same escalation vocabulary and move the same counters. Returns
+// true when the ticket was escalated rather than completed.
+//
+//nolint:gocritic // hugeParam: see runTicket
+func (p *TicketPoller) report(parent context.Context, ticket controlplane.Ticket, result string, err error, started time.Time) bool {
+	reportCtx, reportCancel := context.WithTimeout(parent, 30*time.Second)
 	defer reportCancel()
 
+	observe := func(outcome string) {
+		if !started.IsZero() {
+			p.metrics.ObserveRunDuration(outcome, time.Since(started))
+		}
+	}
 	if err != nil {
 		p.escalate(reportCtx, ticket, err, result)
-		p.metrics.ObserveRunDuration(agentmetrics.RunEscalated, time.Since(started))
-		return
+		observe(agentmetrics.RunEscalated)
+		return true
 	}
 	evidence := truncateEvidence(result, maxEvidenceBytes)
 	if evidence == "" {
 		// An empty final message is not evidence. Treat it the same way the
 		// completion gate treats a missing verifier verdict: escalate.
 		p.escalate(reportCtx, ticket, errors.New("agent produced no final output"), "")
-		p.metrics.ObserveRunDuration(agentmetrics.RunEscalated, time.Since(started))
-		return
+		observe(agentmetrics.RunEscalated)
+		return true
 	}
 	if cerr := p.board.CompleteTicket(reportCtx, ticket.ID, evidence); cerr != nil {
 		p.bump(func(s *TicketPollerStats) { s.Errors++ })
 		p.logger.Error("ticket completed but the board rejected the report",
 			slog.String("ticket", ticket.ID), slog.String("error", cerr.Error()))
-		return
+		return false
 	}
 	p.bump(func(s *TicketPollerStats) { s.Completed++ })
 	p.metrics.TicketCompleted()
-	p.metrics.ObserveRunDuration(agentmetrics.RunCompleted, time.Since(started))
+	observe(agentmetrics.RunCompleted)
 	p.logger.Info("ticket completed", slog.String("ticket", ticket.ID))
+	return false
+}
+
+// ReportRecovered reports the outcome of a ticket run that the recovery sweep
+// resumed after its worker died. The board only needs the ticket id; the run
+// duration is unknown (it spans a crash), so a zero start time tells report
+// not to sample it.
+func (p *TicketPoller) ReportRecovered(ctx context.Context, ticketID, result string, runErr error) bool {
+	return p.report(context.WithoutCancel(ctx), controlplane.Ticket{ID: ticketID}, result, runErr, time.Time{})
 }
 
 // escalate posts the failure evidence as a comment and leaves the ticket

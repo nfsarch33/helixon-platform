@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,7 @@ import (
 
 func newTestStore(t *testing.T) *SessionStore {
 	t.Helper()
-	dsn := filepath.Join(t.TempDir(), "test.db")
+	dsn := testDBPath(t, "test.db")
 	store, err := NewSessionStore(context.Background(), dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = store.Close() })

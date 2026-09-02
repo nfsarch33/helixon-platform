@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -47,7 +46,7 @@ func (m *mockToolExecutor) Available() []llm.Tool {
 
 func newTestAgent(t *testing.T, provider llm.Provider, tools ToolExecutor) (*Agent, *SessionStore) {
 	t.Helper()
-	dsn := filepath.Join(t.TempDir(), "agent_test.db")
+	dsn := testDBPath(t, "agent_test.db")
 	store, err := NewSessionStore(context.Background(), dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = store.Close() })
@@ -177,7 +176,7 @@ func TestAgentMaxIterations(t *testing.T) {
 		results: map[string]string{"noop": "ok"},
 	}
 
-	dsn := filepath.Join(t.TempDir(), "test.db")
+	dsn := testDBPath(t, "test.db")
 	store, err := NewSessionStore(context.Background(), dsn)
 	require.NoError(t, err)
 	defer func() { _ = store.Close() }()
@@ -230,7 +229,7 @@ func TestAgentBudgetExhaust(t *testing.T) {
 		results: map[string]string{"noop": "ok"},
 	}
 
-	dsn := filepath.Join(t.TempDir(), "test.db")
+	dsn := testDBPath(t, "test.db")
 	store, err := NewSessionStore(context.Background(), dsn)
 	require.NoError(t, err)
 	defer func() { _ = store.Close() }()

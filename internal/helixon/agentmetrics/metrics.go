@@ -28,6 +28,7 @@ package agentmetrics
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -142,6 +143,10 @@ const (
 	NameTokens      = "hlxn_agent_tokens_total"
 	NameRunDuration = "hlxn_agent_run_duration_seconds"
 	NameBuildInfo   = "hlxn_agent_build_info"
+	// NameGoroutines is the live goroutine count of the agent process. A loop
+	// that leaks a goroutine per run shows up here as a staircase long before
+	// it shows up as an OOM; goleak covers tests, this covers production.
+	NameGoroutines = "hlxn_agent_goroutines"
 )
 
 // Names returns every metric name in the contract, in contract order.
@@ -150,6 +155,7 @@ func Names() []string {
 		NameTicketsClaimed, NameTicketsCompleted, NameEscalations,
 		NameVerifierRuns, NameLoopIterations, NameToolCalls,
 		NameSandboxFailures, NameTokens, NameRunDuration, NameBuildInfo,
+		NameGoroutines,
 	}
 }
 
@@ -165,6 +171,7 @@ type Metrics struct {
 	tokens           *prometheus.CounterVec
 	runDuration      *prometheus.HistogramVec
 	buildInfo        *prometheus.GaugeVec
+	goroutines       prometheus.GaugeFunc
 }
 
 // New builds the collectors, registers them with reg, and publishes revision as
@@ -226,6 +233,10 @@ func New(reg prometheus.Registerer, revision string) (*Metrics, error) {
 			Name: NameBuildInfo,
 			Help: "Always 1; the revision label identifies the running build.",
 		}, []string{"revision"}),
+		goroutines: prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: NameGoroutines,
+			Help: "Goroutines alive in the agent process, sampled at scrape time.",
+		}, func() float64 { return float64(runtime.NumGoroutine()) }),
 	}
 	for _, c := range m.collectors() {
 		if err := reg.Register(c); err != nil {
@@ -241,7 +252,7 @@ func (m *Metrics) collectors() []prometheus.Collector {
 	return []prometheus.Collector{
 		m.ticketsClaimed, m.ticketsCompleted, m.escalations, m.verifierRuns,
 		m.loopIterations, m.toolCalls, m.sandboxFailures, m.tokens,
-		m.runDuration, m.buildInfo,
+		m.runDuration, m.buildInfo, m.goroutines,
 	}
 }
 

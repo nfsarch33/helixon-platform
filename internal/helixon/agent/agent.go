@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nfsarch33/helixon-platform/internal/callbacks"
 	"github.com/nfsarch33/helixon-platform/internal/llm"
 )
@@ -55,6 +57,12 @@ type Config struct {
 	Completion CompletionPolicy
 	// Observer, when non-nil, receives loop telemetry. Optional.
 	Observer RunObserver
+	// LeaseTTL is how long a worker's claim on a run stays valid without a
+	// renewal; a run whose lease lapses is resumable by any worker. Default 30s.
+	LeaseTTL time.Duration
+	// MaxRunAttempts caps how many times an interrupted run is claimed before
+	// the recovery sweep dead-letters it. Default 3.
+	MaxRunAttempts int
 }
 
 func (c Config) withDefaults() Config {
@@ -70,6 +78,12 @@ func (c Config) withDefaults() Config {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
 	}
+	if c.LeaseTTL <= 0 {
+		c.LeaseTTL = defaultLeaseTTL
+	}
+	if c.MaxRunAttempts <= 0 {
+		c.MaxRunAttempts = 3
+	}
 	c.Completion = c.Completion.withDefaults()
 	return c
 }
@@ -81,6 +95,14 @@ type Agent struct {
 	store    *SessionStore
 	cfg      Config
 	logger   *slog.Logger
+	// owner identifies this instance as a run-lease owner (see run_durable.go).
+	owner string
+	// active is the set of run ids this instance is executing right now. The
+	// lease alone cannot refuse a second entry by the SAME owner, and two loops
+	// on one run in one process would be the duplicated side effect the lease
+	// exists to prevent.
+	activeMu sync.Mutex
+	active   map[string]struct{}
 }
 
 // New creates an Agent wired to the given provider, tool executor, and session store.
@@ -92,6 +114,8 @@ func New(provider llm.Provider, tools ToolExecutor, store *SessionStore, cfg Con
 		store:    store,
 		cfg:      cfg,
 		logger:   cfg.Logger.With(slog.String("component", "helixon.agent")),
+		owner:    newOwner(),
+		active:   map[string]struct{}{},
 	}
 }
 
@@ -132,39 +156,10 @@ type RunResult struct {
 //	recordAssistantTurn     - persist assistant turn with optional tool payload
 //	finalizeRun             - decide final/continue based on tool-call presence
 func (a *Agent) Run(ctx context.Context, sessionID, userMessage string) (*RunResult, error) {
-	ctx, result, cleanup, err := a.startRun(ctx, sessionID, userMessage)
-	if err != nil {
-		return nil, err
-	}
-	defer cleanup()
-	for iter := 0; iter < a.cfg.MaxIterations; iter++ {
-		result.Iterations = iter + 1
-		final, err := a.iterateRun(ctx, sessionID, iter+1, userMessage, result)
-		if err != nil {
-			return result, err
-		}
-		if final {
-			return result, nil
-		}
-	}
-	result.Err = ErrMaxIterations
-	return result, ErrMaxIterations
-}
-
-// startRun applies the agent timeout, persists the user turn, and returns the
-// derived context, a fresh RunResult, and a cleanup func that releases the
-// timeout-derived resources when the caller is done.
-func (a *Agent) startRun(ctx context.Context, sessionID, userMessage string) (context.Context, *RunResult, func(), error) {
-	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
-	cleanup := func() { cancel() }
-	if _, err := a.store.AppendTurn(ctx, sessionID, RoleUser, userMessage, nil, "", 0, 0); err != nil {
-		// Classified BEFORE cleanup: cleanup cancels ctx, and a cancelled
-		// context must not be allowed to decide why the store failed.
-		wrapped := storeErr(ctx, "append user turn", err)
-		cleanup()
-		return nil, nil, func() {}, wrapped
-	}
-	return ctx, &RunResult{SessionID: sessionID}, cleanup, nil
+	// Every entry point is durable: a fresh run id, the user turn written in
+	// the same transaction as the run row, a lease, and a terminal record.
+	// See run_durable.go for the lifecycle and for Resume.
+	return a.RunDurable(ctx, uuid.New().String(), sessionID, userMessage, nil)
 }
 
 // iterateRun runs one model iteration and reports whether the loop can exit.
@@ -173,7 +168,7 @@ func (a *Agent) startRun(ctx context.Context, sessionID, userMessage string) (co
 //
 // Returned error covers: budget/timeout guard, build failure, model failure,
 // store failure, or tool-execute failure.
-func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, userMessage string, result *RunResult) (final bool, err error) {
+func (a *Agent) iterateRun(ctx context.Context, runID, sessionID string, iter int, userMessage string, result *RunResult) (final bool, err error) {
 	if err := checkRunTermination(ctx, result, iter, a.cfg.MaxTokens, a.cfg.MaxIterations); err != nil {
 		return false, err
 	}
@@ -188,7 +183,7 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	if err != nil {
 		return false, storeErr(ctx, "build messages", err)
 	}
-	ctx = a.notifyRunStart(ctx, sessionID, iter, userMessage)
+	ctx = a.notifyRunStart(ctx, runID, iter, userMessage)
 
 	resp, err := a.invokeModel(ctx, sessionID, messages, iter)
 	if err != nil {
@@ -206,7 +201,8 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 		slog.Int("tokens_in", resp.Usage.PromptTokens),
 		slog.Int("tokens_out", resp.Usage.CompletionTokens),
 	)
-	if err := a.recordAssistantTurn(ctx, sessionID, &choice, resp.Usage); err != nil {
+	assistantSeq, err := a.recordAssistantTurn(ctx, runID, sessionID, &choice, resp.Usage)
+	if err != nil {
 		return false, err
 	}
 	done, err := finalizeRun(result, choice.Message.Content, len(choice.Message.ToolCalls))
@@ -235,7 +231,7 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	if err := checkTokenBudget(result, a.cfg.MaxTokens); err != nil {
 		return false, err
 	}
-	if err := a.executeToolCalls(ctx, sessionID, choice.Message.ToolCalls, result); err != nil {
+	if err := a.executeToolCalls(ctx, runID, sessionID, iter, assistantSeq, choice.Message.ToolCalls, result); err != nil {
 		return false, err
 	}
 	return false, nil
@@ -245,12 +241,35 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 // per call. It also maintains the completion-gate bookkeeping: which tools
 // changed state, and whether the verifier has passed or failed consecutively.
 //
-// Returns a wrapped error if the store rejects any append, or
-// ErrNeedsHumanApproval once the verifier has failed MaxConsecutiveFailures
-// times in a row — the loop stops there rather than retrying forever.
-func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []llm.ToolCall, result *RunResult) error {
+// Every call is bracketed by a durable step: BeginStep before dispatch,
+// FinishStep after the tool turn is written. On a resumed run BeginStep
+// finds the step already there, and settleReplayedStep decides from the
+// durable log whether the call is done, must be re-run, or must stop the run
+// for a human (a mutating call with no recorded outcome).
+//
+// Returns a wrapped error if the store rejects any write, ErrInterruptedMutation
+// for the unknown-outcome case, or ErrNeedsHumanApproval once the verifier has
+// failed MaxConsecutiveFailures times in a row — the loop stops there rather
+// than retrying forever.
+//
+// iteration scopes the step key (tool call ids repeat across responses for
+// some providers) and assistantSeq bounds the tool-turn lookup on replay.
+func (a *Agent) executeToolCalls(ctx context.Context, runID, sessionID string, iteration int, assistantSeq int64, calls []llm.ToolCall, result *RunResult) error {
 	for _, tc := range calls {
 		name := tc.Function.Name
+		step, created, err := a.store.BeginStep(ctx, runID, iteration, tc.ID, name, tc.Function.Arguments)
+		if err != nil {
+			return storeErr(ctx, "begin step", err)
+		}
+		if !created {
+			settled, err := a.settleReplayedStep(ctx, runID, sessionID, assistantSeq, step, result)
+			if err != nil {
+				return err
+			}
+			if settled {
+				continue
+			}
+		}
 		toolResult, toolErr := a.tools.Execute(ctx, name, tc.Function.Arguments)
 		if a.cfg.Completion.isMutating(name) {
 			result.Mutated = true
@@ -259,8 +278,15 @@ func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []
 		if toolErr != nil {
 			toolResult = fmt.Sprintf("error: %s", toolErr.Error())
 		}
-		if _, err := a.store.AppendTurn(ctx, sessionID, RoleTool, toolResult, nil, tc.ID, 0, 0); err != nil {
+		if _, err := a.store.AppendRunTurn(ctx, runID, a.owner, sessionID, RoleTool, toolResult, nil, tc.ID, 0, 0); err != nil {
 			return storeErr(ctx, "append tool turn", err)
+		}
+		stepStatus := StepDone
+		if toolErr != nil {
+			stepStatus = StepFailed
+		}
+		if err := a.store.FinishStep(ctx, runID, iteration, tc.ID, stepStatus, toolResult); err != nil {
+			return storeErr(ctx, "finish step", err)
 		}
 		if escalate {
 			result.NeedsHumanApproval = true
@@ -274,6 +300,56 @@ func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []
 		}
 	}
 	return nil
+}
+
+// settleReplayedStep decides what a resumed run does with a tool call it has
+// seen before. It returns settled=true when nothing must be dispatched:
+//
+//   - the step already finished: its tool turn is in the log;
+//   - the step is pending but its tool turn exists: the crash landed between
+//     the append and FinishStep, so the turn IS the outcome - close the step;
+//   - the step is pending, no tool turn, and the tool is mutating: the outcome
+//     is unknowable, so the run stops for a human (ErrInterruptedMutation)
+//     with a tool turn saying so, rather than risk a second side effect.
+//
+// It returns settled=false for a pending, unrecorded, non-mutating call:
+// re-reading is free of side effects, so the caller dispatches it again.
+func (a *Agent) settleReplayedStep(ctx context.Context, runID, sessionID string, assistantSeq int64, step *RunStep, result *RunResult) (bool, error) {
+	if step.Status != StepPending {
+		if a.cfg.Completion.isMutating(step.Tool) {
+			result.Mutated = true
+		}
+		return true, nil
+	}
+	recorded, err := a.store.ToolTurnExists(ctx, sessionID, assistantSeq, step.ToolCallID)
+	if err != nil {
+		return false, storeErr(ctx, "look up tool turn", err)
+	}
+	if recorded {
+		if err := a.store.FinishStep(ctx, runID, step.Iteration, step.ToolCallID, StepDone, ""); err != nil {
+			return false, storeErr(ctx, "close replayed step", err)
+		}
+		if a.cfg.Completion.isMutating(step.Tool) {
+			result.Mutated = true
+		}
+		return true, nil
+	}
+	if !a.cfg.Completion.isMutating(step.Tool) {
+		return false, nil
+	}
+	note := fmt.Sprintf("error: tool %s was interrupted before its outcome was recorded; a human must confirm its effect before the run continues", step.Tool)
+	if _, err := a.store.AppendRunTurn(ctx, runID, a.owner, sessionID, RoleTool, note, nil, step.ToolCallID, 0, 0); err != nil {
+		return false, storeErr(ctx, "append interrupted tool turn", err)
+	}
+	if err := a.store.FinishStep(ctx, runID, step.Iteration, step.ToolCallID, StepFailed, note); err != nil {
+		return false, storeErr(ctx, "fail interrupted step", err)
+	}
+	result.Mutated = true
+	result.NeedsHumanApproval = true
+	result.Err = ErrInterruptedMutation
+	a.logger.Warn("resumed run found a mutating tool call with no recorded outcome; stopping for human approval",
+		slog.String("run_id", runID), slog.String("tool", step.Tool), slog.String("tool_call_id", step.ToolCallID))
+	return true, ErrInterruptedMutation
 }
 
 // recordVerifierOutcome updates the verifier bookkeeping for one tool call
@@ -392,16 +468,20 @@ func (a *Agent) invokeModel(ctx context.Context, sessionID string, messages []ll
 // SessionTokenUsage summed to zero for every session ever recorded and the
 // per-turn cost of a run was unrecoverable after the fact. The provider
 // already returns Usage on each response; it just was not being written down.
-func (a *Agent) recordAssistantTurn(ctx context.Context, sessionID string, choice *llm.Choice, usage llm.Usage) error {
+//
+// It returns the turn's seq, which bounds the replay lookup for this
+// iteration's tool calls.
+func (a *Agent) recordAssistantTurn(ctx context.Context, runID, sessionID string, choice *llm.Choice, usage llm.Usage) (int64, error) {
 	var toolCallsJSON json.RawMessage
 	if len(choice.Message.ToolCalls) > 0 {
 		toolCallsJSON, _ = json.Marshal(choice.Message.ToolCalls)
 	}
-	if _, err := a.store.AppendTurn(ctx, sessionID, RoleAssistant, choice.Message.Content,
-		toolCallsJSON, "", usage.PromptTokens, usage.CompletionTokens); err != nil {
-		return storeErr(ctx, "append assistant turn", err)
+	turn, err := a.store.AppendRunTurn(ctx, runID, a.owner, sessionID, RoleAssistant, choice.Message.Content,
+		toolCallsJSON, "", usage.PromptTokens, usage.CompletionTokens)
+	if err != nil {
+		return 0, storeErr(ctx, "append assistant turn", err)
 	}
-	return nil
+	return turn.Seq, nil
 }
 
 // finalizeRun inspects the assistant content and tool-call presence on the
