@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -22,22 +23,76 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// liveRequiredEnv turns "daemon unreachable" from a skip into a failure when
+// set to any non-empty value. CI on the runner that shares a host with the
+// daemon sets it: a silently skipped roundtrip would otherwise read as green,
+// which is exactly how a wire-schema drift stays invisible until an agent
+// hits it in production.
+const liveRequiredEnv = "HLXN_ENGRAM_LIVE_REQUIRED"
+
 func liveEngramURL(t *testing.T) string {
 	t.Helper()
 	baseURL := os.Getenv("ENGRAM_URL")
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:8280"
 	}
+	if reason := liveProbe(baseURL); reason != "" {
+		if liveRequired() {
+			t.Fatalf("%s is set: %s", liveRequiredEnv, reason)
+		}
+		t.Skip(reason)
+	}
+	return baseURL
+}
+
+// liveRequired reports whether an unreachable daemon must fail the test
+// instead of skipping it.
+func liveRequired() bool { return os.Getenv(liveRequiredEnv) != "" }
+
+// liveProbe returns "" when the daemon answers GET /healthz with 200, else
+// the reason to put in the skip or failure message.
+func liveProbe(baseURL string) string {
 	probe := &http.Client{Timeout: 2 * time.Second}
 	resp, err := probe.Get(baseURL + "/healthz") //nolint:gosec // G704 ENGRAM_URL is operator test config; defaults to loopback
 	if err != nil {
-		t.Skipf("engram daemon not reachable at %s: %v", baseURL, err)
+		return fmt.Sprintf("engram daemon not reachable at %s: %v", baseURL, err)
 	}
 	defer resp.Body.Close() //nolint:errcheck
 	if resp.StatusCode != http.StatusOK {
-		t.Skipf("engram daemon at %s unhealthy: status %d", baseURL, resp.StatusCode)
+		return fmt.Sprintf("engram daemon at %s unhealthy: status %d", baseURL, resp.StatusCode)
 	}
-	return baseURL
+	return ""
+}
+
+// TestLiveProbe_ReportsWhyItCannotRun pins the gate's halves: a healthy
+// daemon yields no reason; a non-200 /healthz and a closed port each yield
+// one, so the skip/failure message always says what was wrong.
+func TestLiveProbe_ReportsWhyItCannotRun(t *testing.T) {
+	healthy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer healthy.Close()
+	assert.Empty(t, liveProbe(healthy.URL))
+
+	sick := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer sick.Close()
+	assert.Contains(t, liveProbe(sick.URL), "unhealthy")
+
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closedURL := closed.URL
+	closed.Close()
+	assert.Contains(t, liveProbe(closedURL), "not reachable")
+}
+
+// TestLiveRequired_ReadsTheEnv: the env var, and only the env var, decides
+// whether an unreachable daemon is a skip or a failure.
+func TestLiveRequired_ReadsTheEnv(t *testing.T) {
+	t.Setenv(liveRequiredEnv, "")
+	assert.False(t, liveRequired())
+	t.Setenv(liveRequiredEnv, "1")
+	assert.True(t, liveRequired())
 }
 
 // TestEngramClient_LiveAddGetDelete round-trips a memory through the real
