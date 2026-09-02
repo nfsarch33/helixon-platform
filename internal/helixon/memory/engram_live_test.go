@@ -101,7 +101,13 @@ func TestLiveRequired_ReadsTheEnv(t *testing.T) {
 // daemon (never by touching engram.db directly).
 func TestEngramClient_LiveAddGetDelete(t *testing.T) {
 	baseURL := liveEngramURL(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// The budget covers the daemon's own per-request timeout (30s) for each
+	// of Add and Delete, not a latency expectation: Add blocks on the
+	// embedder, and on a loaded host the primary embedder has been measured
+	// timing out and falling through, so one Add took 27s. This test checks
+	// the wire schema; with the gate required in CI, a tight budget would
+	// turn host load into a false red.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	client := NewEngramClient(EngramConfig{BaseURL: baseURL}, nil)
