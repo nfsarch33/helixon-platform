@@ -1,11 +1,18 @@
 name: Console
 
 # The operator console (web/console) is a Next.js static export embedded into
-# the helixon binary behind the `console` build tag (docs/adr/0004). This job
-# proves three things on every change to it: the app type-checks, lints and
-# passes its unit tests; it builds to a static export; and the binary built
-# with the tag serves that export at /console/ (the Go test only runs with
-# the tag, so a green run means the embed is real, not skipped).
+# the helixon binary behind the `console` build tag (docs/adr/0004).
+#
+# What a green run here does and does not prove. It proves the app
+# type-checks, lints, passes its unit tests above their coverage floor, and
+# builds to a static export; that the export embeds and is served through the
+# Go handler with real assets, not just an index page; and that `helixon`
+# itself still links with the tag on. It does not exercise the console in a
+# browser - that is what `npm run e2e` is for, and it is not run here.
+#
+# The last two steps are the ones with teeth: the tagged Go test cannot pass
+# without a real export behind it, and the tagged build of package main is the
+# only step that compiles the binary the operator actually runs.
 
 on:
   pull_request:
@@ -22,6 +29,15 @@ on:
 
 permissions:
   contents: read
+
+# This is the heaviest job in the estate - a full npm install, a Next build and
+# two -race Go test runs - and the runners are self-hosted and serial. Without
+# a group, three pushes to one branch queue three of these behind each other
+# and everything else in the repo waits on them. The sibling workflows in this
+# repo carry the same block for the same reason.
+concurrency:
+  group: console-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   console:
@@ -45,7 +61,7 @@ jobs:
         run: npx tsc --noEmit
       - name: lint
         run: npx eslint .
-      - name: unit tests
+      - name: unit tests (coverage thresholds enforced in vitest.config.ts)
         run: npx vitest run
       - name: build the static export and stage it for embedding
         run: npm run build:embed
@@ -55,3 +71,10 @@ jobs:
       - name: the default build names the rebuild step
         working-directory: .
         run: go test -race -count=1 ./cmd/helixon/consolefs/
+      # The tests above exercise the consolefs package. Nothing had ever
+      # compiled package main under the tag, so a change that broke the mount
+      # site would have gone green here and failed only for whoever built the
+      # binary the operator runs.
+      - name: the binary itself links with the console in it
+        working-directory: .
+        run: go build -tags console -o /dev/null ./cmd/helixon

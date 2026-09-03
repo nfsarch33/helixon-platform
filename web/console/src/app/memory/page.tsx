@@ -9,7 +9,10 @@ export default function MemoryPage() {
   const { data, error, isLoading } = useMemorySearch(submitted);
   return (
     <Panel title="Memory search">
-      <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); setSubmitted(q); }}>
+      {/* Trim on submit: the API rejects a blank q with 400, and a query of
+          spaces used to be "submitted" without ever producing a request, so
+          the panel sat on <Loading/> for a search that was never made. */}
+      <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); setSubmitted(q.trim()); }}>
         <label className="sr-only" htmlFor="memory-q">Search memory</label>
         <input id="memory-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="What did the agent learn about…" className="flex-1 rounded border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900" />
         <button type="submit" className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white dark:bg-white dark:text-slate-900">Search</button>

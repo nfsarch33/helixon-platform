@@ -22,7 +22,7 @@ export default function OverviewPage() {
           </dl>
         )}
       </Panel>
-      <Panel title="Cost, last 24h">
+      <Panel title="Runs started, last 24 h">
         {costs.error ? <ErrorState error={costs.error} /> : !costs.data ? <Loading /> : (
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
             <dt className="text-slate-500">Runs</dt><dd>{fmtInt(costs.data.last_24h.runs)}</dd>

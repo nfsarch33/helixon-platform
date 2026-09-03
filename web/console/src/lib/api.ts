@@ -60,7 +60,18 @@ export interface RunUsage {
 }
 
 export interface RunsResponse { runs: RunRecord[]; generated_at: string }
-export interface RunDetail { run: RunRecord; steps: RunStep[]; turns: Turn[] }
+export interface RunDetail {
+  run: RunRecord;
+  steps: RunStep[];
+  // The API returns the turns of the SESSION the run belongs to, and says so
+  // in turns_scope; both lists are bounded by limit, with the truncation
+  // flags set when there was more than the bound.
+  turns: Turn[];
+  turns_scope?: string;
+  limit?: number;
+  steps_truncated?: boolean;
+  turns_truncated?: boolean;
+}
 export interface CostsResponse { last_24h: RunUsage; last_7d: RunUsage; all_time: RunUsage; generated_at: string }
 export interface TextfileMetric { name: string; labels?: Record<string, string>; value: number; file: string }
 export interface EvalsResponse {
@@ -94,6 +105,15 @@ export async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T>
   if (!res.ok) {
     const reason = (body as { error?: string } | null)?.error ?? `${res.status} ${res.statusText}`;
     throw new ApiError(res.status, reason, path);
+  }
+  // A 2xx whose body is empty or unparseable is not success. Returning it as
+  // `null` made every caller see `data === undefined && !error`, which each
+  // page renders as <Loading/> - a spinner that never resolves, for a request
+  // that already finished. An unreadable answer is an error and says so.
+  if (body === null || body === undefined) {
+    throw new ApiError(res.status, text.trim() === ""
+      ? "the server answered with an empty body"
+      : "the server answered with a body that is not JSON", path);
   }
   return body as T;
 }

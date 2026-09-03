@@ -26,11 +26,19 @@ export function Loading({ label = "Loading" }: { label?: string }) {
   return <p role="status" aria-live="polite" className="text-sm text-slate-500">{label}…</p>;
 }
 
+// A DOM id cannot contain whitespace, so a title of more than one word used
+// to produce an aria-labelledby pointing at no element at all: the section
+// was left with no accessible name, which is worse than having no landmark.
+function panelId(title: string) {
+  return `panel-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
 export function Panel({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
+  const id = panelId(title);
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby={`panel-${title}`}>
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby={id}>
       <div className="mb-3 flex items-center justify-between">
-        <h2 id={`panel-${title}`} className="text-base font-semibold">{title}</h2>
+        <h2 id={id} className="text-base font-semibold">{title}</h2>
         {actions}
       </div>
       {children}

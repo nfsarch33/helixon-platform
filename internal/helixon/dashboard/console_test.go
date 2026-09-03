@@ -1,9 +1,12 @@
 package dashboard
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,6 +24,10 @@ type fakeRuns struct {
 	steps map[string][]agent.RunStep
 	turns map[string][]agent.Turn
 	usage map[bool]agent.RunUsage // keyed by since.IsZero()
+	// ignoreTurnLimit models a RunView that does not apply the limit it is
+	// given, so the endpoint's own bound can be tested rather than the
+	// store's. The real SessionStore applies it in SQL.
+	ignoreTurnLimit bool
 }
 
 func (f *fakeRuns) ListRuns(_ context.Context, fl agent.RunFilter) ([]agent.RunRecord, error) {
@@ -49,8 +56,12 @@ func (f *fakeRuns) ListSteps(_ context.Context, runID string) ([]agent.RunStep, 
 	return f.steps[runID], nil
 }
 
-func (f *fakeRuns) ListTurns(_ context.Context, sessionID string, _ int) ([]agent.Turn, error) {
-	return f.turns[sessionID], nil
+func (f *fakeRuns) ListTurns(_ context.Context, sessionID string, limit int) ([]agent.Turn, error) {
+	t := f.turns[sessionID]
+	if limit > 0 && !f.ignoreTurnLimit && len(t) > limit {
+		t = t[:limit]
+	}
+	return t, nil
 }
 
 func (f *fakeRuns) RunUsage(_ context.Context, since time.Time) (agent.RunUsage, error) {
@@ -224,5 +235,171 @@ func TestParseSample(t *testing.T) {
 	}
 	if _, ok := parseSample("node_load1 0.5", "hlxn_"); ok {
 		t.Fatal("prefix must filter")
+	}
+}
+
+// An unknown ?status= used to answer 200 with an empty list, which reads
+// exactly like "nothing needs a human" -- the one answer an operator acts on
+// by walking away. A typo must be a rejection, and must say what is allowed.
+func TestConsole_AnUnknownStatusIsARejection(t *testing.T) {
+	f := &fakeRuns{runs: []agent.RunRecord{{ID: "r1", Status: agent.RunNeedsHuman}}}
+	mux := http.NewServeMux()
+	MountConsole(mux, f, nil, &ConsoleConfig{})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/v1/runs?status=needs-human")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400 -- a typo'd filter must not read as an empty fleet", resp.StatusCode)
+	}
+	if msg, _ := body["error"].(string); !strings.Contains(msg, "needs_human") {
+		t.Fatalf("the rejection does not name the allowed values: %q", msg)
+	}
+
+	// The control: a status the store can hold is still served, so the check
+	// above is a rejection of the unknown, not of filtering.
+	resp, err = http.Get(srv.URL + "/api/v1/runs?status=needs_human")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("a known status returned %d, want 200", resp.StatusCode)
+	}
+}
+
+// The run detail endpoint is polled, and the turns it returns belong to the
+// SESSION, which outlives the run. Both facts have to reach the client:
+// a bound, and the scope of what came back.
+func TestConsole_RunDetailIsBoundedAndSaysItsScope(t *testing.T) {
+	turns := make([]agent.Turn, 0, 40)
+	steps := make([]agent.RunStep, 0, 40)
+	for i := 0; i < 40; i++ {
+		turns = append(turns, agent.Turn{ID: fmt.Sprintf("t%d", i), SessionID: "s1", Role: "user", Seq: int64(i)})
+		steps = append(steps, agent.RunStep{RunID: "r1", Seq: int64(i), Iteration: i, ToolCallID: fmt.Sprintf("c%d", i), Tool: "shell"})
+	}
+	f := &fakeRuns{
+		runs:  []agent.RunRecord{{ID: "r1", SessionID: "s1", Status: agent.RunCompleted}},
+		steps: map[string][]agent.RunStep{"r1": steps},
+		turns: map[string][]agent.Turn{"s1": turns},
+	}
+	mux := http.NewServeMux()
+	MountConsole(mux, f, nil, &ConsoleConfig{})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/v1/runs/r1?limit=10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d RunDetail
+	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if d.TurnsScope != "session" {
+		t.Fatalf("turns_scope = %q, want \"session\" -- the console labels the panel from this", d.TurnsScope)
+	}
+	if d.Limit != 10 {
+		t.Fatalf("limit = %d, want 10", d.Limit)
+	}
+	if len(d.Steps) != 10 || !d.StepsTruncated {
+		t.Fatalf("steps: %d returned, truncated=%v; want 10 and true", len(d.Steps), d.StepsTruncated)
+	}
+	if len(d.Turns) != 10 || !d.TurnsTruncated {
+		t.Fatalf("turns: %d returned, truncated=%v; want 10 and true", len(d.Turns), d.TurnsTruncated)
+	}
+
+	// The bound is the endpoint's, not the store's: a view that ignores the
+	// limit it is handed must still not produce an unbounded response.
+	f.ignoreTurnLimit = true
+	resp, err = http.Get(srv.URL + "/api/v1/runs/r1?limit=10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d = RunDetail{}
+	_ = json.NewDecoder(resp.Body).Decode(&d)
+	_ = resp.Body.Close()
+	if len(d.Turns) != 10 || !d.TurnsTruncated {
+		t.Fatalf("a view ignoring the limit produced %d turns; the endpoint must cap at 10", len(d.Turns))
+	}
+	f.ignoreTurnLimit = false
+
+	// The control: a run whose lists fit under the bound is NOT reported as
+	// truncated, so the flag means something.
+	f.steps["r1"] = steps[:2]
+	f.turns["s1"] = turns[:2]
+	resp, err = http.Get(srv.URL + "/api/v1/runs/r1?limit=10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d = RunDetail{}
+	_ = json.NewDecoder(resp.Body).Decode(&d)
+	_ = resp.Body.Close()
+	if d.StepsTruncated || d.TurnsTruncated {
+		t.Fatalf("a short run is reported truncated: steps=%v turns=%v", d.StepsTruncated, d.TurnsTruncated)
+	}
+}
+
+// A gate that has nothing to report writes NaN, which is legal in a textfile
+// and impossible in JSON. Encoding it straight to the ResponseWriter failed
+// after 200 had gone out, and the console was handed a successful, empty
+// answer -- which it renders as a spinner that never resolves.
+func TestConsole_ANonFiniteSampleDoesNotEmptyTheResponse(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "hlxn_eval.prom"), []byte(
+		"# HELP hlxn_student_score_ratio ratio\n"+
+			"hlxn_student_score_ratio{tier=\"minimax\"} NaN\n"+
+			"hlxn_student_score_ratio{tier=\"local\"} +Inf\n"+
+			"hlxn_eval_tasks_total 52\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	MountConsole(mux, nil, nil, &ConsoleConfig{TextfileDir: dir, EvalLedgerPath: filepath.Join(dir, "none.ndjson")})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/v1/evals")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status %d, want 200: %s", resp.StatusCode, raw)
+	}
+	if len(bytes.TrimSpace(raw)) == 0 {
+		t.Fatal("200 with an empty body: the encoder failed after the status was sent")
+	}
+	var body struct {
+		Metrics []TextfileMetric `json:"metrics"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("the body is not JSON (%v): %s", err, raw)
+	}
+	// The finite sample survives; the two that cannot be carried are omitted
+	// rather than carried wrongly.
+	if len(body.Metrics) != 1 || body.Metrics[0].Name != "hlxn_eval_tasks_total" {
+		t.Fatalf("metrics = %+v, want only the finite sample", body.Metrics)
+	}
+}
+
+// The belt to that pair of braces: whatever the payload, a response that
+// cannot be encoded must not be a 200. Ranging over a channel-valued map is
+// the smallest thing json refuses.
+func TestConsole_AnUnencodableBodyIsNotA200(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeJSON(rec, http.StatusOK, map[string]any{"bad": make(chan int)})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status %d, want 500", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "could not be encoded") {
+		t.Fatalf("the failure does not say what happened: %s", rec.Body.String())
 	}
 }

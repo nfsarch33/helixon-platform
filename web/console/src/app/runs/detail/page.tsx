@@ -15,6 +15,11 @@ function RunDetailInner() {
   if (error) return <ErrorState error={error} />;
   if (!data) return <Loading label={`Loading run ${id.slice(0, 8)}`} />;
   const { run, steps, turns } = data;
+  // The API returns the turns of the SESSION this run belongs to, not of the
+  // run alone, and it says so in turns_scope. Labelling the panel
+  // "Conversation" would have presented a session's whole history as this
+  // run's, which is the kind of quiet over-claim an operator acts on.
+  const sessionScoped = data.turns_scope === "session";
   return (
     <div className="grid gap-4">
       <Panel title={`Run ${run.id.slice(0, 8)}`}>
@@ -44,7 +49,11 @@ function RunDetailInner() {
           </ol>
         )}
       </Panel>
-      <Panel title={`Conversation (${turns.length} turns)`}>
+      <Panel title={`Session conversation (${turns.length} turns)`}>
+        <p className="mb-2 text-xs text-slate-500">
+          {sessionScoped ? `Every turn of session ${run.session_id.slice(0, 8)}, which may span more than this run.` : "Turns recorded for this run."}
+          {data.turns_truncated ? ` Showing the first ${data.limit} — the session has more.` : ""}
+        </p>
         {turns.length === 0 ? <EmptyState title="No turns yet" /> : (
           <ol className="space-y-2 text-sm">
             {turns.map((t) => (

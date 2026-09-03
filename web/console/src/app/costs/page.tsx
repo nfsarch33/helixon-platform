@@ -24,7 +24,7 @@ export default function CostsPage() {
   if (!data) return <Loading />;
   return (
     <div className="grid gap-4 md:grid-cols-3">
-      <Window title="Last 24 hours" u={data.last_24h} />
+      <Window title="Runs started, last 24 h" u={data.last_24h} />
       <Window title="Last 7 days" u={data.last_7d} />
       <Window title="All time" u={data.all_time} />
       <p className="text-xs text-slate-500 md:col-span-3">Tokens are the provider-reported counts recorded when each run ended; a run still in flight contributes nothing until it ends.</p>

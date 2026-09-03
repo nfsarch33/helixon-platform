@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The operator console
 
-## Getting Started
+The console is the read-only view of one running Helixon agent: its runs, what
+each run did, what it cost, how the evaluation cycles are trending, and what is
+in memory. It renders what the agent's own API returns and nothing else - an
+empty list stays empty, an unreachable endpoint says so.
 
-First, run the development server:
+## How it reaches the agent
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+It is a **static export** (`output: "export"`, `basePath: "/console"`) embedded
+into the `helixon` binary and served by the agent at `/console/`. There is no
+Node process in production and no separate origin: the pages call
+`/api/v1/...` on the same host they were served from.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+That home is argued in `docs/adr/0004-operator-console-home.md`. Short version:
+the dashboard listener is a loopback, single-operator surface, so a static
+export is the whole of what is needed; the day the console is exposed to more
+than one person it moves to SSR behind the shared auth package, and the ADR
+says what that costs.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Running it against a live agent
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+    npm install
+    npm run dev            # http://localhost:3000/console/
 
-## Learn More
+`next dev` serves under the same basePath, so **`http://localhost:3000/` is a
+404 by design** - open `/console/`. Point it at a running agent with
 
-To learn more about Next.js, take a look at the following resources:
+    NEXT_PUBLIC_HLXN_API_BASE=http://127.0.0.1:9410 npm run dev
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Without that, `fetch` is same-origin and the dev server has no API to answer.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Building the console into the binary
 
-## Deploy on Vercel
+    npm run build:embed                       # in web/console
+    go build -tags console ./cmd/helixon      # from the repo root
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`build:embed` writes the export to `cmd/helixon/consolefs/out/`, which is
+**gitignored on purpose**: a checked-in build artefact goes stale silently,
+and a stale console is worse than none. The consequence is deliberate and
+worth knowing: `go build -tags console` on a fresh checkout fails with
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+    pattern all:out: no matching files found
+
+That is the intended failure. It is loud, it cannot ship by accident, and the
+fix is the `build:embed` line above. A default build (no tag) needs none of
+this - it compiles without the console and serves an explanatory 404 at
+`/console/`, so the absence is never a blank page.
+
+## Checks
+
+    npm run typecheck      # tsc --noEmit
+    npm run lint           # eslint (next lint is gone in Next 16)
+    npm test               # vitest, with coverage thresholds enabled
+    npm run e2e            # playwright, against a served build
+
+CI runs all of these plus `go test -tags console ./cmd/helixon/consolefs/`,
+which serves the freshly built export through the Go handler and asserts the
+real assets come back - the only step that can tell a binary carrying the
+console from one carrying nothing.
+
+## Layout
+
+    src/app/            one directory per route (overview, runs, runs/detail, evals, costs, memory)
+    src/lib/api.ts      the typed client and the only place fetch is called
+    src/lib/hooks.ts    SWR wrappers with the polling intervals
+    src/components/     Panel, StatusBadge, and the empty/error/loading states

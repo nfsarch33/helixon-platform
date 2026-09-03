@@ -37,4 +37,14 @@ describe("api paths", () => {
     expect(calls[1]).toBe("/api/v1/runs?status=needs_human&limit=5");
     expect(calls[2]).toBe("/api/v1/memory/search?q=lease+renewal&limit=3");
   });
+
+  it("treats a 2xx with an empty or unreadable body as an error, not as data", async () => {
+    // Returning `null` here made every caller see no data and no error, which
+    // each page renders as a spinner that never resolves - for a request that
+    // already finished.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 200 })));
+    await expect(fetchJSON("/api/v1/runs")).rejects.toThrow(/empty body/);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>proxy error</html>", { status: 200 })));
+    await expect(fetchJSON("/api/v1/runs")).rejects.toThrow(/not JSON/);
+  });
 });

@@ -2,9 +2,11 @@ package dashboard
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -85,10 +87,26 @@ func MountConsole(mux *http.ServeMux, rv RunView, mem MemorySearcher, cfg *Conso
 	mux.Handle("GET /api/v1/memory/search", MemorySearchHandler(mem, cfg))
 }
 
+// writeJSON encodes first and writes only what encoded.
+//
+// json.NewEncoder(w).Encode commits the status line before it can fail, and
+// it can: one non-finite float anywhere in the payload makes Encode return an
+// error after 200 has already gone out, and the client is handed a 200 with
+// an empty body. Every consumer of this API reads that as "loaded, nothing
+// here" and waits forever. These payloads are bounded, so buffering costs one
+// copy and turns that case into an honest 500 that says what happened.
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(v); err != nil {
+		body, _ := json.Marshal(map[string]string{"error": "response could not be encoded: " + err.Error()})
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(append(body, '\n'))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(buf.Bytes())
 }
 
 func writeErr(w http.ResponseWriter, status int, msg string) {
@@ -113,8 +131,16 @@ func RunsHandler(rv RunView) http.Handler {
 			writeErr(w, http.StatusServiceUnavailable, "run store not initialized")
 			return
 		}
+		// An unknown status must not answer 200 with an empty list: a typo in
+		// a filter would then read exactly like "nothing needs a human", which
+		// is the one answer an operator acts on by walking away.
+		status := agent.RunStatus(r.URL.Query().Get("status"))
+		if status != "" && !knownRunStatus(status) {
+			writeErr(w, http.StatusBadRequest, "unknown status "+strconv.Quote(string(status))+"; want one of "+strings.Join(runStatusNames(), ", "))
+			return
+		}
 		runs, err := rv.ListRuns(r.Context(), agent.RunFilter{
-			Status: agent.RunStatus(r.URL.Query().Get("status")),
+			Status: status,
 			Limit:  limitParam(r, 100, 500),
 		})
 		if err != nil {
@@ -128,11 +154,36 @@ func RunsHandler(rv RunView) http.Handler {
 	})
 }
 
-// RunDetail is one run with its durable steps and the session's turns.
+// RunDetail is one run with its durable steps and the turns of the SESSION
+// the run belongs to -- not of the run alone. A session outlives its runs and
+// the store keys turns by session, so these are the conversation the loop saw,
+// which is wider than this run. TurnsScope says so in the payload, and the
+// console labels the panel with it rather than implying the narrower thing.
+//
+// Both lists are bounded by ?limit= (200 by default, 1000 max): the console
+// polls this endpoint, and a long-running session would otherwise grow an
+// unbounded response with no way to ask for less.
 type RunDetail struct {
-	Run   agent.RunRecord `json:"run"`
-	Steps []agent.RunStep `json:"steps"`
-	Turns []agent.Turn    `json:"turns"`
+	Run            agent.RunRecord `json:"run"`
+	Steps          []agent.RunStep `json:"steps"`
+	Turns          []agent.Turn    `json:"turns"`
+	TurnsScope     string          `json:"turns_scope"`
+	Limit          int             `json:"limit"`
+	StepsTruncated bool            `json:"steps_truncated"`
+	TurnsTruncated bool            `json:"turns_truncated"`
+}
+
+// knownRunStatus reports whether s is a status the store can hold.
+func knownRunStatus(s agent.RunStatus) bool {
+	switch s {
+	case agent.RunRunning, agent.RunCompleted, agent.RunFailed, agent.RunNeedsHuman:
+		return true
+	}
+	return false
+}
+
+func runStatusNames() []string {
+	return []string{string(agent.RunRunning), string(agent.RunCompleted), string(agent.RunFailed), string(agent.RunNeedsHuman)}
 }
 
 // RunHandler serves one run with its steps and turns.
@@ -157,7 +208,8 @@ func RunHandler(rv RunView) http.Handler {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		turns, err := rv.ListTurns(r.Context(), run.SessionID, 0)
+		limit := limitParam(r, 200, 1000)
+		turns, err := rv.ListTurns(r.Context(), run.SessionID, limit)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
@@ -168,7 +220,26 @@ func RunHandler(rv RunView) http.Handler {
 		if turns == nil {
 			turns = []agent.Turn{}
 		}
-		writeJSON(w, http.StatusOK, RunDetail{Run: *run, Steps: steps, Turns: turns})
+		detail := RunDetail{Run: *run, Steps: steps, Turns: turns, TurnsScope: "session", Limit: limit}
+		// The bound belongs to the endpoint, not to whichever RunView is
+		// behind it: the store applies it in SQL, but a view that ignored it
+		// would otherwise hand the console an unbounded response through an
+		// endpoint that advertises a limit.
+		//
+		// The store returns turns oldest first, so a clipped list is the start
+		// of the session, not its tail. Saying which end was kept is the
+		// difference between a short conversation and a truncated one.
+		if len(detail.Turns) > limit {
+			detail.Turns = detail.Turns[:limit]
+		}
+		if len(detail.Turns) >= limit {
+			detail.TurnsTruncated = true
+		}
+		if len(detail.Steps) > limit {
+			detail.Steps = detail.Steps[:limit]
+			detail.StepsTruncated = true
+		}
+		writeJSON(w, http.StatusOK, detail)
 	})
 }
 
@@ -180,7 +251,14 @@ func CostsHandler(rv RunView) http.Handler {
 			return
 		}
 		now := time.Now().UTC()
-		out := map[string]any{"generated_at": now.Format(time.RFC3339Nano)}
+		// The windows select runs by the time they were CREATED, because that
+		// is the only timestamp the runs table indexes them by. A run that
+		// started 30 hours ago and is still going contributes nothing to
+		// last_24h, and one created inside the window contributes all of its
+		// tokens however long it ran. That is a defensible reading of "spend
+		// in the last day" but it is not the only one, so the payload names
+		// the basis and the console labels the panel with it.
+		out := map[string]any{"generated_at": now.Format(time.RFC3339Nano), "basis": "run_created_at"}
 		for name, since := range map[string]time.Time{"last_24h": now.Add(-24 * time.Hour), "last_7d": now.Add(-7 * 24 * time.Hour), "all_time": {}} {
 			u, err := rv.RunUsage(r.Context(), since)
 			if err != nil {
@@ -327,6 +405,14 @@ func parseSample(line, prefix string) (TextfileMetric, bool) {
 	}
 	v, err := strconv.ParseFloat(strings.TrimSpace(rest), 64)
 	if err != nil {
+		return TextfileMetric{}, false
+	}
+	// Prometheus writes NaN for "no value" and +Inf for an unbounded one, and
+	// both are legal in a textfile. Neither is representable in JSON, and
+	// encoding one used to fail the whole /evals response after its 200 had
+	// been sent. A sample that cannot be carried is omitted rather than
+	// carried wrongly; writeJSON is the belt to this pair of braces.
+	if math.IsNaN(v) || math.IsInf(v, 0) {
 		return TextfileMetric{}, false
 	}
 	m.Value = v
