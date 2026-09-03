@@ -119,13 +119,26 @@ RULES=(
   #
   #   "network_topology|(^|[^0-9.])100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.[0-9]{1,3}\\.[0-9]{1,3}([^0-9]|$)|carrier-grade NAT address"
   #
-  # Adding that line was measured against this tree: 15 findings across 9 files
-  # -- the scrape config, a fleet health check, a cluster join script, and six
-  # files under evidence/. Those files do carry allow-file headers, but for
-  # fleet_host_alias or internal_service_id, and a header only suppresses the
-  # categories it names. (The paths are deliberately described rather than
-  # quoted: one of them carries a host name, and the sibling scanner refuses a
-  # diff that adds one -- which is the gate working.)
+  # Two numbers, because they answer different questions and the smaller one
+  # was quoted alone here at first, which framed the decision too narrowly.
+  #
+  # THE EXPOSURE, measured over this gate's own file types with a strict
+  # dotted-quad match: 10 distinct addresses in that range, appearing 82 times
+  # across 31 files. That is what is already published.
+  #
+  # THE FINDING COUNT if the rule below were enabled: 15 findings across 9
+  # files, with 77 occurrences suppressed. The gap is not noise -- most of
+  # those files already carry an allow-file header naming network_topology, so
+  # enabling the rule surfaces only the unannotated remainder: the scrape
+  # config, a fleet health check, a cluster join script, and six files under
+  # evidence/ whose headers name fleet_host_alias or internal_service_id
+  # instead, and a header only suppresses the categories it names.
+  #
+  # So the decision is about ten addresses, not fifteen findings. Enabling the
+  # rule does not reduce the exposure; it stops the next one being added
+  # silently. (Paths are described rather than quoted here: one of them carries
+  # a host name, and the sibling scanner refuses a diff that adds one -- which
+  # is that gate working.)
   #
   # So enabling it is not a gate change, it is a decision about fifteen mesh
   # addresses already published in a public repo: annotate them, or scrub them.
