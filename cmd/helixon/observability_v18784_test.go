@@ -180,9 +180,24 @@ func TestGuardrailsWireTheSandboxAndVerifierObservers(t *testing.T) {
 	srv := httptest.NewServer(ch.Routes(echo))
 	t.Cleanup(srv.Close)
 	_, body := fetch(t, srv.URL+"/metrics")
-	const want = `hlxn_agent_sandbox_failures_total{kind="preflight"} 1`
+
+	// The run above was REFUSED (a path-shaped command). That is containment
+	// working, not the sandbox failing to start, so it must land on "rejected".
+	//
+	// Both directions are asserted because the alerting rules split on exactly
+	// this label: AgentSandboxFailing selects kind!="rejected" and pages, while
+	// AgentSandboxRejectionStorm selects kind="rejected" and does not. Asserting
+	// only the positive would let the two kinds be re-merged and page an
+	// operator for a boundary doing its job -- the incident that motivated the
+	// split. The negative is written with its value because every accepted kind
+	// is pre-initialised at zero, so the series exists either way.
+	const want = `hlxn_agent_sandbox_failures_total{kind="rejected"} 1`
 	if !strings.Contains(body, want) {
-		t.Errorf("exposition does not carry %q; the sandbox failure observer is not attached", want)
+		t.Errorf("exposition does not carry %q; a refused command was not counted as a rejection", want)
+	}
+	const notWant = `hlxn_agent_sandbox_failures_total{kind="preflight"} 0`
+	if !strings.Contains(body, notWant) {
+		t.Errorf("exposition does not carry %q; a refused command was counted as an outage, which pages", notWant)
 	}
 }
 

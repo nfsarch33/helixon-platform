@@ -64,14 +64,34 @@ const reapTimeout = 60 * time.Second
 // Failure kinds reported to a FailureObserver.
 //
 // The split is the one the operator has to act on, not the one the code finds
-// convenient. `preflight` means the sandbox refused to start the command at
-// all — a rejected argv, a command outside the allow-list, a missing engine or
-// image — and is usually a config or host problem. `timeout` means the command
-// ran and was killed at the wall clock, which says nothing about the code under
-// test. `exec` means the engine itself failed. A non-zero exit is NOT here: a
-// red check is a verdict, not a sandbox failure, and counting it as one would
-// bury the failures that matter under ordinary red builds.
+// convenient — and an earlier version of this comment got that split wrong. It
+// filed a rejected argv and a missing container image under one `preflight`
+// kind, on the reasoning that both stop the command before the container starts
+// and so are "one operator action". Live traffic disproved it. On 2026-08-29 all
+// three observed increments were the model emitting shell pipelines
+// (`ls -la /workspace/ 2>&1 | head -50`) which ValidateArgv correctly refused.
+// That paged an operator to investigate a broken sandbox that was, in fact,
+// working exactly as designed. The two cases need opposite responses, so they
+// need different labels:
+//
+//   - `rejected` means the sandbox refused the command the agent asked for — a
+//     path instead of a bare binary, or a command outside the allow-list. This
+//     is CONTAINMENT WORKING. Nothing is broken on the host and no operator
+//     action fixes it; a sustained rate is a signal about the model's prompt
+//     contract, not an outage.
+//   - `preflight` means the sandbox could not start ANY command: engine binary
+//     missing, image missing, workspace scratch unusable. This is a genuine
+//     host or config problem and the agent can do no work until it is fixed.
+//   - `timeout` means the command ran and was killed at the wall clock, which
+//     says nothing about the code under test.
+//   - `exec` means the engine itself failed.
+//
+// A non-zero exit is NOT here: a red check is a verdict, not a sandbox failure,
+// and counting it as one would bury the failures that matter under ordinary red
+// builds. `rejected` was split out for the same reason — it was burying the
+// outage signal under the boundary doing its job.
 const (
+	FailureKindRejected  = "rejected"
 	FailureKindPreflight = "preflight"
 	FailureKindTimeout   = "timeout"
 	FailureKindExec      = "exec"
@@ -81,7 +101,7 @@ const (
 // side can assert it accepts all of them, rather than each side testing its own
 // copy of the strings and both passing while disagreeing.
 func FailureKinds() []string {
-	return []string{FailureKindPreflight, FailureKindTimeout, FailureKindExec}
+	return []string{FailureKindRejected, FailureKindPreflight, FailureKindTimeout, FailureKindExec}
 }
 
 // Spec is one command to run inside the sandbox.
@@ -376,13 +396,16 @@ func (r *Runner) reap(name string) {
 // failure to run the sandbox at all (missing engine, missing image, rejected
 // argv) is returned as an error.
 func (r *Runner) Run(ctx context.Context, spec Spec) (Result, error) {
+	// Both of these are the boundary refusing what the agent asked for, which is
+	// the boundary working. They must not share a label with "the sandbox cannot
+	// start at all" — see the FailureKind* comment.
 	if err := ValidateArgv(spec.Command, spec.Args); err != nil {
-		r.reportFailure(FailureKindPreflight)
+		r.reportFailure(FailureKindRejected)
 		return Result{Outcome: OutcomeError, ExitCode: -1}, err
 	}
 	if !spec.SkipAllowList {
 		if err := r.cfg.CheckAllowed(spec.Command); err != nil {
-			r.reportFailure(FailureKindPreflight)
+			r.reportFailure(FailureKindRejected)
 			return Result{Outcome: OutcomeError, ExitCode: -1}, err
 		}
 	}
