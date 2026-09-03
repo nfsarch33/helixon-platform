@@ -5,8 +5,8 @@
 // import cost).
 //
 // Per 1password-uuid-required.mdc the webhook URL must be fetched via
-// the 26-character UUID exported from the onepassword package
-// (onepassword.SlackWebhookUUID).
+// its 26-character UUID, which onepassword.ResolveItem reads from
+// HLXN_OP_ITEM_SLACK_WEBHOOK and length-checks.
 package slack
 
 import (
@@ -18,8 +18,8 @@ import (
 
 // NewFromOp resolves the Slack incoming webhook URL from 1Password and
 // returns a fully-configured Client. The webhook URL is fetched from the
-// SENTRUX_SLACK_WEBHOOK item in the HelixonSafe vault
-// (onepassword.SlackWebhookUUID).
+// SENTRUX_SLACK_WEBHOOK item in the configured vault; both the vault
+// and the item id are resolved from the environment.
 //
 // Example:
 //

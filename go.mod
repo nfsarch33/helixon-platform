@@ -1,6 +1,6 @@
 module github.com/nfsarch33/helixon-platform
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/1password/onepassword-sdk-go v0.4.0
@@ -16,6 +16,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
 	go.uber.org/goleak v1.3.0
+	golang.org/x/sync v0.21.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.50.1
 )

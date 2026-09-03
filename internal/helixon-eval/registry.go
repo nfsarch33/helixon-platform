@@ -225,13 +225,27 @@ func (r *Runner) RunAll(models []Model, catalog TaskCatalog) (int, error) {
 }
 
 // mean returns the arithmetic mean of the map values, 0 if empty.
+//
+// The addends are summed in sorted-key order. Go randomises map
+// iteration and float64 addition is not associative, so summing in
+// map order made the result vary by one ULP between calls on the same
+// input: the four synth rubrics for "multi-step coding" sum to
+// 3.6560000000000001 or 3.6559999999999997 depending on where 0.944
+// lands, giving a score of 0.914 on one call and 0.9139999999999999
+// on the next. Sorting first makes the score a pure function of the
+// rubric map, which is what every caller already assumes.
 func mean(m map[string]float64) float64 {
 	if len(m) == 0 {
 		return 0
 	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 	var sum float64
-	for _, v := range m {
-		sum += v
+	for _, k := range keys {
+		sum += m[k]
 	}
 	return sum / float64(len(m))
 }

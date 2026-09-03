@@ -25,10 +25,24 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 dockers:
+  # `goos`/`goarch` select WHICH built binary goreleaser stages into the build
+  # context. They are not decoration and they are not implied by --platform:
+  # unset, they default to linux/amd64, so before this was pinned BOTH entries
+  # were handed the amd64 binary and the arm64 image shipped an x86-64
+  # executable under an arm64 manifest. That built and pushed perfectly green
+  # and would have crashed on exec for every arm64 consumer.
+  #
+  # The old Dockerfile hid this by compiling from source inside the image,
+  # where --platform drove the compiler through QEMU. Now that the image
+  # consumes a prebuilt binary, this filter is what makes the arm64 image
+  # arm64, and .github/workflows/image.yml asserts on the extracted binary
+  # rather than the manifest so a regression here cannot pass.
   - image_templates:
       - "ghcr.io/nfsarch33/helixon-platform:{{ .Version }}-amd64"
     dockerfile: Dockerfile
     use: buildx
+    goos: linux
+    goarch: amd64
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.source=https://github.com/nfsarch33/helixon-platform"
@@ -36,6 +50,8 @@ dockers:
       - "ghcr.io/nfsarch33/helixon-platform:{{ .Version }}-arm64"
     dockerfile: Dockerfile
     use: buildx
+    goos: linux
+    goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.source=https://github.com/nfsarch33/helixon-platform"
@@ -49,6 +65,18 @@ docker_manifests:
     image_templates:
       - "ghcr.io/nfsarch33/helixon-platform:{{ .Version }}-amd64"
       - "ghcr.io/nfsarch33/helixon-platform:{{ .Version }}-arm64"
+
+# Snapshot builds ONLY. A real `goreleaser release` on a v* tag ignores this
+# block entirely, so it cannot reach a published version or image tag.
+#
+# It exists so .github/workflows/image.yml can NAME the images it has to run
+# instead of discovering them. Discovery is a false-green waiting to happen on
+# a persistent self-hosted runner: `docker images` would cheerfully return a
+# leftover image from an earlier run, and the gate would pass having tested a
+# stale artifact. Keyed to the full commit, the tag is exactly predictable
+# from ${{ github.sha }} and cannot collide with an older build.
+snapshot:
+  version_template: "ci-{{ .FullCommit }}"
 
 checksum:
   name_template: 'checksums.txt'

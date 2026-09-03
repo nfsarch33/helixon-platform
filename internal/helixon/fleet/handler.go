@@ -50,6 +50,15 @@ type TaskRecord struct {
 	CompletedAt *time.Time     `json:"completed_at,omitempty"`
 	Attempts    int            `json:"attempts"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
+
+	// TimeoutSecs preserves the submission's per-task timeout so a reclaimed
+	// task is redispatched with the timeout it was submitted with, not the
+	// handler default. Zero means "use the handler default".
+	TimeoutSecs int `json:"timeout_secs,omitempty"`
+	// LeaseOwner and LeaseExpiresAt expose the durable-execution lease when a
+	// TaskStore backs the handler; both are empty on the in-memory path.
+	LeaseOwner     string     `json:"lease_owner,omitempty"`
+	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
 }
 
 // Duration returns the elapsed execution time, or zero if not started.
@@ -81,6 +90,24 @@ type HandlerConfig struct {
 	DefaultTimeout time.Duration
 	MaxRetries     int
 	Logger         *slog.Logger
+
+	// Store, when set, makes task state durable: submissions, results, and
+	// leases live in SQLite instead of process memory, so a restart loses
+	// nothing and a crashed worker's tasks are reclaimed by lease expiry
+	// (start the sweeper with StartLeaseSweeper). When nil the handler keeps
+	// its original in-memory behavior.
+	Store *TaskStore
+	// LeaseOwner identifies this process on claims. Defaults to a fresh UUID
+	// per handler, which is correct: identity must be unique per worker, not
+	// stable across restarts — a restarted process must NOT resume its dead
+	// predecessor's leases except through the sweeper.
+	LeaseOwner string
+	// LeaseTTL is how long a claim survives without renewal (default 60s).
+	// Renewal runs at TTL/3 while the executor runs.
+	LeaseTTL time.Duration
+	// SweepInterval is the reclaim cadence (default LeaseTTL/2), bounding
+	// crash recovery at under 2x TTL.
+	SweepInterval time.Duration
 }
 
 func (c HandlerConfig) withDefaults() HandlerConfig {
@@ -95,6 +122,15 @@ func (c HandlerConfig) withDefaults() HandlerConfig {
 	}
 	if c.Logger == nil {
 		c.Logger = slog.Default()
+	}
+	if c.LeaseOwner == "" {
+		c.LeaseOwner = uuid.New().String()
+	}
+	if c.LeaseTTL <= 0 {
+		c.LeaseTTL = time.Minute
+	}
+	if c.SweepInterval <= 0 {
+		c.SweepInterval = c.LeaseTTL / 2
 	}
 	return c
 }
@@ -111,18 +147,28 @@ type Handler struct {
 	mu        sync.RWMutex
 	tasks     map[string]*TaskRecord
 	listeners []func(TaskRecord)
+
+	// Durable-execution wiring; all zero-valued when cfg.Store is nil.
+	store         *TaskStore
+	owner         string
+	leaseTTL      time.Duration
+	sweepInterval time.Duration
 }
 
 // NewHandler creates a fleet task handler.
 func NewHandler(executor TaskExecutor, claimer SprintboardClaimer, cfg HandlerConfig) *Handler {
 	cfg = cfg.withDefaults()
 	return &Handler{
-		cfg:      cfg,
-		executor: executor,
-		claimer:  claimer,
-		logger:   cfg.Logger.With(slog.String("component", "helixon.fleet.handler")),
-		sem:      make(chan struct{}, cfg.MaxConcurrent),
-		tasks:    make(map[string]*TaskRecord),
+		cfg:           cfg,
+		executor:      executor,
+		claimer:       claimer,
+		logger:        cfg.Logger.With(slog.String("component", "helixon.fleet.handler")),
+		sem:           make(chan struct{}, cfg.MaxConcurrent),
+		tasks:         make(map[string]*TaskRecord),
+		store:         cfg.Store,
+		owner:         cfg.LeaseOwner,
+		leaseTTL:      cfg.LeaseTTL,
+		sweepInterval: cfg.SweepInterval,
 	}
 }
 
@@ -159,6 +205,24 @@ func (h *Handler) Submit(ctx context.Context, sub TaskSubmission) (string, error
 		Status:      TaskStatusPending,
 		SubmittedAt: time.Now().UTC(),
 		Metadata:    sub.Metadata,
+		TimeoutSecs: sub.TimeoutSecs,
+	}
+
+	if h.store != nil {
+		// Durable path: the store is the only source of truth. The primary
+		// key turns a duplicate task ID into an error instead of a silent
+		// overwrite, which makes a caller-supplied ID an idempotency key.
+		if err := h.store.Insert(ctx, record); err != nil {
+			return "", fmt.Errorf("fleet: persist task: %w", err)
+		}
+		h.logger.Info("task submitted",
+			slog.String("task_id", taskID),
+			slog.String("agent", sub.AgentName),
+			slog.String("ticket", sub.TicketID),
+			slog.Bool("durable", true),
+		)
+		go h.processTaskDurable(context.WithoutCancel(ctx), taskID, timeout)
+		return taskID, nil
 	}
 
 	h.mu.Lock()
@@ -176,8 +240,20 @@ func (h *Handler) Submit(ctx context.Context, sub TaskSubmission) (string, error
 	return taskID, nil
 }
 
-// GetTask returns the current state of a task.
+// GetTask returns the current state of a task. On the durable path it reads
+// through to the store, so it reflects work done by other processes sharing
+// the same database, not just this one.
+//
+//nolint:contextcheck // the public accessor keeps its ctx-free signature; the read is bounded by the store's busy_timeout
 func (h *Handler) GetTask(taskID string) (TaskRecord, bool) {
+	if h.store != nil {
+		rec, ok, err := h.store.Get(context.Background(), taskID)
+		if err != nil {
+			h.logger.Warn("get task failed", slog.String("task_id", taskID), slog.String("error", err.Error()))
+			return TaskRecord{}, false
+		}
+		return rec, ok
+	}
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	rec, ok := h.tasks[taskID]
@@ -188,7 +264,17 @@ func (h *Handler) GetTask(taskID string) (TaskRecord, bool) {
 }
 
 // ListTasks returns all task records.
+//
+//nolint:contextcheck // the public accessor keeps its ctx-free signature; the read is bounded by the store's busy_timeout
 func (h *Handler) ListTasks() []TaskRecord {
+	if h.store != nil {
+		out, err := h.store.List(context.Background())
+		if err != nil {
+			h.logger.Warn("list tasks failed", slog.String("error", err.Error()))
+			return nil
+		}
+		return out
+	}
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	out := make([]TaskRecord, 0, len(h.tasks))
@@ -308,12 +394,23 @@ func (h *Handler) updateStatus(record *TaskRecord, status TaskStatus, result, er
 		record.CompletedAt = &now
 	}
 	snapshot := *record
-	listeners := make([]func(TaskRecord), len(h.listeners))
-	copy(listeners, h.listeners)
 	h.mu.Unlock()
 
+	h.notify(&snapshot)
+}
+
+// notify fires the registered completion listeners with a snapshot. Listeners
+// are copied under the lock and invoked outside it, so a listener can call
+// back into the handler without deadlocking. Each listener still receives its
+// own value copy, per the OnTaskComplete contract.
+func (h *Handler) notify(rec *TaskRecord) {
+	h.mu.RLock()
+	listeners := make([]func(TaskRecord), len(h.listeners))
+	copy(listeners, h.listeners)
+	h.mu.RUnlock()
+
 	for _, fn := range listeners {
-		fn(snapshot)
+		fn(*rec)
 	}
 }
 

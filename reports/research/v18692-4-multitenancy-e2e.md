@@ -105,7 +105,7 @@ Race-clean.
 
 ## References
 
-- Plan: `/home/jason/.cursor/plans/helixon_v18691-v18694_pilot%2Bqa%2Breality%2Bworkspace_e406210d.plan.md`
+- Plan: `/home/<operator>/.cursor/plans/helixon_v18691-v18694_pilot%2Bqa%2Breality%2Bworkspace_e406210d.plan.md`
 - Existing tenantid package: `internal/tenantid/tenantid.go`.
 - v18692-1 report: `reports/research/v18692-1-live-llm-e2e.md`.
 - v18692-2 report: `reports/research/v18692-2-idempotency-e2e.md`.

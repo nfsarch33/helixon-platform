@@ -46,6 +46,11 @@ func TestChannel_PublishAndReceive(t *testing.T) {
 	client, _ := dial(t, wsURL)
 	defer func() { _ = client.Close() }()
 
+	// Wait for the server side to register the subscriber. Publish drops
+	// events when the set is empty, so publishing before ServeWS has
+	// subscribed races the handler and loses the event.
+	ch.WaitForSubscribers(1, 2*time.Second)
+
 	// Publish an event from the server side.
 	ch.Publish(Event{
 		Type:      EventAgentStarted,
@@ -261,6 +266,197 @@ func TestChannel_ConcurrentPublishers(t *testing.T) {
 	}
 	if seen < total {
 		t.Errorf("expected %d events, got %d", total, seen)
+	}
+}
+
+// TestChannel_CloseWithInFlightSubscribers drives Close concurrently with
+// subscriber read and write loops that are tearing themselves down, and with
+// publishers holding the read lock.
+//
+// Regression test. Close used to walk the subscriber set while holding
+// c.mu and call sub.closeOnce.Do inside the loop. sync.Once is itself a lock,
+// and Unsubscribe -- which the read and write loops run from their defers --
+// takes c.mu *after* entering that same Once. The two orderings deadlocked:
+// Close held c.mu waiting for the Once, the once-holder waited for c.mu.
+// Close then never returned and took the whole package down with the 10m test
+// timeout. No job in this repo sets timeout-minutes, so that burned a full
+// runner slot on every unrelated PR that drew the losing side of the race.
+func TestChannel_CloseWithInFlightSubscribers(t *testing.T) {
+	// Close should return in milliseconds. The bound only has to distinguish
+	// "slow" from "never", so it is generous enough not to flake on a loaded
+	// CI host while still failing far short of the package test timeout.
+	const closeBudget = 30 * time.Second
+	const iterations = 30
+	const subscribers = 8
+
+	for it := 0; it < iterations; it++ {
+		ch := NewChannel(ChannelConfig{ChannelBuffer: 4, WriteTimeout: 100 * time.Millisecond})
+		srv, wsURL := newTestServer(t, ch)
+
+		clients := make([]*websocket.Conn, 0, subscribers)
+		for i := 0; i < subscribers; i++ {
+			c, _ := dial(t, wsURL)
+			clients = append(clients, c)
+		}
+		ch.WaitForSubscribers(subscribers, 2*time.Second)
+
+		// Publishers keep taking c.mu.RLock for the whole teardown.
+		stopPub := make(chan struct{})
+		var pubWG sync.WaitGroup
+		for p := 0; p < 4; p++ {
+			pubWG.Add(1)
+			go func() {
+				defer pubWG.Done()
+				for {
+					select {
+					case <-stopPub:
+						return
+					default:
+						ch.Publish(Event{Type: EventStepCompleted, JobID: "teardown"})
+					}
+				}
+			}()
+		}
+
+		// Slam every client connection shut at the same instant Close runs.
+		// Each one errors a readLoop, which enters Unsubscribe -- that is the
+		// goroutine Close used to deadlock against.
+		start := make(chan struct{})
+		var kickWG sync.WaitGroup
+		for i := range clients {
+			kickWG.Add(1)
+			go func(c *websocket.Conn) {
+				defer kickWG.Done()
+				<-start
+				_ = c.Close()
+			}(clients[i])
+		}
+
+		closed := make(chan struct{})
+		go func() {
+			<-start
+			ch.Close()
+			close(closed)
+		}()
+		close(start)
+
+		select {
+		case <-closed:
+		case <-time.After(closeBudget):
+			t.Fatalf("iteration %d: Close did not return within %s with %d "+
+				"subscribers tearing down concurrently", it, closeBudget, subscribers)
+		}
+
+		if got := ch.SubscriberCount(); got != 0 {
+			t.Errorf("iteration %d: SubscriberCount after Close = %d, want 0", it, got)
+		}
+
+		close(stopPub)
+		pubWG.Wait()
+		kickWG.Wait()
+		srv.Close()
+	}
+}
+
+// TestChannel_SubscribeAfterClose covers the other half of the lifecycle race:
+// a Subscribe that wins the check in ServeWS but lands after Close has swept
+// the subscriber set. It must not register (which would race c.wg.Add against
+// the c.wg.Wait in Close, and leave a readLoop blocked on a connection nothing
+// closes), and the handle it returns must already be done so ServeWS returns.
+func TestChannel_SubscribeAfterClose(t *testing.T) {
+	ch := NewChannel(ChannelConfig{ChannelBuffer: 4})
+	srv, wsURL := newTestServer(t, ch)
+	defer func() { srv.Close() }()
+
+	c, _ := dial(t, wsURL)
+	defer func() { _ = c.Close() }()
+	ch.WaitForSubscribers(1, 2*time.Second)
+	ch.Close()
+
+	// Mint a real connection from a second, open channel, then hand it to the
+	// closed channel's Subscribe -- the state ServeWS lands in when Close runs
+	// between its closed check and the upgrade.
+	spare := NewChannel(ChannelConfig{ChannelBuffer: 4})
+	defer func() { spare.Close() }()
+	spareSrv, spareURL := newTestServer(t, spare)
+	defer func() { spareSrv.Close() }()
+	spareConn, _ := dial(t, spareURL)
+	defer func() { _ = spareConn.Close() }()
+
+	sub := ch.Subscribe(spareConn)
+
+	// Already torn down on return, not merely torn down eventually: the old
+	// code registered the subscriber and spawned both loops, and done was only
+	// closed once writeLoop got scheduled and observed stopCh.
+	select {
+	case <-sub.done:
+	default:
+		t.Fatal("Subscribe on a closed channel returned a handle that was not already torn down")
+	}
+	if got := ch.SubscriberCount(); got != 0 {
+		t.Errorf("SubscriberCount after subscribing to a closed channel = %d, want 0", got)
+	}
+
+	// A second Close must still return promptly and not double-close anything.
+	done := make(chan struct{})
+	go func() { ch.Close(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("second Close did not return within 5s")
+	}
+}
+
+// TestChannel_ServeWSRacesClose dials through the real handler while Close
+// runs, so ServeWS -> Subscribe overlaps Close -> c.wg.Wait.
+//
+// Regression test for the second half of the lifecycle bug, observed failing
+// TestChannel_CloseUnsubscribes on main:
+//
+//	WARNING: DATA RACE
+//	Write at 0x00c00012a4b8 by goroutine 27:
+//	  livechannel.TestChannel_CloseUnsubscribes()  websocket_channel_test.go:132  // ch.Close()
+//	Previous read at 0x00c00012a4b8 by goroutine 29:
+//	  livechannel.(*Channel).ServeWS()             websocket_channel.go:220       // c.Subscribe(conn)
+//
+// Subscribe published the subscriber in two steps: c.subCnt.Add(1), which is
+// what WaitForSubscribers polls, and only then c.wg.Add(1). A caller that
+// waited for the subscriber and closed immediately landed in that gap, so
+// Close reached c.wg.Wait() with the counter still at zero and returned while
+// Subscribe was still performing its first Add. sync.WaitGroup instruments
+// the first Add with race.Read(&wg.sema) and Wait with race.Write(&wg.sema)
+// exactly to catch that; unsynchronized, it is also a "WaitGroup misuse"
+// panic. Subscribe now does both increments under c.mu, so the count cannot
+// become observable before the WaitGroup has been incremented.
+//
+// This is the shape of TestChannel_CloseUnsubscribes, looped to hit the gap.
+func TestChannel_ServeWSRacesClose(t *testing.T) {
+	const iterations = 60
+
+	for it := 0; it < iterations; it++ {
+		ch := NewChannel(ChannelConfig{ChannelBuffer: 4})
+		srv, wsURL := newTestServer(t, ch)
+
+		conn, _ := dial(t, wsURL)
+		ch.WaitForSubscribers(1, 2*time.Second)
+
+		closed := make(chan struct{})
+		go func() {
+			ch.Close()
+			close(closed)
+		}()
+
+		select {
+		case <-closed:
+		case <-time.After(30 * time.Second):
+			t.Fatalf("iteration %d: Close did not return within 30s", it)
+		}
+		if got := ch.SubscriberCount(); got != 0 {
+			t.Errorf("iteration %d: SubscriberCount after Close = %d, want 0", it, got)
+		}
+
+		_ = conn.Close()
+		srv.Close()
 	}
 }
 

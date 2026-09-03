@@ -7,6 +7,7 @@
 package lint
 
 import (
+	"errors"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -22,11 +23,47 @@ import (
 // nosec G204: the input is a fixed set of flags, not user input.
 func runLint(t *testing.T) (string, error) { //nolint:gosec // G204 fixed args
 	t.Helper()
+	logLintBinary(t)
 	cmd := exec.Command("golangci-lint", "run", "--timeout", "5m",
 		"--max-issues-per-linter=9999", "--max-same-issues=9999") //nolint:gosec
 	cmd.Dir = "../.."
 	out, err := cmd.CombinedOutput()
+	requireLintVerdict(t, string(out), err)
 	return string(out), err
+}
+
+// logLintBinary records which golangci-lint the PATH resolved to and its
+// version, so a count that differs between two environments (e.g. this
+// shell vs the CI runner) can be attributed to a binary rather than
+// guessed at. Best-effort: absence is handled by the callers' skip path.
+func logLintBinary(t *testing.T) {
+	t.Helper()
+	path, err := exec.LookPath("golangci-lint")
+	if err != nil {
+		return
+	}
+	ver, err := exec.Command(path, "version").Output() //nolint:gosec // G204 fixed args on the resolved binary
+	if err != nil {
+		return
+	}
+	t.Logf("%s: %s", path, strings.TrimSpace(string(ver)))
+}
+
+// requireLintVerdict fails the test when golangci-lint terminated without
+// rendering a lint verdict. Exit 0 (clean) and exit 1 (issues found) are
+// verdicts; anything else — config rejected, run error, timeout, or a
+// signal kill (ExitCode -1, whose truncated output would parse as a low
+// count) — used to fall through categoryCount as "0 issues" and turn a
+// broken linter into a passing invariant, e.g. a v1 binary refusing this
+// v2 config. A non-ExitError (binary missing) keeps the callers' skip
+// semantics.
+func requireLintVerdict(t *testing.T, out string, err error) {
+	t.Helper()
+	var ee *exec.ExitError
+	if err != nil && errors.As(err, &ee) && ee.ExitCode() != 1 {
+		t.Fatalf("golangci-lint exited %d without a lint verdict; output: %s",
+			ee.ExitCode(), lastLines(out))
+	}
 }
 
 // categoryRe captures the per-linter summary line "  * <name>: <count>".
@@ -83,6 +120,7 @@ func testFileErrcheck(t *testing.T) (int, string, error) { //nolint:gosec // G20
 		"--tests=false") //nolint:gosec
 	cmd.Dir = "../.."
 	out, err := cmd.CombinedOutput()
+	requireLintVerdict(t, string(out), err)
 	count := 0
 	for _, line := range strings.Split(string(out), "\n") {
 		// Match patterns like "cmd/foo/main_test.go:10:5: ..." or
@@ -115,7 +153,7 @@ func TestErrcheck_Below350_TestFiles(t *testing.T) {
 	// v18684-1 target: 413 → ≤350 (63+ errcheck issues closed in test files)
 	if count >= 350 {
 		t.Errorf("test-file errcheck count = %d, want < 350 (v18684-1 target); sample output: %s",
-			count, lastLines(out, 15))
+			count, lastLines(out))
 	}
 }
 
@@ -151,7 +189,7 @@ func TestRevive_Below100(t *testing.T) {
 	}
 	if got >= 100 {
 		t.Errorf("revive count = %d, want < 100 (v18684-2 target from 229); sample output: %s",
-			got, lastLines(out, 15))
+			got, lastLines(out))
 	}
 }
 
@@ -193,7 +231,7 @@ func TestGosec_Below10(t *testing.T) {
 	}
 	if got >= 10 {
 		t.Errorf("gosec count = %d, want < 10 (v18684-3 target from 129); sample output: %s",
-			got, lastLines(out, 15))
+			got, lastLines(out))
 	}
 }
 
@@ -213,8 +251,9 @@ func TestGosec_StableBoundary(t *testing.T) {
 	}
 }
 
-// lastLines returns the trailing N non-empty lines for failure context.
-func lastLines(out string, n int) string {
+// lastLines returns the trailing non-empty lines for failure context.
+func lastLines(out string) string {
+	const n = 15
 	lines := []string{}
 	for _, line := range strings.Split(out, "\n") {
 		if strings.TrimSpace(line) != "" {

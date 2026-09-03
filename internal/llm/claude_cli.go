@@ -59,7 +59,7 @@ func NewClaudeCLIClient(cfg ClaudeCLIConfig) *ClaudeCLIClient {
 }
 
 func defaultExec(ctx context.Context, name string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // G204 binary from provider config; exec-style args, prompt is data
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

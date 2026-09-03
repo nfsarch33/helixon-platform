@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,11 @@ type Turn struct {
 	TokensIn   int             `json:"tokens_in"`
 	TokensOut  int             `json:"tokens_out"`
 	CreatedAt  time.Time       `json:"created_at"`
+
+	// Seq is the turn's 1-based position within its session, assigned when the
+	// turn is appended. It, not CreatedAt, defines conversation order: CreatedAt
+	// is a wall-clock reading and wall clocks tie, stall and step backwards.
+	Seq int64 `json:"seq"`
 }
 
 // Session groups a sequence of turns under a single conversation.
@@ -53,22 +59,75 @@ type Session struct {
 type SessionStore struct {
 	db *sql.DB
 	mu sync.RWMutex
+
+	// now supplies wall-clock stamps. Overridable so tests can freeze or rewind
+	// it; ordering must not depend on what it returns.
+	now func() time.Time
+}
+
+// storePragmas are applied to every pooled connection via the DSN.
+//
+// They are carried in the DSN rather than issued as `PRAGMA ...` statements
+// after Open because journal_mode is the only one of the three that is stored
+// in the database file; synchronous and foreign_keys are per-CONNECTION, and
+// database/sql hands out a pool. Issuing them through db.ExecContext sets them
+// on whichever single connection served the statement — measured on this
+// package, 7 of 8 pooled connections still had foreign_keys OFF, so the
+// ON DELETE CASCADE from turns to sessions was unenforced on most of them.
+//
+// synchronous=NORMAL is the pairing SQLite documents for WAL: WAL cannot
+// corrupt the database at NORMAL, and an application crash is fully safe; the
+// exposure is losing the most recent transactions to an OS or power failure.
+// That is the right trade for a conversation log, and the cost of the
+// alternative is not small — at the default FULL every AppendTurn is an fsync
+// barrier, measured here at 220ms mean / 406ms worst idle and 1.4-5.2s per
+// write under -race at load average 9, against 1.6ms for a read.
+//
+// busy_timeout matches internal/notify/notifydb: connections racing to
+// initialize a fresh WAL database return SQLITE_BUSY immediately without it.
+var storePragmaList = []string{
+	"_pragma=journal_mode(WAL)",
+	"_pragma=synchronous(NORMAL)",
+	"_pragma=busy_timeout(5000)",
+	"_pragma=foreign_keys(ON)",
+}
+
+// storePragmas is the full set, as it appears in a DSN that named none of them.
+var storePragmas = strings.Join(storePragmaList, "&")
+
+// withStorePragmas adds the store's pragmas to a caller-supplied DSN,
+// respecting any query string it already carries — session DSNs in this repo
+// include forms like "file::memory:?cache=shared".
+//
+// The merge is PER PRAGMA, not all-or-nothing. A caller who sets one pragma to
+// tune something (say a longer busy_timeout) keeps their value and still gets
+// the rest; bailing out on the first sight of "_pragma=" would silently hand
+// back foreign_keys OFF and synchronous FULL, which are exactly the two
+// defects this indirection exists to prevent, and neither announces itself.
+func withStorePragmas(dsn string) string {
+	add := make([]string, 0, len(storePragmaList))
+	for _, p := range storePragmaList {
+		// "_pragma=synchronous(NORMAL)" -> key "_pragma=synchronous("
+		key := p[:strings.IndexByte(p, '(')+1]
+		if !strings.Contains(dsn, key) {
+			add = append(add, p)
+		}
+	}
+	if len(add) == 0 {
+		return dsn
+	}
+	sep := "?"
+	if strings.Contains(dsn, "?") {
+		sep = "&"
+	}
+	return dsn + sep + strings.Join(add, "&")
 }
 
 // NewSessionStore opens (or creates) a SQLite database and initializes the schema.
 func NewSessionStore(ctx context.Context, dsn string) (*SessionStore, error) {
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("sqlite", withStorePragmas(dsn))
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
-	}
-
-	if _, err := db.ExecContext(ctx, "PRAGMA journal_mode=WAL"); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("set WAL mode: %w", err)
-	}
-	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys=ON"); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
 	if err := migrate(ctx, db); err != nil {
@@ -76,7 +135,10 @@ func NewSessionStore(ctx context.Context, dsn string) (*SessionStore, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
-	return &SessionStore{db: db}, nil
+	return &SessionStore{
+		db:  db,
+		now: func() time.Time { return time.Now().UTC() },
+	}, nil
 }
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -98,7 +160,8 @@ CREATE TABLE IF NOT EXISTS turns (
 	tool_call_id TEXT DEFAULT '',
 	tokens_in    INTEGER DEFAULT 0,
 	tokens_out   INTEGER DEFAULT 0,
-	created_at   TEXT NOT NULL
+	created_at   TEXT NOT NULL,
+	seq          INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_turns_session ON turns(session_id, created_at);
@@ -111,8 +174,75 @@ CREATE TRIGGER IF NOT EXISTS turns_ai AFTER INSERT ON turns BEGIN
 	VALUES (new.rowid, new.content, new.session_id);
 END;
 `
-	_, err := db.ExecContext(ctx, ddl)
-	return err
+	if _, err := db.ExecContext(ctx, ddl); err != nil {
+		return err
+	}
+	if err := ensureTurnSeq(ctx, db); err != nil {
+		return err
+	}
+	// Created after ensureTurnSeq so it also lands on databases that predate the
+	// column. This is the index ListTurns reads.
+	if _, err := db.ExecContext(ctx,
+		`CREATE INDEX IF NOT EXISTS idx_turns_session_seq ON turns(session_id, seq)`); err != nil {
+		return err
+	}
+	// Durable runs and their steps (runstore.go); IF NOT EXISTS, so a database
+	// from before they existed gains them on open.
+	return migrateRuns(ctx, db)
+}
+
+// ensureTurnSeq adds turns.seq to databases created before it existed and
+// backfills it, so conversation order survives the upgrade.
+func ensureTurnSeq(ctx context.Context, db *sql.DB) error {
+	has, err := hasColumn(ctx, db, "turns", "seq")
+	if err != nil {
+		return err
+	}
+	if has {
+		return nil
+	}
+
+	if _, err := db.ExecContext(ctx,
+		`ALTER TABLE turns ADD COLUMN seq INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return fmt.Errorf("add turns.seq: %w", err)
+	}
+
+	// Backfill from rowid, which is insertion order: turns are only ever
+	// appended and nothing deletes them, so rowid is the one trustworthy record
+	// of the order the conversation actually happened in. created_at is not --
+	// recovering order from it is exactly the bug this column exists to fix.
+	if _, err := db.ExecContext(ctx, `
+		UPDATE turns SET seq = (
+			SELECT COUNT(*) FROM turns AS prior
+			WHERE prior.session_id = turns.session_id AND prior.rowid <= turns.rowid
+		)`); err != nil {
+		return fmt.Errorf("backfill turns.seq: %w", err)
+	}
+	return nil
+}
+
+// hasColumn reports whether table already has the named column.
+func hasColumn(ctx context.Context, db *sql.DB, table, column string) (bool, error) {
+	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
+	if err != nil {
+		return false, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	found := false
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return false, fmt.Errorf("scan %s column: %w", table, err)
+		}
+		if name == column {
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	return found, nil
 }
 
 // CreateSession starts a new conversation session.
@@ -120,7 +250,7 @@ func (s *SessionStore) CreateSession(ctx context.Context, agentID string, meta m
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := s.now()
 	sess := &Session{
 		ID:        uuid.New().String(),
 		AgentID:   agentID,
@@ -174,7 +304,7 @@ func (s *SessionStore) AppendTurn(ctx context.Context, sessionID string, role Ro
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	now := time.Now().UTC()
+	now := s.now()
 	turn := &Turn{
 		ID:         uuid.New().String(),
 		SessionID:  sessionID,
@@ -193,10 +323,15 @@ func (s *SessionStore) AppendTurn(ctx context.Context, sessionID string, role Ro
 		tcStr = &s
 	}
 
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO turns (id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		turn.ID, turn.SessionID, string(turn.Role), turn.Content, tcStr, turn.ToolCallID, turn.TokensIn, turn.TokensOut, now.Format(time.RFC3339Nano),
-	)
+	// seq is derived inside the INSERT so the read-modify-write is a single
+	// atomic statement, and returned so callers see the position that was
+	// actually assigned.
+	err := s.db.QueryRowContext(ctx,
+		`INSERT INTO turns (id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at, seq)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM turns WHERE session_id = ?))
+		 RETURNING seq`,
+		turn.ID, turn.SessionID, string(turn.Role), turn.Content, tcStr, turn.ToolCallID, turn.TokensIn, turn.TokensOut, now.Format(time.RFC3339Nano), sessionID,
+	).Scan(&turn.Seq)
 	if err != nil {
 		return nil, fmt.Errorf("insert turn: %w", err)
 	}
@@ -209,7 +344,13 @@ func (s *SessionStore) AppendTurn(ctx context.Context, sessionID string, role Ro
 	return turn, nil
 }
 
-// ListTurns retrieves all turns for a session, ordered chronologically.
+// ListTurns retrieves all turns for a session in the order they were appended.
+//
+// Ordering is by seq, never by created_at. Agent.buildMessages feeds this slice
+// straight to the model, so a wrong order shows the model a tool result before
+// the assistant turn that asked for it. created_at cannot carry that weight: two
+// turns can share a stamp, and the wall clock it comes from can step backwards
+// between appends, which reorders a conversation that was written correctly.
 func (s *SessionStore) ListTurns(ctx context.Context, sessionID string, limit int) ([]Turn, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -219,8 +360,8 @@ func (s *SessionStore) ListTurns(ctx context.Context, sessionID string, limit in
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at 
-		 FROM turns WHERE session_id = ? ORDER BY created_at ASC LIMIT ?`, sessionID, limit,
+		`SELECT id, session_id, role, content, tool_calls, tool_call_id, tokens_in, tokens_out, created_at, seq
+		 FROM turns WHERE session_id = ? ORDER BY seq ASC, rowid ASC LIMIT ?`, sessionID, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query turns: %w", err)
@@ -232,7 +373,7 @@ func (s *SessionStore) ListTurns(ctx context.Context, sessionID string, limit in
 		var t Turn
 		var tcStr sql.NullString
 		var createdStr string
-		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr); err != nil {
+		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr, &t.Seq); err != nil {
 			return nil, fmt.Errorf("scan turn: %w", err)
 		}
 		if tcStr.Valid {
@@ -254,7 +395,7 @@ func (s *SessionStore) SearchTurns(ctx context.Context, query string, limit int)
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT t.id, t.session_id, t.role, t.content, t.tool_calls, t.tool_call_id, t.tokens_in, t.tokens_out, t.created_at
+		`SELECT t.id, t.session_id, t.role, t.content, t.tool_calls, t.tool_call_id, t.tokens_in, t.tokens_out, t.created_at, t.seq
 		 FROM turns t
 		 JOIN turns_fts f ON t.rowid = f.rowid
 		 WHERE turns_fts MATCH ?
@@ -271,7 +412,7 @@ func (s *SessionStore) SearchTurns(ctx context.Context, query string, limit int)
 		var t Turn
 		var tcStr sql.NullString
 		var createdStr string
-		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr); err != nil {
+		if err := rows.Scan(&t.ID, &t.SessionID, &t.Role, &t.Content, &tcStr, &t.ToolCallID, &t.TokensIn, &t.TokensOut, &createdStr, &t.Seq); err != nil {
 			return nil, fmt.Errorf("scan turn: %w", err)
 		}
 		if tcStr.Valid {

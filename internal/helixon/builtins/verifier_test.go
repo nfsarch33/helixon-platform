@@ -308,9 +308,27 @@ func TestVerifierConfig_Defaults(t *testing.T) {
 
 // --- podman-backed ---------------------------------------------------------
 
+// verifierIntegrationOptIn is the variable that has to be set for the
+// container-backed verifier tests to run at all. It matches the sandbox
+// package's own gate; the two suites share a host bottleneck, so gating one
+// and not the other would just move the 10m package deadline from
+// internal/helixon/sandbox to this package. It was in fact failing here too:
+//
+//	panic: test timed out after 10m0s
+//	  TestIT_VerifierReportsTheVerdictItReturns (301.16s)
+const verifierIntegrationOptIn = "HLXN_SANDBOX_INTEGRATION"
+
+// verifierImageCheckTimeout mirrors imageCheckTimeout in the sandbox package;
+// see the reasoning there. The short version: the previous 2 minutes was not
+// slack, it was a source of silent skips on exactly the busy hosts where the
+// assertions matter most.
+const verifierImageCheckTimeout = 5 * time.Minute
+
 // requirePodmanForVerifier mirrors the guard in internal/helixon/sandbox: the
 // skip is loud, because a verifier that has never been shown to run a real
-// container proves nothing about anyone's work.
+// container proves nothing about anyone's work. Like that guard it is OPT-IN
+// — see the header of podman_integration_test.go for why, and for the CI job
+// that runs these with the skip turned into a failure.
 func requirePodmanForVerifier(t *testing.T) {
 	t.Helper()
 	strict := os.Getenv("HELIXON_SANDBOX_REQUIRE_PODMAN") == "1"
@@ -321,16 +339,27 @@ func requirePodmanForVerifier(t *testing.T) {
 		}
 		t.Skipf("SKIPPED — the verifier sandbox assertions did NOT run: "+format, args...)
 	}
+	if !strict && os.Getenv(verifierIntegrationOptIn) != "1" {
+		fail("%s is not set; the container-backed verifier tests are opt-in (see internal/helixon/sandbox/podman_integration_test.go)", verifierIntegrationOptIn)
+	}
 	if testing.Short() && !strict {
-		fail("-short was set; container start costs minutes on a vfs-backed rootless podman")
+		fail("-short was set; container start costs minutes on a rootless podman")
 	}
 	if _, err := exec.LookPath("podman"); err != nil {
 		fail("podman is not on PATH: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), verifierImageCheckTimeout)
 	defer cancel()
 	//nolint:gosec // G204 the image reference is a package constant, not input
-	if err := exec.CommandContext(ctx, "podman", "image", "exists", sandbox.DefaultImage).Run(); err != nil {
+	err := exec.CommandContext(ctx, "podman", "image", "exists", sandbox.DefaultImage).Run()
+	// See imageCheckTimeout in internal/helixon/sandbox: a probe that ran out
+	// of time is not a probe that answered "absent", and conflating them made
+	// these assertions skip silently on a loaded host.
+	switch {
+	case ctx.Err() != nil:
+		fail("`podman image exists %s` did not answer within %s; the engine is unusable on this host, which is NOT the same as the image being absent",
+			sandbox.DefaultImage, verifierImageCheckTimeout)
+	case err != nil:
 		fail("image %q is not present: %v", sandbox.DefaultImage, err)
 	}
 }

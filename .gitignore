@@ -45,3 +45,8 @@ tests/__pycache__/
 __pycache__/
 evidence/v14546-plaintext-scan.json
 evidence/*/plaintext-scan*.json
+# operator console (web/console): dependencies and the staged static export
+web/console/node_modules/
+web/console/.next/
+web/console/out/
+cmd/helixon/consolefs/out/

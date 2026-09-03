@@ -359,7 +359,7 @@ func findOnPath(file string) (string, error) {
 			continue
 		}
 		p := filepath.Join(dir, file)
-		if info, err := os.Stat(p); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+		if info, err := os.Stat(p); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 { //nolint:gosec // G703 stats PATH-env candidates in a LookPath reimplementation
 			return p, nil
 		}
 	}

@@ -5,7 +5,7 @@
 //   - MiniMax-M3          -> https://api.minimaxi.com/v1
 //     env: MINIMAX_API_KEY (preferred) or MINIMAX_M3_TOKEN_PLAN_KEY (legacy)
 //   - qwen3.7-plus/3.7-max -> https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
-//     env: ALIYUN_QWEN_TOKEN_PLAN_KEY (1Password HelixonSafe/4qt774avrbzabdscc6ezygl5hi)
+//     env: ALIYUN_QWEN_TOKEN_PLAN_KEY (1Password: $HLXN_OP_VAULT / $HLXN_OP_ITEM_QWEN)
 //
 // The test runs against the 5 canonical Sprint 18 pilot prompts
 // (helixon-eval.GoldenTasks) and records per-call latency + cost.
@@ -105,8 +105,8 @@ func ndjsonPath() string {
 // effort — never fails the test.
 func appendNDJSON(r LiveCallResult) {
 	p := ndjsonPath()
-	_ = os.MkdirAll(filepath.Dir(p), 0o755)
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	_ = os.MkdirAll(filepath.Dir(p), 0o750)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644) //nolint:gosec // G304 env/home-derived trend stream path (test observability)
 	if err != nil {
 		return
 	}

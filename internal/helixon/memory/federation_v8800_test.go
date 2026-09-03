@@ -3,12 +3,10 @@ package memory
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"sync"
 	"testing"
 
@@ -89,10 +87,7 @@ func TestHybridSearcher_FederatedSearch_MergesAllThreeSources(t *testing.T) {
 	srv, engram := newEngramServerEcho(t)
 	defer func() { srv.Close() }()
 
-	dbPath := filepath.Join(t.TempDir(), "fed.db")
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
+	db := openTempSQLite(t)
 
 	mem0 := &stubMem0{
 		results: []Mem0Result{
@@ -145,10 +140,7 @@ func TestHybridSearcher_FederatedWrite_Mem0Mirror(t *testing.T) {
 	srv, engram := newEngramServerEcho(t)
 	defer func() { srv.Close() }()
 
-	dbPath := filepath.Join(t.TempDir(), "fed-write.db")
-	db, err := sql.Open("sqlite", dbPath)
-	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
+	db := openTempSQLite(t)
 
 	mem0 := &stubMem0{}
 	searcher := NewHybridSearcher(db, engram, HybridSearchConfig{}, nil)

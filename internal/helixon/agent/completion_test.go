@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -84,7 +83,7 @@ func textResponse(content string) *llm.CompletionResponse {
 
 func newGateAgent(t *testing.T, provider llm.Provider, exec ToolExecutor, policy CompletionPolicy) (*Agent, *SessionStore, string) {
 	t.Helper()
-	store, err := NewSessionStore(context.Background(), filepath.Join(t.TempDir(), "gate.db"))
+	store, err := NewSessionStore(context.Background(), testDBPath(t, "gate.db"))
 	if err != nil {
 		t.Fatalf("NewSessionStore: %v", err)
 	}

@@ -39,6 +39,67 @@ func TestCheckRunTermination_OK(t *testing.T) {
 	}
 }
 
+// TestCheckRunTermination_BudgetWinsWhenBothLimitsCrossed pins the decision
+// order (v18801). Under load a run can be over budget AND past its deadline at
+// the same check. The verdict must be ErrBudgetExhaust: retry classification
+// treats a timeout as retryable and a blown budget as terminal, so reporting
+// ErrTimeout here re-runs — and re-pays — a run that policy already stopped.
+func TestCheckRunTermination_BudgetWinsWhenBothLimitsCrossed(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r := &RunResult{TokensIn: 60, TokensOut: 50}
+	if err := checkRunTermination(ctx, r, 0, 100, 10); !errors.Is(err, ErrBudgetExhaust) {
+		t.Errorf("got %v, want ErrBudgetExhaust when both limits are crossed", err)
+	}
+	if !errors.Is(r.Err, ErrBudgetExhaust) {
+		t.Errorf("RunResult.Err should record budget exhaustion, got %v", r.Err)
+	}
+}
+
+// TestCheckTokenBudget_Boundary pins the boundary the contract states: the
+// budget is exhausted when the token sum is GREATER than MaxTokens, so
+// spending exactly the budget is still inside it.
+//
+// It is here because nothing else in the package exercised that edge — every
+// other case sits far from the limit — so swapping the comparison for >= was
+// an off-by-one that passed the whole suite. A limit test that never tests the
+// limit is decoration.
+func TestCheckTokenBudget_Boundary(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name          string
+		in, out, max  int
+		wantExhausted bool
+	}{
+		{"well under budget", 10, 20, 100, false},
+		{"one token short", 60, 39, 100, false},
+		{"exactly at budget is not exhausted", 60, 40, 100, false},
+		{"one token over is exhausted", 60, 41, 100, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := &RunResult{TokensIn: tc.in, TokensOut: tc.out}
+			err := checkTokenBudget(r, tc.max)
+			if tc.wantExhausted {
+				if !errors.Is(err, ErrBudgetExhaust) {
+					t.Errorf("%d+%d against %d: got %v, want ErrBudgetExhaust", tc.in, tc.out, tc.max, err)
+				}
+				if !errors.Is(r.Err, ErrBudgetExhaust) {
+					t.Errorf("RunResult.Err should record the verdict, got %v", r.Err)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("%d+%d against %d: got %v, want nil", tc.in, tc.out, tc.max, err)
+			}
+			if r.Err != nil {
+				t.Errorf("RunResult.Err should stay clean, got %v", r.Err)
+			}
+		})
+	}
+}
+
 // TestFinalize_NoToolCalls sets FinalContent and returns final=true.
 func TestFinalize_NoToolCalls(t *testing.T) {
 	t.Parallel()

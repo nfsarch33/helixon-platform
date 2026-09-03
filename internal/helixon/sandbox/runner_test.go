@@ -62,7 +62,7 @@ func newTestRunner(t *testing.T, mutate func(c Config) Config) (*Runner, *fakeEn
 func TestEngineArgs_HardeningFlags(t *testing.T) {
 	t.Parallel()
 	r, _ := newTestRunner(t, nil)
-	args := r.EngineArgs(Spec{Command: "echo", Args: []string{"hi"}})
+	args := r.EngineArgs(Spec{Command: "echo", Args: []string{"hi"}}, "hlxn-sbx-test")
 	joined := strings.Join(args, " ")
 
 	required := []struct {
@@ -112,7 +112,7 @@ func TestEngineArgs_UserNSDisabledFallsBackToUser(t *testing.T) {
 		c.User = DefaultUser
 		return c
 	})
-	joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}), " ")
+	joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}, "hlxn-sbx-test"), " ")
 	if !strings.Contains(joined, "--user="+DefaultUser) {
 		t.Fatalf("userns disabled must fall back to --user; argv: %s", joined)
 	}
@@ -127,7 +127,7 @@ func TestEngineArgs_UserNSDisabledFallsBackToUser(t *testing.T) {
 func TestEngineArgs_ToolchainEnvReachesTheContainer(t *testing.T) {
 	t.Parallel()
 	r, _ := newTestRunner(t, nil)
-	joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}), " ")
+	joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}, "hlxn-sbx-test"), " ")
 	for _, want := range []string{
 		"--env=HOME=/tmp",
 		"--env=GOCACHE=/tmp/go-build",
@@ -281,7 +281,7 @@ func TestEngineArgs_WorkspaceModes(t *testing.T) {
 				c.Network = tt.network
 				return c
 			})
-			joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}), " ")
+			joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}, "hlxn-sbx-test"), " ")
 			hasVolume := strings.Contains(joined, "--volume=")
 			if tt.absent {
 				if hasVolume {
@@ -304,7 +304,7 @@ func TestEngineArgs_BindsAndEnvAreExplicitOnly(t *testing.T) {
 		c.Env = map[string]string{"CI": "1", "AAA": "2"}
 		return c
 	})
-	args := r.EngineArgs(Spec{Command: "echo"})
+	args := r.EngineArgs(Spec{Command: "echo"}, "hlxn-sbx-test")
 	joined := strings.Join(args, " ")
 	if !strings.Contains(joined, "/opt/tools:ro") {
 		t.Fatalf("bind must default to read-only; argv: %s", joined)
@@ -331,7 +331,7 @@ func TestEngineArgs_ReadWriteBind(t *testing.T) {
 		c.Binds = []Bind{{Host: bindDir, Container: "/opt/rw", ReadWrite: true}}
 		return c
 	})
-	if !strings.Contains(strings.Join(r.EngineArgs(Spec{Command: "echo"}), " "), "/opt/rw:rw") {
+	if !strings.Contains(strings.Join(r.EngineArgs(Spec{Command: "echo"}, "hlxn-sbx-test"), " "), "/opt/rw:rw") {
 		t.Fatal("an explicit read-write bind should be emitted as :rw")
 	}
 }
@@ -473,6 +473,105 @@ func TestRun_TimeoutIsDistinctFromFailure(t *testing.T) {
 	}
 	if res.Pass() {
 		t.Fatal("a timed-out run must not report Pass()")
+	}
+}
+
+// TestRun_TimeoutReapsTheContainer is the regression test for the leak that
+// kept this package's own integration suite from ever finishing.
+//
+// `--rm` removes a container that EXITS. A run killed at its deadline does not
+// exit — exec.CommandContext kills the engine CLI, and the container it
+// started keeps running, unsupervised and unreferenced. Every timeout
+// therefore cost the host one permanent container, which is why 28 of them
+// were found still up on win1/wsl1, and why the engine there had slowed to the
+// point that a single container start no longer fit a 5m ceiling.
+//
+// MUTATION: drop the `if runCtx.Err() != nil { r.reap(name) }` block in Run
+// and this test fails — no rm is issued, and the container survives the run.
+func TestRun_TimeoutReapsTheContainer(t *testing.T) {
+	t.Parallel()
+	r, fe := newTestRunner(t, func(c Config) Config { c.Timeout = 50 * time.Millisecond; return c })
+	fe.runFn = func(ctx context.Context, args []string, _ io.Writer) (int, error) {
+		if args[0] == "rm" {
+			return 0, nil
+		}
+		<-ctx.Done()
+		return -1, ctx.Err()
+	}
+	if _, err := r.Run(context.Background(), Spec{Command: "echo"}); err != nil {
+		t.Fatalf("a timeout is a Result, not an error: %v", err)
+	}
+
+	fe.mu.Lock()
+	defer fe.mu.Unlock()
+	var started, removed string
+	for _, call := range fe.calls {
+		for _, a := range call {
+			if name, ok := strings.CutPrefix(a, "--name="); ok {
+				started = name
+			}
+		}
+		if call[0] == "rm" {
+			removed = call[len(call)-1]
+		}
+	}
+	if started == "" {
+		t.Fatalf("the run argv named no container, so nothing can reap it; calls: %v", fe.calls)
+	}
+	if removed == "" {
+		t.Fatalf("a run killed at its deadline left container %q running; calls: %v", started, fe.calls)
+	}
+	// Reaping the WRONG name would be worse than not reaping at all: it would
+	// kill a container belonging to a run still in flight beside this one.
+	if removed != started {
+		t.Fatalf("reaped %q but started %q", removed, started)
+	}
+}
+
+// TestRun_CleanRunIsNotReaped: `--rm` already removed a container that exited,
+// so issuing an rm anyway would spend a syscall per run on every host, and
+// would race with the engine's own cleanup.
+func TestRun_CleanRunIsNotReaped(t *testing.T) {
+	t.Parallel()
+	r, fe := newTestRunner(t, nil)
+	if _, err := r.Run(context.Background(), Spec{Command: "echo"}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	fe.mu.Lock()
+	defer fe.mu.Unlock()
+	for _, call := range fe.calls {
+		if call[0] == "rm" {
+			t.Fatalf("a run that exited on its own must not be reaped; calls: %v", fe.calls)
+		}
+	}
+}
+
+// TestEngineArgs_ContainerIsNamedAndLabelled: the name is what Run reaps by,
+// and the label is the only handle on containers left by a test binary that
+// died before any cleanup could run.
+func TestEngineArgs_ContainerIsNamedAndLabelled(t *testing.T) {
+	t.Parallel()
+	r, _ := newTestRunner(t, nil)
+	joined := strings.Join(r.EngineArgs(Spec{Command: "echo"}, "hlxn-sbx-test"), " ")
+	if !strings.Contains(joined, "--name=hlxn-sbx-test") {
+		t.Fatalf("missing --name; argv: %s", joined)
+	}
+	if !strings.Contains(joined, "--label="+ContainerLabel) {
+		t.Fatalf("missing --label=%s; argv: %s", ContainerLabel, joined)
+	}
+}
+
+// TestContainerName_IsUnique: a fixed name would make the reap in one run
+// remove the container of another running beside it.
+func TestContainerName_IsUnique(t *testing.T) {
+	t.Parallel()
+	seen := make(map[string]bool, 128)
+	for range 128 {
+		n := containerName()
+		if seen[n] {
+			t.Fatalf("containerName repeated %q", n)
+		}
+		seen[n] = true
 	}
 }
 

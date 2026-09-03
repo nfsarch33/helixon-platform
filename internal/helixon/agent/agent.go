@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nfsarch33/helixon-platform/internal/callbacks"
 	"github.com/nfsarch33/helixon-platform/internal/llm"
 )
@@ -55,6 +57,12 @@ type Config struct {
 	Completion CompletionPolicy
 	// Observer, when non-nil, receives loop telemetry. Optional.
 	Observer RunObserver
+	// LeaseTTL is how long a worker's claim on a run stays valid without a
+	// renewal; a run whose lease lapses is resumable by any worker. Default 30s.
+	LeaseTTL time.Duration
+	// MaxRunAttempts caps how many times an interrupted run is claimed before
+	// the recovery sweep dead-letters it. Default 3.
+	MaxRunAttempts int
 }
 
 func (c Config) withDefaults() Config {
@@ -70,6 +78,12 @@ func (c Config) withDefaults() Config {
 	if c.Logger == nil {
 		c.Logger = slog.Default()
 	}
+	if c.LeaseTTL <= 0 {
+		c.LeaseTTL = defaultLeaseTTL
+	}
+	if c.MaxRunAttempts <= 0 {
+		c.MaxRunAttempts = 3
+	}
 	c.Completion = c.Completion.withDefaults()
 	return c
 }
@@ -81,6 +95,14 @@ type Agent struct {
 	store    *SessionStore
 	cfg      Config
 	logger   *slog.Logger
+	// owner identifies this instance as a run-lease owner (see run_durable.go).
+	owner string
+	// active is the set of run ids this instance is executing right now. The
+	// lease alone cannot refuse a second entry by the SAME owner, and two loops
+	// on one run in one process would be the duplicated side effect the lease
+	// exists to prevent.
+	activeMu sync.Mutex
+	active   map[string]struct{}
 }
 
 // New creates an Agent wired to the given provider, tool executor, and session store.
@@ -92,6 +114,8 @@ func New(provider llm.Provider, tools ToolExecutor, store *SessionStore, cfg Con
 		store:    store,
 		cfg:      cfg,
 		logger:   cfg.Logger.With(slog.String("component", "helixon.agent")),
+		owner:    newOwner(),
+		active:   map[string]struct{}{},
 	}
 }
 
@@ -132,36 +156,10 @@ type RunResult struct {
 //	recordAssistantTurn     - persist assistant turn with optional tool payload
 //	finalizeRun             - decide final/continue based on tool-call presence
 func (a *Agent) Run(ctx context.Context, sessionID, userMessage string) (*RunResult, error) {
-	ctx, result, cleanup, err := a.startRun(ctx, sessionID, userMessage)
-	if err != nil {
-		return nil, err
-	}
-	defer cleanup()
-	for iter := 0; iter < a.cfg.MaxIterations; iter++ {
-		result.Iterations = iter + 1
-		final, err := a.iterateRun(ctx, sessionID, iter+1, userMessage, result)
-		if err != nil {
-			return result, err
-		}
-		if final {
-			return result, nil
-		}
-	}
-	result.Err = ErrMaxIterations
-	return result, ErrMaxIterations
-}
-
-// startRun applies the agent timeout, persists the user turn, and returns the
-// derived context, a fresh RunResult, and a cleanup func that releases the
-// timeout-derived resources when the caller is done.
-func (a *Agent) startRun(ctx context.Context, sessionID, userMessage string) (context.Context, *RunResult, func(), error) {
-	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
-	cleanup := func() { cancel() }
-	if _, err := a.store.AppendTurn(ctx, sessionID, RoleUser, userMessage, nil, "", 0, 0); err != nil {
-		cleanup()
-		return nil, nil, func() {}, fmt.Errorf("append user turn: %w", err)
-	}
-	return ctx, &RunResult{SessionID: sessionID}, cleanup, nil
+	// Every entry point is durable: a fresh run id, the user turn written in
+	// the same transaction as the run row, a lease, and a terminal record.
+	// See run_durable.go for the lifecycle and for Resume.
+	return a.RunDurable(ctx, uuid.New().String(), sessionID, userMessage, nil)
 }
 
 // iterateRun runs one model iteration and reports whether the loop can exit.
@@ -170,7 +168,7 @@ func (a *Agent) startRun(ctx context.Context, sessionID, userMessage string) (co
 //
 // Returned error covers: budget/timeout guard, build failure, model failure,
 // store failure, or tool-execute failure.
-func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, userMessage string, result *RunResult) (final bool, err error) {
+func (a *Agent) iterateRun(ctx context.Context, runID, sessionID string, iter int, userMessage string, result *RunResult) (final bool, err error) {
 	if err := checkRunTermination(ctx, result, iter, a.cfg.MaxTokens, a.cfg.MaxIterations); err != nil {
 		return false, err
 	}
@@ -183,9 +181,9 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	}
 	messages, err := a.buildMessages(ctx, sessionID)
 	if err != nil {
-		return false, fmt.Errorf("build messages: %w", err)
+		return false, storeErr(ctx, "build messages", err)
 	}
-	ctx = a.notifyRunStart(ctx, sessionID, iter, userMessage)
+	ctx = a.notifyRunStart(ctx, runID, iter, userMessage)
 
 	resp, err := a.invokeModel(ctx, sessionID, messages, iter)
 	if err != nil {
@@ -203,7 +201,8 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 		slog.Int("tokens_in", resp.Usage.PromptTokens),
 		slog.Int("tokens_out", resp.Usage.CompletionTokens),
 	)
-	if err := a.recordAssistantTurn(ctx, sessionID, &choice, resp.Usage); err != nil {
+	assistantSeq, err := a.recordAssistantTurn(ctx, runID, sessionID, &choice, resp.Usage)
+	if err != nil {
 		return false, err
 	}
 	done, err := finalizeRun(result, choice.Message.Content, len(choice.Message.ToolCalls))
@@ -213,7 +212,26 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 	if done {
 		return true, a.gateCompletion(result)
 	}
-	if err := a.executeToolCalls(ctx, sessionID, choice.Message.ToolCalls, result); err != nil {
+	// The budget verdict is reached HERE: on the numbers the provider just
+	// reported, and before this iteration's tool calls are dispatched.
+	//
+	// The position is load-bearing in three ways. It is AFTER
+	// recordAssistantTurn because the provider bills for the response that
+	// blew the budget, so it has to be written down — v18779 added the
+	// per-turn token columns precisely so a run's cost stayed recoverable, and
+	// dropping the last turn would undercount every over-budget run by its
+	// single most expensive call. It is AFTER the `done` branch because a run
+	// that has already produced its final answer has finished, and failing it
+	// for a limit it crossed on the way to succeeding would be perverse. And
+	// it is BEFORE executeToolCalls because the tool calls, not the write, are
+	// what the budget is protecting against: checking only at the top of the
+	// next iteration let a run that had already blown its budget dispatch a
+	// whole further round of tool calls, with whatever side effects those
+	// carry. A limit enforced one full iteration late is not enforcing much.
+	if err := checkTokenBudget(result, a.cfg.MaxTokens); err != nil {
+		return false, err
+	}
+	if err := a.executeToolCalls(ctx, runID, sessionID, iter, assistantSeq, choice.Message.ToolCalls, result); err != nil {
 		return false, err
 	}
 	return false, nil
@@ -223,12 +241,35 @@ func (a *Agent) iterateRun(ctx context.Context, sessionID string, iter int, user
 // per call. It also maintains the completion-gate bookkeeping: which tools
 // changed state, and whether the verifier has passed or failed consecutively.
 //
-// Returns a wrapped error if the store rejects any append, or
-// ErrNeedsHumanApproval once the verifier has failed MaxConsecutiveFailures
-// times in a row — the loop stops there rather than retrying forever.
-func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []llm.ToolCall, result *RunResult) error {
+// Every call is bracketed by a durable step: BeginStep before dispatch,
+// FinishStep after the tool turn is written. On a resumed run BeginStep
+// finds the step already there, and settleReplayedStep decides from the
+// durable log whether the call is done, must be re-run, or must stop the run
+// for a human (a mutating call with no recorded outcome).
+//
+// Returns a wrapped error if the store rejects any write, ErrInterruptedMutation
+// for the unknown-outcome case, or ErrNeedsHumanApproval once the verifier has
+// failed MaxConsecutiveFailures times in a row — the loop stops there rather
+// than retrying forever.
+//
+// iteration scopes the step key (tool call ids repeat across responses for
+// some providers) and assistantSeq bounds the tool-turn lookup on replay.
+func (a *Agent) executeToolCalls(ctx context.Context, runID, sessionID string, iteration int, assistantSeq int64, calls []llm.ToolCall, result *RunResult) error {
 	for _, tc := range calls {
 		name := tc.Function.Name
+		step, created, err := a.store.BeginStep(ctx, runID, iteration, tc.ID, name, tc.Function.Arguments)
+		if err != nil {
+			return storeErr(ctx, "begin step", err)
+		}
+		if !created {
+			settled, err := a.settleReplayedStep(ctx, runID, sessionID, assistantSeq, step, result)
+			if err != nil {
+				return err
+			}
+			if settled {
+				continue
+			}
+		}
 		toolResult, toolErr := a.tools.Execute(ctx, name, tc.Function.Arguments)
 		if a.cfg.Completion.isMutating(name) {
 			result.Mutated = true
@@ -237,8 +278,15 @@ func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []
 		if toolErr != nil {
 			toolResult = fmt.Sprintf("error: %s", toolErr.Error())
 		}
-		if _, err := a.store.AppendTurn(ctx, sessionID, RoleTool, toolResult, nil, tc.ID, 0, 0); err != nil {
-			return fmt.Errorf("append tool turn: %w", err)
+		if _, err := a.store.AppendRunTurn(ctx, runID, a.owner, sessionID, RoleTool, toolResult, nil, tc.ID, 0, 0); err != nil {
+			return storeErr(ctx, "append tool turn", err)
+		}
+		stepStatus := StepDone
+		if toolErr != nil {
+			stepStatus = StepFailed
+		}
+		if err := a.store.FinishStep(ctx, runID, iteration, tc.ID, stepStatus, toolResult); err != nil {
+			return storeErr(ctx, "finish step", err)
 		}
 		if escalate {
 			result.NeedsHumanApproval = true
@@ -252,6 +300,56 @@ func (a *Agent) executeToolCalls(ctx context.Context, sessionID string, calls []
 		}
 	}
 	return nil
+}
+
+// settleReplayedStep decides what a resumed run does with a tool call it has
+// seen before. It returns settled=true when nothing must be dispatched:
+//
+//   - the step already finished: its tool turn is in the log;
+//   - the step is pending but its tool turn exists: the crash landed between
+//     the append and FinishStep, so the turn IS the outcome - close the step;
+//   - the step is pending, no tool turn, and the tool is mutating: the outcome
+//     is unknowable, so the run stops for a human (ErrInterruptedMutation)
+//     with a tool turn saying so, rather than risk a second side effect.
+//
+// It returns settled=false for a pending, unrecorded, non-mutating call:
+// re-reading is free of side effects, so the caller dispatches it again.
+func (a *Agent) settleReplayedStep(ctx context.Context, runID, sessionID string, assistantSeq int64, step *RunStep, result *RunResult) (bool, error) {
+	if step.Status != StepPending {
+		if a.cfg.Completion.isMutating(step.Tool) {
+			result.Mutated = true
+		}
+		return true, nil
+	}
+	recorded, err := a.store.ToolTurnExists(ctx, sessionID, assistantSeq, step.ToolCallID)
+	if err != nil {
+		return false, storeErr(ctx, "look up tool turn", err)
+	}
+	if recorded {
+		if err := a.store.FinishStep(ctx, runID, step.Iteration, step.ToolCallID, StepDone, ""); err != nil {
+			return false, storeErr(ctx, "close replayed step", err)
+		}
+		if a.cfg.Completion.isMutating(step.Tool) {
+			result.Mutated = true
+		}
+		return true, nil
+	}
+	if !a.cfg.Completion.isMutating(step.Tool) {
+		return false, nil
+	}
+	note := fmt.Sprintf("error: tool %s was interrupted before its outcome was recorded; a human must confirm its effect before the run continues", step.Tool)
+	if _, err := a.store.AppendRunTurn(ctx, runID, a.owner, sessionID, RoleTool, note, nil, step.ToolCallID, 0, 0); err != nil {
+		return false, storeErr(ctx, "append interrupted tool turn", err)
+	}
+	if err := a.store.FinishStep(ctx, runID, step.Iteration, step.ToolCallID, StepFailed, note); err != nil {
+		return false, storeErr(ctx, "fail interrupted step", err)
+	}
+	result.Mutated = true
+	result.NeedsHumanApproval = true
+	result.Err = ErrInterruptedMutation
+	a.logger.Warn("resumed run found a mutating tool call with no recorded outcome; stopping for human approval",
+		slog.String("run_id", runID), slog.String("tool", step.Tool), slog.String("tool_call_id", step.ToolCallID))
+	return true, ErrInterruptedMutation
 }
 
 // recordVerifierOutcome updates the verifier bookkeeping for one tool call
@@ -270,19 +368,67 @@ func (a *Agent) recordVerifierOutcome(name, payload string, toolErr error, resul
 	return result.VerifierFailures >= a.cfg.Completion.MaxConsecutiveFailures
 }
 
-// checkRunTermination returns ErrTimeout when ctx is done and ErrBudgetExhaust
-// when the in+out token sum is greater than MaxTokens. iter and maxIter are
-// reserved for the future iterations-overflow guard.
+// checkRunTermination returns ErrBudgetExhaust when the in+out token sum is
+// greater than MaxTokens, and ErrTimeout when ctx is done. iter and maxIter
+// are reserved for the future iterations-overflow guard.
+//
+// The budget is checked FIRST, and the order is load-bearing. Under load a run
+// crosses both limits before the same check: the tokens were spent before the
+// clock ran out, so budget exhaustion is the true stop reason — and the two
+// verdicts travel different roads from here. A timeout is classified
+// retryable and re-runs the work; a blown budget is a policy stop, and
+// re-running it re-pays every call the budget already refused. The reason also
+// feeds the escalations metric, and separating budget_exhausted from timeout
+// there is the point of having the label. The budget verdict is decidable from
+// numbers the loop already holds; ctx.Err() merely reports what the clock did
+// in the meantime, so it goes second.
 func checkRunTermination(ctx context.Context, r *RunResult, iter, maxTokens, maxIter int) error { //nolint:revive // unused-parameter required by interface
+	if err := checkTokenBudget(r, maxTokens); err != nil {
+		return err
+	}
 	if ctx.Err() != nil {
 		r.Err = ErrTimeout
 		return ErrTimeout
 	}
+	return nil
+}
+
+// checkTokenBudget returns ErrBudgetExhaust when the in+out token sum is
+// greater than maxTokens. It is deliberately free of I/O and of the context:
+// the budget is a property of numbers the loop already holds, so the verdict
+// is decidable without waiting on anything and cannot be pre-empted by a slow
+// durable write.
+func checkTokenBudget(r *RunResult, maxTokens int) error {
 	if r.TokensIn+r.TokensOut > maxTokens {
 		r.Err = ErrBudgetExhaust
 		return ErrBudgetExhaust
 	}
 	return nil
+}
+
+// storeErr classifies a session-store failure.
+//
+// A store call that failed because the RUN's own deadline expired is a run
+// timeout, not a storage fault. Reporting it verbatim names the wrong
+// subsystem — "append tool turn: insert turn: context deadline exceeded" says
+// nothing about which limit the run actually hit — so the typed ErrTimeout is
+// added to the chain while the underlying cause is preserved for diagnostics.
+//
+// The test is specifically DeadlineExceeded, not ctx.Err() != nil, because
+// that broader test misattributes two other things as an execution timeout:
+// an upstream cancellation (the caller went away — telling an operator to
+// raise Config.Timeout sends them nowhere), and any failure on a path that has
+// already cancelled the context itself, which would relabel a foreign-key
+// rejection or a full disk as a timeout zero seconds into the budget.
+//
+// Two %w verbs rather than errors.Join: Join separates its operands with a
+// NEWLINE, which splits one failure across two records in a line-oriented log.
+// Both errors stay reachable through errors.Is either way.
+func storeErr(ctx context.Context, op string, err error) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("%s: %w: %w", op, ErrTimeout, err)
+	}
+	return fmt.Errorf("%s: %w", op, err)
 }
 
 // notifyRunStart fires the callbacks.OnStart hook if a handler is registered.
@@ -322,14 +468,20 @@ func (a *Agent) invokeModel(ctx context.Context, sessionID string, messages []ll
 // SessionTokenUsage summed to zero for every session ever recorded and the
 // per-turn cost of a run was unrecoverable after the fact. The provider
 // already returns Usage on each response; it just was not being written down.
-func (a *Agent) recordAssistantTurn(ctx context.Context, sessionID string, choice *llm.Choice, usage llm.Usage) error {
+//
+// It returns the turn's seq, which bounds the replay lookup for this
+// iteration's tool calls.
+func (a *Agent) recordAssistantTurn(ctx context.Context, runID, sessionID string, choice *llm.Choice, usage llm.Usage) (int64, error) {
 	var toolCallsJSON json.RawMessage
 	if len(choice.Message.ToolCalls) > 0 {
 		toolCallsJSON, _ = json.Marshal(choice.Message.ToolCalls)
 	}
-	_, err := a.store.AppendTurn(ctx, sessionID, RoleAssistant, choice.Message.Content,
+	turn, err := a.store.AppendRunTurn(ctx, runID, a.owner, sessionID, RoleAssistant, choice.Message.Content,
 		toolCallsJSON, "", usage.PromptTokens, usage.CompletionTokens)
-	return err
+	if err != nil {
+		return 0, storeErr(ctx, "append assistant turn", err)
+	}
+	return turn.Seq, nil
 }
 
 // finalizeRun inspects the assistant content and tool-call presence on the

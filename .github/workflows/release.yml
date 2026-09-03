@@ -12,6 +12,26 @@ permissions:
 jobs:
   goreleaser:
     runs-on: [self-hosted, linux]
+    # This workflow fires only on v* tags and has still never executed, so
+    # there is no duration of its own to size against. There is now a good
+    # proxy: the Image workflow runs this same goreleaser invocation on every
+    # PR, differing only in that it skips publishing. That measures at 1m1s
+    # warm and 2m33s cold, and the two image builds are now a FROM/COPY, not
+    # a compile.
+    #
+    # The old justification for this number no longer holds and is worth
+    # recording, because it was the shape of the bug: the root Dockerfile used
+    # to compile the binary INSIDE the image, so the arm64 leg did that whole
+    # build under QEMU and was assumed to be a tens-of-minutes long pole. It
+    # was not slow, it was broken -- goreleaser's build context has no source
+    # tree, so that Dockerfile could never build here at all.
+    #
+    # 90m is kept anyway. It is no new ceiling (sandbox-integration already
+    # holds the runner that long), it still cuts an uncapped release hang to a
+    # quarter of the 360m default, and the real risk here is publishing to
+    # ghcr, which is network-bound and unmeasured. Note `[self-hosted, linux]`
+    # resolves to the same single runner every other job queues behind.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,8 +39,34 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+          # MUST stay false on the self-hosted runner. setup-go@v5 defaults
+          # cache to true, and its post-job cache-save tars go into
+          # uninterruptible sleep on this substrate, pinning the single runner
+          # this repository has until the timeout. One such tar held it for
+          # 5h38m with nine runs queued behind it. ~/go survives between jobs
+          # on a persistent runner anyway, so the cache buys nothing here.
+          cache: false
+      # Neither setup-qemu-action nor setup-buildx-action, and both removals
+      # are load-bearing.
+      #
+      # setup-buildx-action did not merely become unnecessary -- it CANNOT
+      # succeed on this runner. `/usr/bin/docker` here is a shim that execs
+      # podman, so the action installs a buildx plugin nothing consults and
+      # then fails creating a builder instance with `unknown flag: --name`
+      # from `podman buildx`. This workflow has never executed, so that had
+      # never been observed; the Image workflow hit it on the first PR that
+      # actually ran this path. No builder instance is needed: `podman buildx
+      # build` is podman's own build, and real Docker falls back to its
+      # default builder.
+      #
+      # setup-qemu-action was emulating arm64 for a Dockerfile that compiled
+      # inside the image. The Dockerfile now only does FROM/COPY/ENTRYPOINT,
+      # which executes no target-architecture instruction, so the arm64 image
+      # is assembled with no binfmt handler at all.
+      #
+      # The Image workflow runs this same goreleaser invocation on every PR
+      # and asserts the resulting arm64 image carries an aarch64 binary, so
+      # both removals stay honest.
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io

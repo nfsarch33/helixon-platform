@@ -79,8 +79,18 @@ func TestNewRegistersEveryContractName(t *testing.T) {
 			t.Errorf("metric %q is registered nowhere; the contract lists it", name)
 		}
 	}
-	if len(Names()) != 10 {
-		t.Errorf("Names() returned %d entries, want the 10 in the frozen contract", len(Names()))
+	if len(Names()) != 11 {
+		t.Errorf("Names() returned %d entries, want the 11 in the frozen contract", len(Names()))
+	}
+}
+
+// TestGoroutineGaugeIsLive: the gauge samples the process at scrape time,
+// so it is never zero in a running test binary.
+func TestGoroutineGaugeIsLive(t *testing.T) {
+	_, reg := newTestMetrics(t)
+	got := gathered(t, reg)
+	if v, ok := got[NameGoroutines]; !ok || v < 1 {
+		t.Fatalf("%s = %v (present=%v), want a live count >= 1", NameGoroutines, v, ok)
 	}
 }
 
