@@ -55,8 +55,15 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: install (locked)
-        run: npm ci --no-audit --no-fund
+      # --ignore-scripts: this workflow runs on `pull_request`, on a
+      # self-hosted runner, in a public repository. Without it, a dependency's
+      # install script - anywhere in a tree of 483 packages, changeable by a
+      # pull request that edits the lockfile - executes on the estate's own
+      # machine before any review. The console needs none of them: the build,
+      # the export and the tests are identical with scripts disabled, measured
+      # before this line was added.
+      - name: install (locked, no dependency lifecycle scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: typecheck
         run: npx tsc --noEmit
       - name: lint
