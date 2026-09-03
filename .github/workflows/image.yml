@@ -9,6 +9,35 @@ on:
 permissions:
   contents: read
 
+# Repo-wide, and deliberately NOT keyed on the ref.
+#
+# The sibling workflows key their group on ${{ github.ref }}, because what they
+# protect against is a branch pushed three times in a minute. This job's
+# contention is different in kind: goreleaser builds images through podman, and
+# every run on this repo shares ONE containers-storage on ONE self-hosted
+# runner. Two runs on DIFFERENT refs therefore collide - one pulls the base
+# image while the other is writing the same layers, and the loser fails at the
+# first instruction:
+#
+#   exit status 125: STEP 1/4: FROM gcr.io/distroless/static-debian12:nonroot
+#   Error: creating build container: locating pulled image
+#   "gcr.io/distroless/static-debian12:nonroot" name in containers storage:
+#   image not known
+#
+# Measured 2026-09-03: three failures in twenty-five runs, all three on the
+# same afternoon, all three with two Image runs overlapping on separate
+# branches, and all three green on a serial rerun with nothing else changed.
+# A per-ref group would not have prevented any of them.
+#
+# cancel-in-progress is false on purpose. Cancelling would leave the older
+# pull request's Image check in the `cancelled` state, which is neither a pass
+# nor an actionable failure - a merge gate cannot read it, and a human reads it
+# as "something went wrong". Queueing costs a couple of minutes; the job is
+# 1-3 minutes warm.
+concurrency:
+  group: image-build
+  cancel-in-progress: false
+
 jobs:
   build-and-run:
     runs-on: self-hosted
