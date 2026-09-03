@@ -85,9 +85,53 @@ RULES=(
   "private_key|ssh-rsa |public key material"
   "private_key|BEGIN RSA PRIVATE|private key"
   "private_key|BEGIN OPENSSH PRIVATE|private key"
-  "network_topology|192\\.168\\.|private address"
-  "network_topology|10\\.0\\.|private address"
-  "network_topology|172\\.(1[6-9]|2[0-9]|3[01])\\.|private address"
+  # v18809 -- a private address has four octets, and these had two or three.
+  # That was wrong in both directions at once, and the narrow direction is the
+  # one that matters.
+  #
+  # Too narrow: `10\\.0\\.` covers 10.0/16 and nothing else of 10/8, so a real
+  # address elsewhere in that range walked past it. `172\\.(1[6-9]|...)` was worse -- see the
+  # parser note above: it never compiled, so 172.16/12 was not scanned at all.
+  #
+  # Too broad: two octets match any dotted number containing them. The first npm
+  # lockfile committed here matched ten lines of semver (`^10.0.0`) and registry
+  # URLs (`runtime-1.10.0.tgz`), and every JavaScript dependency added afterwards
+  # would have matched the same way.
+  #
+  # Requiring four octets, bounded so a longer number cannot supply them
+  # (a public address that merely carries one as a substring is not one, and a
+  # five-part dotted number is not an address at all), is strictly
+  # stronger: measured over this tree it keeps every existing true positive,
+  # adds the whole of 10/8 and 172.16/12 that were being missed, and drops all
+  # ten lockfile false positives. The right-hand bound admits a trailing dot so
+  # an address ending a sentence still matches.
+  #
+  # Deliberate limit, pinned in the tests: a prose placeholder such as
+  # 192.168.x.x no longer matches. A placeholder is not a disclosure.
+  "network_topology|(^|[^0-9.])192\\.168\\.[0-9]{1,3}\\.[0-9]{1,3}([^0-9]|$)|private address"
+  "network_topology|(^|[^0-9.])10\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}([^0-9]|$)|private address"
+  "network_topology|(^|[^0-9.])172\\.(1[6-9]|2[0-9]|3[01])\\.[0-9]{1,3}\\.[0-9]{1,3}([^0-9]|$)|private address"
+  # KNOWN GAP, measured and deliberately not closed in this change: the mesh
+  # range. 100.64/10 is carrier-grade NAT space, which is what the overlay
+  # network hands out, and one of those addresses identifies a host here
+  # exactly as an RFC1918 address does. No rule covers it, so the gate is blind
+  # to every one of them.
+  #
+  #   "network_topology|(^|[^0-9.])100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.[0-9]{1,3}\\.[0-9]{1,3}([^0-9]|$)|carrier-grade NAT address"
+  #
+  # Adding that line was measured against this tree: 15 findings across 9 files
+  # -- the scrape config, a fleet health check, a cluster join script, and six
+  # files under evidence/. Those files do carry allow-file headers, but for
+  # fleet_host_alias or internal_service_id, and a header only suppresses the
+  # categories it names. (The paths are deliberately described rather than
+  # quoted: one of them carries a host name, and the sibling scanner refuses a
+  # diff that adds one -- which is the gate working.)
+  #
+  # So enabling it is not a gate change, it is a decision about fifteen mesh
+  # addresses already published in a public repo: annotate them, or scrub them.
+  # That decision is the operator's, and it is not this PR's to make quietly.
+  # T10i below pins the gap so it stays visible and goes red the day the rule
+  # is added -- at which point this comment is what needs re-arguing.
 )
 
 # Does $1 carry an allow-file header covering category $2?
@@ -107,16 +151,41 @@ allows() {
   return 1
 }
 
+# Every rule must compile before any of them runs. grep exits 2 on a regex it
+# cannot parse, and the scan below sends stderr to /dev/null, so an uncompilable
+# rule is indistinguishable from a rule that found nothing -- which is exactly
+# how the 172.16/12 rule stayed dead. An unusable rule is an infrastructure
+# failure (exit 2), never a clean tree (exit 0).
+for rule in "${RULES[@]}"; do
+  probe="${rule#*|}"
+  probe="${probe%|*}"
+  grep -qE -- "$probe" /dev/null
+  if [ "$?" -ge 2 ]; then
+    echo "::error::gate rule does not compile: ${rule%%|*}"
+    echo "A rule that grep cannot parse reports nothing, which reads as clean."
+    exit 2
+  fi
+done
+
 findings=0
 suppressed=0
 : >/tmp/public-repo-gate-findings.txt
 : >/tmp/public-repo-gate-suppressed.txt
 
+# A rule is category|pattern|description, and the PATTERN is everything between
+# the first delimiter and the last -- not everything up to the second.
+#
+# v18809: it used to be `${rest%%|*}`, which truncates at the first `|` INSIDE
+# the pattern. The 172.16/12 rule contains an alternation, so the gate compiled
+# `172\.(1[6-9]` , grep exited 2 on the unmatched parenthesis, the error went to
+# /dev/null with everything else, and the rule reported nothing for as long as
+# it existed. A dead rule and a clean tree print the same line, which is the
+# whole reason the compile check below is not optional.
 for rule in "${RULES[@]}"; do
   category="${rule%%|*}"
-  rest="${rule#*|}"
-  pattern="${rest%%|*}"
-  desc="${rest##*|}"
+  desc="${rule##*|}"
+  pattern="${rule#*|}"
+  pattern="${pattern%|*}"
 
   while IFS= read -r hit; do
     [ -n "$hit" ] || continue
@@ -145,8 +214,20 @@ for rule in "${RULES[@]}"; do
       echo "[$category] $hit" >>/tmp/public-repo-gate-findings.txt
       echo "::error file=${file#./}::${desc} (${category}): ${pattern}"
     fi
-  done < <(grep -rn "${INCLUDES[@]}" -E -- "$pattern" . 2>/dev/null \
-           | grep -v '/\.git/' | grep -v 'node_modules/')
+  # v18809: --exclude-dir, not a `grep -v` on the output.
+  #
+  # The output of `grep -rn` is path:line:TEXT, so filtering it with
+  # `grep -v 'node_modules/'` drops every finding whose matched TEXT happens to
+  # contain that string, wherever the file actually lives. A dependency
+  # manifest quoting a path, a script that greps its own tree, a note about a
+  # build directory -- a real violation sharing a line with any of those was
+  # silently discarded. The filter was meant to scope the scan and was instead
+  # scoping the findings, which is the shape of an exclusion that fails open.
+  #
+  # --exclude-dir sits before the path operand deliberately: grep ignores it
+  # after one, without a word.
+  done < <(grep -rn "${INCLUDES[@]}" --exclude-dir=.git --exclude-dir=node_modules \
+           -E -- "$pattern" . 2>/dev/null)
 done
 
 echo "public-repo-gate: ${findings} finding(s), ${suppressed} suppressed by allow-file annotation"

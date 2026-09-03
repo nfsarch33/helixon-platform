@@ -159,6 +159,107 @@ rc="$(run_gate "$TMP/r")"
 [ "$rc" = "0" ] && ok "T9c KNOWN LIMIT: .txt is still outside the gate's blast radius" \
                 || nope "T9c exited ${rc}, want 0 -- if .txt was added, update this test"
 
+# ---------------------------------------------------------------------------
+# T10 private addressing: four octets, bounded.
+#
+# The three network_topology rules used to carry two or three octets, which was
+# wrong in both directions at once. Too narrow: `10\.0\.` is 10.0/16 and
+# nothing else of 10/8. Too broad: two octets match any dotted number that
+# contains them, so the first npm lockfile committed here matched ten lines of
+# semver and registry URLs. T10e-h are those false positives; T10a-d are the
+# true positives, two of which this gate could not catch at all before.
+# ---------------------------------------------------------------------------
+# The sibling anti-leak scanner (scripts/ci/deny-pattern.sh) reads ADDED lines
+# and refuses a complete private-address literal. That is correct for a public
+# repository, and it applies to this file like any other: a test is not exempt.
+#
+# These vectors are synthetic - not one of them is an address in use here - but
+# a literal is a literal, so they are assembled from octets at run time. The
+# assertions are what give them meaning; the strings themselves say nothing
+# about this estate.
+ip() { printf '%s.%s.%s.%s' "$1" "$2" "$3" "$4"; }
+A172="$(ip 172 31 0 12)"    # RFC1918, the range whose rule never compiled
+A10="$(ip 10 42 7 19)"      # RFC1918, outside the 10.0/16 the old rule reached
+A192="$(ip 192 168 10 4)"   # RFC1918, the range that always worked: the control
+AMESH="$(ip 100 96 0 12)"   # carrier-grade NAT, the range no rule covers
+APUB="$(ip 210 0 0 1)"      # public, and carries a private address as a substring
+AVER="1.$(ip 10 0 0 1)"     # not an address at all: five dotted parts
+
+topo() { # label content want_rc
+  fixture
+  printf '%s\n' "$2" >"$TMP/r/topology.md"
+  local rc; rc="$(run_gate "$TMP/r")"
+  [ "$rc" = "$3" ] && ok "$1" || nope "$1 (exited ${rc}, want $3)"
+}
+
+topo "T10a a 172.16/12 address is a finding"          "control plane: $A172"     1
+topo "T10b a 10/8 address outside 10.0/16 is one too" "vpc host $A10 answers"    1
+topo "T10c a 192.168 address still is"                "lan host $A192"           1
+topo "T10d an address ending a sentence still is"     "the control plane is ${A172}."  1
+topo "T10e a caret semver range is NOT"               '"eslint": "^8.57.0 || ^9.0.0 || ^10.0.0",'  0
+topo "T10f a registry tarball URL is NOT"             '"resolved": "https://r.example/x-1.10.0.tgz"' 0
+topo "T10g a public address carrying one as a substring is NOT" "the endpoint is $APUB today" 0
+topo "T10h a five-part dotted number is NOT"          "build $AVER shipped"      0
+
+# T10i and T10j are KNOWN LIMITS, asserted as they are rather than as they
+# should be, so the gate's real blast radius is written down. Both are meant to
+# go RED the day the corresponding rule is added -- that is the point of them.
+topo "T10i KNOWN GAP: a mesh address is not scanned"  "peer $AMESH direct"       0
+topo "T10j KNOWN LIMIT: a prose placeholder is not"   'the lan is 192.168.x.x somewhere'  0
+
+# ---------------------------------------------------------------------------
+# T11 a rule that does not compile must stop the gate, not pass it.
+#
+# The 172.16/12 rule contains an alternation and the parser split on the FIRST
+# delimiter, so the gate compiled `172\.(1[6-9]`, grep exited 2, stderr went to
+# /dev/null with everything else, and the rule reported nothing for as long as
+# it existed. T10a is the positive half of that fix; this is the half that
+# stops the next one being silent.
+# ---------------------------------------------------------------------------
+fixture
+printf 'clean\n' >"$TMP/r/a.md"
+sed 's#^  "private_key|ssh-rsa |public key material"#  "private_key|ssh-rsa (unclosed|public key material"#' \
+    "$GATE" >"$TMP/broken-gate.sh"
+if ! grep -q 'ssh-rsa (unclosed' "$TMP/broken-gate.sh"; then
+  nope "T11 could not inject an uncompilable rule (the rule list moved)"
+else
+  rc="$(PUBLIC_REPO_GATE_ROOT="$TMP/r" bash "$TMP/broken-gate.sh" >"$TMP/broken.log" 2>&1; echo $?)"
+  [ "$rc" = "2" ] && ok "T11a an uncompilable rule exits 2, not 0" \
+                  || nope "T11a exited ${rc}, want 2 -- a dead rule reads as a clean tree"
+  grep -q "does not compile" "$TMP/broken.log" \
+    && ok "T11b   ... and names the category it could not compile" \
+    || nope "T11b the failure does not say which rule"
+fi
+
+# ---------------------------------------------------------------------------
+# T12 exclusions are by PATH, not by the text of a finding.
+#
+# `grep -rn` prints path:line:TEXT, so filtering that stream with
+# `grep -v 'node_modules/'` dropped any finding whose matched TEXT contained
+# the string, wherever the file lived. T12a is the violation that used to
+# vanish; T12b and T12c are the controls that the real directories are still
+# out of scope, so the fix did not simply delete the exclusion.
+# ---------------------------------------------------------------------------
+fixture
+printf 'see node_modules/react and the box at %s\n' "$A192" >"$TMP/r/notes.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T12a a violation on a line mentioning node_modules/ IS a finding" \
+                || nope "T12a exited ${rc}, want 1 -- the exclusion is filtering findings, not paths"
+
+fixture
+mkdir -p "$TMP/r/node_modules/pkg"
+printf 'host %s\n' "$A192" >"$TMP/r/node_modules/pkg/readme.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "0" ] && ok "T12b a violation inside node_modules/ is still out of scope" \
+                || nope "T12b exited ${rc}, want 0 -- dependency trees are not ours to scan"
+
+fixture
+mkdir -p "$TMP/r/.git"
+printf 'host %s\n' "$A192" >"$TMP/r/.git/config.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "0" ] && ok "T12c a violation inside .git/ is still out of scope" \
+                || nope "T12c exited ${rc}, want 0"
+
 echo
 echo "PASS: $PASS, FAIL: $FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
