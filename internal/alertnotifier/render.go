@@ -34,9 +34,25 @@ type Digest struct {
 // of the same cycle reuses the key (the vendor de-duplicates it) while the
 // next renotify cycle produces a different one (it is genuinely a new
 // message).
+//
+// The body must therefore be as stable as the key. It used to open with
+// `now`, which is wall-clock: a retry of a failed send reused the key with a
+// body that differed by the elapsed minutes, and the vendor rejected it with
+//
+//	409 invalid_idempotent_request: this idempotency key has been used with
+//	this HTTP method and endpoint within the last 24 hours, but the request
+//	body was modified
+//
+// Measured in production on 2026-09-05: the 06:00 send failed, the 06:05
+// retry failed the same way, and only the 06:10 run got through because the
+// alert set had changed by then and produced a new key. The header now uses
+// the cycle's own anchor - a value derived from the same inputs the key folds
+// in - so a retry re-renders byte-identical text. `now` is still the send
+// clock and still stamps the audit record; it just no longer leaks into the
+// idempotent payload.
 func Render(ch Change, prev State, now time.Time, source string) Digest {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Helixon fleet alert digest — %s\n", now.UTC().Format(time.RFC3339))
+	fmt.Fprintf(&b, "Helixon fleet alert digest — %s\n", cycleAnchor(ch, prev, now).UTC().Format(time.RFC3339))
 	fmt.Fprintf(&b, "Source: %s%s\n\n", strings.TrimRight(source, "/"), alertsPath)
 
 	writeAlertSection(&b, fmt.Sprintf("NEW FIRING (%d)", len(ch.NewFiring)), ch.NewFiring)
@@ -50,6 +66,40 @@ func Render(ch Change, prev State, now time.Time, source string) Digest {
 		HTML:           renderHTML(text),
 		IdempotencyKey: IdempotencyKey(ch, prev),
 	}
+}
+
+// cycleAnchor is the timestamp the digest is dated by: the newest instant
+// that the idempotency key already folds in, so two renders of the same cycle
+// produce the same header no matter when they run.
+//
+// It walks exactly the inputs IdempotencyKey walks - the new alerts' start
+// times, the resolved alerts' start times, and each still-firing alert's
+// previous notification stamp - and takes the newest. A change set with none
+// of those (which Render is never called with, since an empty change set
+// sends nothing) falls back to the send clock, because a zero time in the
+// header would be worse than a stable-enough one.
+func cycleAnchor(ch Change, prev State, fallback time.Time) time.Time {
+	var newest time.Time
+	consider := func(t time.Time) {
+		if t.After(newest) {
+			newest = t
+		}
+	}
+	for i := range ch.NewFiring {
+		consider(ch.NewFiring[i].StartsAt)
+	}
+	for _, e := range ch.Resolved {
+		consider(e.StartsAt)
+	}
+	for i := range ch.Renotify {
+		if ts := prev.Active[FingerprintOf(&ch.Renotify[i])].LastNotifiedUnix; ts > 0 {
+			consider(time.Unix(ts, 0).UTC())
+		}
+	}
+	if newest.IsZero() {
+		return fallback
+	}
+	return newest
 }
 
 // Subject summarizes the change set in the mail subject, so an operator
