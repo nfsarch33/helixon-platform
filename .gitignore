@@ -1,7 +1,28 @@
 # Binaries
+#
+# `go build ./cmd/<name>` drops <name> in the repo root, so every cmd package is
+# a stray binary waiting to happen. This list was maintained by hand and had
+# fallen behind by sixteen names -- one of which (secrets-bootstrap) was
+# committed, 3.5 MB of ELF carrying the operator's home path 337 times, and
+# neither leak gate could see it. Keep this list generated from cmd/, not
+# curated: `ls cmd/` is the source of truth.
+/alert-notifier
+/choose-llm
+/cursor-tools
+/eval-smoke
+/fleet-agent
+/github-sync
 /helixon
 /helixon-eval
+/helixon-slo-ack
+/notify
+/onepassword-bootstrap
+/registra
+/secrets-bootstrap
 /send-end-email
+/session-audit
+/svcregistry-bridge
+/svcregistryd
 /tools/email-vendor-rotation/email-vendor-rotation
 *.exe
 *.dll
