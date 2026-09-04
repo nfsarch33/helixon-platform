@@ -57,13 +57,27 @@ func TestRenderBody(t *testing.T) {
 		"2026-08-27T14:12:18Z",
 		"2026-08-27T09:00:00Z",
 		"http://127.0.0.1:9093/api/v2/alerts",
-		"2026-08-28T02:00:00Z",
+		// The header is dated by the cycle, no longer the render clock: it is
+		// the newest instant the idempotency key already folds in, which here
+		// is the critical alert's StartsAt. It used to be `now`
+		// (2026-08-28T02:00:00Z), and that is precisely what made a retry
+		// re-render a different body under the same key and earn a vendor
+		// 409 invalid_idempotent_request -- see
+		// TestRenderIsStableAcrossTheRetryClock.
+		"Helixon fleet alert digest — 2026-08-27T14:12:18Z",
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(d.Text, want) {
 			t.Errorf("digest text missing %q:\n%s", want, d.Text)
 		}
 	}
+	// The render clock must not appear in the body at all. If it does, a
+	// retry of this same cycle renders different bytes under the same
+	// idempotency key, which the vendor rejects with 409.
+	if strings.Contains(d.Text, "2026-08-28T02:00:00Z") {
+		t.Errorf("the render clock leaked into the idempotent body:\n%s", d.Text)
+	}
+
 	// Critical must be rendered before warning.
 	if strings.Index(d.Text, "severity=critical") > strings.Index(d.Text, "severity=warning") {
 		t.Errorf("critical must precede warning:\n%s", d.Text)
@@ -163,5 +177,70 @@ func TestGroupSeverities(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("groupSeverities = %v, want %v", got, want)
 		}
+	}
+}
+
+// A retry must re-render byte-identical text.
+//
+// This is the bug the frozen-clock retry test could not see: run_test.go pins
+// "the retry resends the identical digest" while holding the clock still, so a
+// body that varies with wall-clock time passes it. Production advances the
+// clock between the failed send and the retry, which is what produced
+// 409 invalid_idempotent_request twice on 2026-09-05.
+//
+// The assertion is the pair: same key AND same bytes. Either alone is passable
+// by a broken implementation - a body-derived key would keep the bytes stable
+// and change the key, which loses vendor de-duplication.
+func TestRenderIsStableAcrossTheRetryClock(t *testing.T) {
+	t.Parallel()
+
+	start := time.Date(2026, 9, 5, 5, 30, 0, 0, time.UTC)
+	ch := Change{
+		NewFiring: []Alert{{
+			Labels:   map[string]string{"alertname": "AgentSandboxFailing", "severity": "critical"},
+			StartsAt: start,
+		}},
+	}
+	prev := State{Active: map[string]Entry{}}
+
+	first := Render(ch, prev, start.Add(30*time.Minute), "http://example.invalid")
+	// The retry happens five minutes later, exactly as the unit's restart does.
+	retry := Render(ch, prev, start.Add(35*time.Minute), "http://example.invalid")
+
+	if first.IdempotencyKey != retry.IdempotencyKey {
+		t.Fatalf("the retry changed the idempotency key: %q -> %q", first.IdempotencyKey, retry.IdempotencyKey)
+	}
+	if first.Text != retry.Text {
+		t.Fatalf("the retry re-rendered a different body under the same key;\nfirst:\n%s\nretry:\n%s", first.Text, retry.Text)
+	}
+	if first.HTML != retry.HTML {
+		t.Fatal("the retry re-rendered different HTML under the same key")
+	}
+	if first.Subject != retry.Subject {
+		t.Fatalf("the retry changed the subject: %q -> %q", first.Subject, retry.Subject)
+	}
+}
+
+// The control: a genuinely new cycle must still produce a new key, or the
+// stability above would have been bought by making every digest identical.
+func TestRenderStillDistinguishesANewCycle(t *testing.T) {
+	t.Parallel()
+
+	start := time.Date(2026, 9, 5, 5, 30, 0, 0, time.UTC)
+	a := Alert{Labels: map[string]string{"alertname": "AgentSandboxFailing"}, StartsAt: start}
+	fp := FingerprintOf(&a)
+
+	first := Render(Change{Renotify: []Alert{a}},
+		State{Active: map[string]Entry{fp: {LastNotifiedUnix: start.Unix()}}},
+		start.Add(time.Hour), "http://example.invalid")
+	second := Render(Change{Renotify: []Alert{a}},
+		State{Active: map[string]Entry{fp: {LastNotifiedUnix: start.Add(time.Hour).Unix()}}},
+		start.Add(2*time.Hour), "http://example.invalid")
+
+	if first.IdempotencyKey == second.IdempotencyKey {
+		t.Fatal("a later renotify cycle reused the key; it is genuinely a new message")
+	}
+	if first.Text == second.Text {
+		t.Fatal("a later renotify cycle rendered an identical body; the header no longer tracks the cycle")
 	}
 }
