@@ -243,6 +243,50 @@ for rule in "${RULES[@]}"; do
            -E -- "$pattern" . 2>/dev/null)
 done
 
+# A committed executable is a finding no RULE above can produce.
+#
+# Every rule here greps text, and INCLUDES lists text extensions, so a compiled
+# binary is invisible to this gate by construction. It is invisible to the
+# secret scanners too: gitleaks reports "no leaks" on one. That blind spot is
+# not theoretical -- a 3.5 MB statically linked ELF sat tracked at the root of
+# this public repository, and `strings` on it returned 337 occurrences of the
+# operator's home path, including the internal worktree layout it was built in,
+# plus the operator handle. None of it reachable by any pattern above.
+#
+# A Go binary embeds its build paths, its module graph and every string
+# constant. Publishing one publishes all of that, and nothing here could see it.
+#
+# Scope: files git TRACKS. Untracked build output is normal on a working
+# machine and is what .gitignore is for; a binary that got committed is the
+# defect. Outside a git checkout there is nothing tracked to ask about, so the
+# check walks the filesystem instead and says which mode it used -- it must
+# never be silently skipped, which is the failure mode this whole gate exists
+# to avoid.
+binary_findings=0
+bin_mode="tracked"
+bin_list() {
+  if git -C . rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C . ls-files
+  else
+    bin_mode="filesystem"
+    find . -type f -not -path './.git/*' -not -path '*/node_modules/*' 2>/dev/null | sed 's|^\./||'
+  fi
+}
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  case "$(head -c 4 "$f" 2>/dev/null | od -An -tx1 | tr -d ' \n')" in
+    7f454c46)                   kind=ELF ;;
+    4d5a*)                      kind=PE ;;
+    cffaedfe|cefaedfe|feedface|feedfacf) kind=Mach-O ;;
+    *)                          continue ;;
+  esac
+  binary_findings=$((binary_findings + 1))
+  findings=$((findings + 1))
+  echo "[tracked_binary] ./${f#./} is a committed ${kind} executable ($(wc -c <"$f") bytes)"
+  echo "::error file=${f#./}::a compiled executable must not be committed to a public repository (tracked_binary)"
+done < <(bin_list)
+echo "public-repo-gate: binary check ran in ${bin_mode} mode, ${binary_findings} committed executable(s)"
+
 echo "public-repo-gate: ${findings} finding(s), ${suppressed} suppressed by allow-file annotation"
 
 if [ "$findings" -gt 0 ]; then
@@ -250,8 +294,11 @@ if [ "$findings" -gt 0 ]; then
   echo "Findings:"
   sed -E 's/(.{200}).*/\1.../' /tmp/public-repo-gate-findings.txt | head -60
   echo
-  echo "Each must be removed, or the file annotated with a header naming the"
-  echo "specific category and a reason that survives review:"
+  echo "A [tracked_binary] finding has no annotation: a committed executable is"
+  echo "removed with 'git rm --cached <file>' and kept out with .gitignore."
+  echo
+  echo "Each other finding must be removed, or the file annotated with a header"
+  echo "naming the specific category and a reason that survives review:"
   echo "  # ${SELF_NAME}: allow-file <category>"
   exit 1
 fi

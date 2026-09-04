@@ -260,6 +260,68 @@ rc="$(run_gate "$TMP/r")"
 [ "$rc" = "0" ] && ok "T12c a violation inside .git/ is still out of scope" \
                 || nope "T12c exited ${rc}, want 0"
 
+# ---------------------------------------------------------------------------
+# T13 a committed executable is a finding.
+#
+# No RULE can produce this one: every rule greps text and INCLUDES lists text
+# extensions, so a compiled binary is invisible to the rest of this gate -- and
+# to gitleaks, which reports "no leaks" on one. A 3.5 MB ELF was tracked at the
+# root of this repository carrying 337 copies of the operator's home path.
+#
+# T13c is the control that matters: a TEXT file whose name looks like a binary
+# must not be flagged, so the check is reading magic bytes rather than names.
+# ---------------------------------------------------------------------------
+elf_fixture() { # $1 = path -- a minimal but genuine ELF header
+  printf '\177ELF\002\001\001\000\000\000\000\000\000\000\000\000\002\000\076\000' >"$1"
+  printf 'padding so the file is not empty\n' >>"$1"
+}
+
+fixture
+elf_fixture "$TMP/r/some-tool"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T13a a committed ELF executable is a finding" \
+                || nope "T13a exited ${rc}, want 1 -- a binary is invisible to every text rule"
+grep -q "tracked_binary" "$TMP/out.log" \
+  && ok "T13b   ... reported under the tracked_binary category" \
+  || nope "T13b the finding is not labelled tracked_binary"
+
+fixture
+printf 'ELF is mentioned here but this is a text file about 7f454c46 magic\n' >"$TMP/r/notes.md"
+printf 'MZ and Mach-O too\n' >>"$TMP/r/notes.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "0" ] && ok "T13c a TEXT file naming those magics is NOT a finding" \
+                || nope "T13c exited ${rc}, want 0 -- the check must read magic bytes, not words"
+
+fixture
+printf 'MZ\220\000\003\000\000\000\004\000\000\000' >"$TMP/r/thing.exe"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T13d a committed PE executable is a finding too" \
+                || nope "T13d exited ${rc}, want 1"
+
+# The mode line must always be printed. A check that can silently not run is
+# the exact failure this gate was built to stop.
+fixture
+printf 'clean\n' >"$TMP/r/a.md"
+rc="$(run_gate "$TMP/r")"
+grep -q "binary check ran in" "$TMP/out.log" \
+  && ok "T13e the binary check always says which mode it ran in" \
+  || nope "T13e the run does not say whether the binary check ran"
+
+# And in a real git checkout it scopes to TRACKED files, so a developer's build
+# output does not turn the gate red on their machine.
+fixture
+( cd "$TMP/r" && git init -q . 2>/dev/null && git config user.email t@invalid && git config user.name t )
+printf 'clean\n' >"$TMP/r/a.md"
+( cd "$TMP/r" && git add a.md && git commit -qm base 2>/dev/null )
+elf_fixture "$TMP/r/built-binary"      # untracked build output
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "0" ] && ok "T13f untracked build output does not trip the gate in a checkout" \
+                || nope "T13f exited ${rc}, want 0 -- untracked output is what .gitignore is for"
+( cd "$TMP/r" && git add -f built-binary && git commit -qm "oops" 2>/dev/null )
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T13g   ... but committing it is a finding" \
+                || nope "T13g exited ${rc}, want 1 -- a committed binary must be caught"
+
 echo
 echo "PASS: $PASS, FAIL: $FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
