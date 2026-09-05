@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -153,11 +154,36 @@ type Handler struct {
 	owner         string
 	leaseTTL      time.Duration
 	sweepInterval time.Duration
+
+	// Task-goroutine lifecycle. Submit and the lease sweeper both start work
+	// that outlives the call which started it, and that work keeps using the
+	// store. Shutdown is what joins it. Without a join the store's owner
+	// closes the database while a task is still mid-query, and the task
+	// goroutine inherits the connection teardown — a WAL checkpoint and an
+	// fsync it never asked for, on a goroutine nobody is waiting for.
+	// lifeMu guards both fields below it so no Add can race Shutdown's Wait.
+	// Two cancel scopes, because the two kinds of goroutine want opposite
+	// treatment at shutdown. Tasks are drained: they have work to finish and
+	// a result to record. The sweep loop is a poller with nothing to drain
+	// and no natural end, so it is stopped FIRST — draining it would mean
+	// waiting for a loop that only stops when the drain is over.
+	lifeMu      sync.Mutex
+	lifeWG      sync.WaitGroup
+	stopping    bool
+	sweepCtx    context.Context
+	sweepCancel context.CancelFunc
+	stopCtx     context.Context
+	stopCancel  context.CancelFunc
 }
 
 // NewHandler creates a fleet task handler.
+//
+// A handler owns goroutines from its first Submit onward; call Shutdown
+// before closing the store it was configured with.
 func NewHandler(executor TaskExecutor, claimer SprintboardClaimer, cfg HandlerConfig) *Handler {
 	cfg = cfg.withDefaults()
+	stopCtx, stopCancel := context.WithCancel(context.Background())
+	sweepCtx, sweepCancel := context.WithCancel(context.Background())
 	return &Handler{
 		cfg:           cfg,
 		executor:      executor,
@@ -169,7 +195,79 @@ func NewHandler(executor TaskExecutor, claimer SprintboardClaimer, cfg HandlerCo
 		owner:         cfg.LeaseOwner,
 		leaseTTL:      cfg.LeaseTTL,
 		sweepInterval: cfg.SweepInterval,
+		stopCtx:       stopCtx,
+		stopCancel:    stopCancel,
+		sweepCtx:      sweepCtx,
+		sweepCancel:   sweepCancel,
 	}
+}
+
+// ErrShuttingDown reports that the handler is stopping and will not start new
+// work. On the durable path the task is already persisted when this is
+// returned: the row stays pending, which is the same state a crashed worker
+// leaves behind, so a sweeper — here or in the next process — picks it up.
+var ErrShuttingDown = errors.New("fleet: handler is shutting down")
+
+// spawn starts fn as a tracked task goroutine, returning false when the
+// handler is shutting down and nothing new may touch the store.
+//
+// The context fn receives is detached from the submitter's — a task must
+// outlive the request that submitted it — but is canceled when Shutdown runs
+// out of patience, so a forced stop unwinds every store call instead of
+// leaving one wedged against a database that is about to be closed.
+func (h *Handler) spawn(ctx context.Context, fn func(context.Context)) bool {
+	h.lifeMu.Lock()
+	if h.stopping {
+		h.lifeMu.Unlock()
+		return false
+	}
+	h.lifeWG.Add(1)
+	h.lifeMu.Unlock()
+
+	taskCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	unwatch := context.AfterFunc(h.stopCtx, cancel)
+	go func() {
+		defer h.lifeWG.Done()
+		defer unwatch()
+		defer cancel()
+		fn(taskCtx)
+	}()
+	return true
+}
+
+// Shutdown stops the handler and waits for every goroutine it spawned to
+// return. It is idempotent and safe to call concurrently.
+//
+// It ALWAYS waits. A deadline on ctx buys a graceful drain: when the deadline
+// expires, in-flight tasks are canceled and Shutdown keeps waiting for them
+// to unwind — prompt, because the executor context and every store call are
+// ctx-bound — then reports the deadline through the returned error. Returning
+// early with a task goroutine still live would defeat the purpose, since the
+// caller's next act is to close the store.
+//
+// Canceled durable tasks are not lost: their lease stops being renewed and
+// the sweeper requeues them, which is the same path a crashed worker takes.
+func (h *Handler) Shutdown(ctx context.Context) error {
+	h.lifeMu.Lock()
+	h.stopping = true
+	h.lifeMu.Unlock()
+
+	// Stop the pollers before waiting on anything. A sweep loop has no
+	// terminal state to reach, so it must be told to stop up front —
+	// including it in the drain would be a deadlock, since it would then be
+	// waiting for a signal this function only sends after the drain.
+	h.sweepCancel()
+
+	unwatch := context.AfterFunc(ctx, h.stopCancel)
+	defer unwatch()
+
+	h.lifeWG.Wait()
+	h.stopCancel()
+
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("fleet: shutdown canceled in-flight tasks: %w", err)
+	}
+	return nil
 }
 
 // OnTaskComplete registers a callback invoked after each task completes or fails.
@@ -221,7 +319,11 @@ func (h *Handler) Submit(ctx context.Context, sub TaskSubmission) (string, error
 			slog.String("ticket", sub.TicketID),
 			slog.Bool("durable", true),
 		)
-		go h.processTaskDurable(context.WithoutCancel(ctx), taskID, timeout)
+		if !h.spawn(ctx, func(taskCtx context.Context) {
+			h.processTaskDurable(taskCtx, taskID, timeout)
+		}) {
+			return taskID, ErrShuttingDown
+		}
 		return taskID, nil
 	}
 
@@ -235,7 +337,14 @@ func (h *Handler) Submit(ctx context.Context, sub TaskSubmission) (string, error
 		slog.String("ticket", sub.TicketID),
 	)
 
-	go h.processTask(context.WithoutCancel(ctx), record, timeout)
+	if !h.spawn(ctx, func(taskCtx context.Context) {
+		h.processTask(taskCtx, record, timeout)
+	}) {
+		// Nothing durable backs this record, so an undispatched task would
+		// sit pending forever. Announce it as failed instead.
+		h.updateStatus(record, TaskStatusFailed, "", ErrShuttingDown.Error())
+		return taskID, ErrShuttingDown
+	}
 
 	return taskID, nil
 }
@@ -429,6 +538,11 @@ func (h *Handler) submitHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	taskID, err := h.Submit(r.Context(), sub)
+	if errors.Is(err, ErrShuttingDown) {
+		// Not the caller's fault and worth retrying elsewhere.
+		writeFleetJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
 	if err != nil {
 		writeFleetJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
