@@ -1,8 +1,8 @@
 # runx-public-repo-gate: allow-file personal_path_id
 # Helixon Platform -- Agent Guidelines
 
-- Repo: `https://github.com/nfsarch33/helixon-platform`
-- Module: `github.com/nfsarch33/helixon-platform`
+- Repo: `https://github.com/<redacted>/helixon-platform`
+- Module: `github.com/<redacted>/helixon-platform`
 - Language: Go (1.22+, tested on 1.25.6)
 
 ## Build & Test
@@ -87,5 +87,5 @@ internal/
 
 ## Identity
 
-- Owner: `nfsarch33` / `jaslian@gmail.com`
+- Owner: `<redacted>` / `<operator-email>`
 - NEVER use work identity for this repo.
