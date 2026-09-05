@@ -134,10 +134,15 @@ jobs:
 
       # Pinned, never @latest: this step chooses the JSON schema the config is
       # judged against, so an unpinned upgrade could flip this gate red or
-      # green with no commit to blame. Keep in step with the version used
-      # locally and by internal/lint.
+      # green with no commit to blame.
+      #
+      # This version MUST stay equal to the one #119 pinned for developers in
+      # Taskfile.yml, .devcontainer/devcontainer.json, .gitlab-ci.yml and
+      # ci/sentrux.gitlab-ci.yml. Two golangci-lint versions in one repository
+      # is how a count gets attributed to the wrong binary -- the reason
+      # internal/lint logs which binary produced its numbers.
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.0
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
 
       # The control runs BEFORE the gate, like setup-go-cache-gate's does.
       # `golangci-lint run` does not validate its own configuration -- that is
