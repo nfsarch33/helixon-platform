@@ -14,6 +14,8 @@
 #   T5  an annotation buried below the header window does not count
 #   T6  the gate reports infrastructure failure (2) distinctly from findings (1)
 #   T7  a file's own annotation line is never itself a finding
+#   T14 ... and the exemption for that is scoped to a REAL annotation, not
+#       to the marker string appearing anywhere in the scanned line
 #
 # Usage: .github/scripts/public-repo-gate-tests.sh
 
@@ -100,6 +102,11 @@ rc="$(run_gate "$TMP/definitely-not-here")"
 # ---------------------------------------------------------------------------
 # T7: the annotation line itself must never be reported. This is the inverse of
 # the original defect, which reported everything EXCEPT that line.
+#
+# Measured in v18814: this fixture matches no RULE, so it produces no grep hit
+# and never reaches the exemption it appears to be testing. The assertion is
+# true and worth keeping -- an annotation must not make its own file dirty --
+# but T14d is the control that actually guards that code path.
 # ---------------------------------------------------------------------------
 fixture
 printf '# runx-public-repo-gate: allow-file personal_path_id\nnothing else here\n' >"$TMP/r/e.md"
@@ -321,6 +328,107 @@ rc="$(run_gate "$TMP/r")"
 rc="$(run_gate "$TMP/r")"
 [ "$rc" = "1" ] && ok "T13g   ... but committing it is a finding" \
                 || nope "T13g exited ${rc}, want 1 -- a committed binary must be caught"
+
+# ---------------------------------------------------------------------------
+# T14 the annotation exemption is scoped to a REAL annotation.
+#
+# The exemption exists so a file's own allow-file header is not itself reported.
+# It used to be tested against the whole `path:line:TEXT` record grep -rn emits,
+# so the marker matched ANYWHERE in the record -- including inside the matched
+# TEXT of a line that had nothing to do with an annotation. A runbook sentence,
+# a comment explaining this gate, a test fixture: any of them carrying a blocked
+# pattern on the same line was skipped. The skip also ran BEFORE allows(), so
+# the hit landed in neither the findings nor the suppressed list and the run
+# printed as a clean tree.
+#
+# This is the third time the same shape has failed open in this file: the
+# original `grep -v public-repo-gate`, then the node_modules output filter
+# (T12), now this. `grep -rn` output is a RECORD, and a test written for one
+# field of it must say which field.
+#
+# T14a-c are the regression from three directions; T14h isolates the window
+# bound. T14d-g are the positive control and are built so they go RED if the
+# exemption is simply deleted -- the intent it encodes is correct and must
+# survive the fix.
+# ---------------------------------------------------------------------------
+
+# T14a THE REGRESSION: a line that merely MENTIONS the marker, well below the
+# header window, is not an annotation and must still be scanned.
+fixture
+{ printf 'notes\n%.0s' {1..11}
+  printf 'A file exempted with runx-public-repo-gate must still never contain /home/jason.\n'
+} >"$TMP/r/runbook.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T14a a line merely MENTIONING the marker is still scanned" \
+                || nope "T14a exited ${rc}, want 1 -- the marker exempts ordinary content"
+
+# T14b the control for T14a: the identical line with the marker replaced is a
+# finding too. Without this, T14a could be passing because the fixture is broken
+# rather than because the marker no longer exempts it.
+fixture
+{ printf 'notes\n%.0s' {1..11}
+  printf 'A file exempted with THE-MARKER must still never contain /home/jason.\n'
+} >"$TMP/r/runbook.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T14b   ... exactly as the same line without the marker is (control)" \
+                || nope "T14b exited ${rc}, want 1 -- the fixture carries no violation"
+
+# T14c the same, but INSIDE the header window, where the line-number bound alone
+# would not catch it. This is what makes the SHAPE half load bearing: prose that
+# names the marker on line 2 is still not an annotation.
+fixture
+printf 'title\nthe runx-public-repo-gate tool refuses /home/jason in a public tree\n' >"$TMP/r/doc.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T14c prose naming the marker inside the header window is still scanned" \
+                || nope "T14c exited ${rc}, want 1 -- the shape test is not being applied"
+
+# T14d POSITIVE CONTROL: a genuine annotation line that itself carries a blocked
+# pattern is still exempt -- the case the exemption is FOR.
+#
+# Non-vacuous by construction: the header names secret_ref while the pattern on
+# the line is personal_path_id, so allows() does NOT cover it. Only the
+# annotation-line exemption can suppress this, so deleting the exemption turns
+# this red rather than leaving it quietly passing.
+fixture
+printf '# runx-public-repo-gate: allow-file secret_ref -- and never a /home/jason path\n' >"$TMP/r/annotated.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "0" ] && ok "T14d a real annotation line carrying a pattern is still exempt" \
+                || nope "T14d exited ${rc}, want 0 -- the exemption's intent was lost"
+
+# T14e   ... and it is VISIBLE. The old exemption skipped before allows() and
+# incremented neither counter, so an exempted hit existed in no list at all.
+grep -q '0 finding(s), 1 suppressed' "$TMP/out.log" \
+  && ok "T14e   ... and is counted as suppressed, not silently dropped" \
+  || nope "T14e an exempted annotation is invisible: $(grep -o '[0-9]* finding.*' "$TMP/out.log" | head -1)"
+
+# T14f KNOWN LIMIT, asserted as it is rather than as it should be: the gate
+# cannot tell a real annotation from a document quoting the syntax verbatim in
+# its own first few lines. Both are annotation-shaped and both sit in the header
+# window, which is all the gate can see. The residue is far narrower than what
+# it replaces -- a line must now be BOTH shaped like an annotation AND inside
+# the window -- and unlike before it is counted, so it cannot hide in a total
+# nobody reads. Tightening this means teaching the gate comment syntax.
+fixture
+printf 'gate syntax\n# runx-public-repo-gate: allow-file network_topology is the header, /home/jason is not\n' >"$TMP/r/syntax-doc.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "0" ] && ok "T14f KNOWN LIMIT: a doc quoting the syntax in its header window is exempt" \
+                || nope "T14f exited ${rc}, want 0 -- if this was tightened, update this test"
+
+grep -q '0 finding(s), 1 suppressed' "$TMP/out.log" \
+  && ok "T14g   ... but it is COUNTED, which the old exemption never was" \
+  || nope "T14g the known-limit exemption is not being counted"
+
+# T14h the window bound, isolated: a line with the exact annotation SHAPE but
+# below the header window is not an operative annotation -- allows() would never
+# read it -- so it must not be exempt either. The mirror of T5.
+fixture
+{ printf 'filler\n%.0s' {1..12}
+  printf '# runx-public-repo-gate: allow-file secret_ref -- with /home/jason on the line\n'
+} >"$TMP/r/buried.md"
+rc="$(run_gate "$TMP/r")"
+[ "$rc" = "1" ] && ok "T14h an annotation-shaped line below the header window is not exempt" \
+                || nope "T14h exited ${rc}, want 1 -- the window bound is not being applied"
+
 
 echo
 echo "PASS: $PASS, FAIL: $FAIL"
