@@ -16,6 +16,8 @@
 #   T7  a file's own annotation line is never itself a finding
 #   T14 ... and the exemption for that is scoped to a REAL annotation, not
 #       to the marker string appearing anywhere in the scanned line
+#   T15 the findings/suppressed lists are run-private, so two gate runs on
+#       one machine cannot rewrite each other's report
 #
 # Usage: .github/scripts/public-repo-gate-tests.sh
 
@@ -428,6 +430,81 @@ fixture
 rc="$(run_gate "$TMP/r")"
 [ "$rc" = "1" ] && ok "T14h an annotation-shaped line below the header window is not exempt" \
                 || nope "T14h exited ${rc}, want 1 -- the window bound is not being applied"
+
+
+# ---------------------------------------------------------------------------
+# T15 the report files are run-private.
+#
+# The findings and suppressed lists used to be two FIXED paths under /tmp,
+# truncated on start and appended to as the scan ran. The "Findings:" block is
+# read back out of that file at the end, so two gate runs sharing a machine
+# could rewrite each other's report: one run printing another's findings, or
+# none of its own, while its exit code -- a shell variable, private to the
+# process -- stayed correct. A report that disagrees with the verdict is worse
+# than a plain failure, because it is believed.
+#
+# That mattered little while one CI job was the only caller. It matters now:
+# this harness alone invokes the gate ~50 times per run, and CI runs the gate
+# and this harness at the same time.
+#
+# T15a is the deterministic half and is what fails against the old code.
+# T15b/c pin the replacement so a future edit cannot quietly reintroduce a
+# shared path by making OUTDIR the only way to get a report at all.
+# ---------------------------------------------------------------------------
+
+# T15a REGRESSION, deterministic: the gate must not touch the old shared paths.
+# A sentinel is planted at each; a run that truncates or appends to either one
+# is using shared state again, whatever else it does.
+fixture
+printf 'clean\n' >"$TMP/r/a.md"
+SENTINEL="sentinel-$$-do-not-clobber"
+printf '%s\n' "$SENTINEL" >/tmp/public-repo-gate-findings.txt
+printf '%s\n' "$SENTINEL" >/tmp/public-repo-gate-suppressed.txt
+rc="$(run_gate "$TMP/r")"
+if grep -qx "$SENTINEL" /tmp/public-repo-gate-findings.txt 2>/dev/null \
+   && grep -qx "$SENTINEL" /tmp/public-repo-gate-suppressed.txt 2>/dev/null; then
+  ok "T15a a run leaves the old shared /tmp report paths untouched"
+else
+  nope "T15a the gate still writes the fixed /tmp report paths -- concurrent runs corrupt each other"
+fi
+rm -f /tmp/public-repo-gate-findings.txt /tmp/public-repo-gate-suppressed.txt
+
+# T15b PUBLIC_REPO_GATE_OUTDIR still produces the lists, because comparing the
+# finding and suppressed SETS against a pristine main is the review step this
+# gate is held to. Losing that would trade one defect for another.
+fixture
+printf '# runx-public-repo-gate: allow-file personal_path_id\n/home/jason\n' >"$TMP/r/annotated.md"
+printf '/home/jason unannotated\n' >"$TMP/r/plain.md"
+OUT="$TMP/out.d"
+rm -rf "$OUT"
+rc="$(PUBLIC_REPO_GATE_OUTDIR="$OUT" PUBLIC_REPO_GATE_ROOT="$TMP/r" bash "$GATE" >"$TMP/out.log" 2>&1; echo $?)"
+if [ "$rc" = "1" ] && [ -s "$OUT/findings.txt" ] && [ -s "$OUT/suppressed.txt" ]; then
+  ok "T15b PUBLIC_REPO_GATE_OUTDIR keeps the finding and suppressed lists"
+else
+  nope "T15b OUTDIR did not produce both lists (rc=${rc}, findings=$(wc -l <"$OUT/findings.txt" 2>/dev/null || echo missing), suppressed=$(wc -l <"$OUT/suppressed.txt" 2>/dev/null || echo missing))"
+fi
+grep -q 'personal_path_id|./annotated.md' "$OUT/suppressed.txt" 2>/dev/null \
+  && ok "T15c   ... and they name the right file per category" \
+  || nope "T15c the suppressed list does not name the annotated file"
+
+# T15d two gate runs at once must each report only their OWN findings. Under a
+# shared path this is the corruption itself; here it is a property that must
+# hold however the two interleave.
+fixture
+mkdir -p "$TMP/r1" "$TMP/r2"
+printf 'alpha marker /home/jason\n' >"$TMP/r1/one.md"
+printf 'beta marker /Users/jason\n'  >"$TMP/r2/two.md"
+PUBLIC_REPO_GATE_ROOT="$TMP/r1" bash "$GATE" >"$TMP/c1.log" 2>&1 &
+P1=$!
+PUBLIC_REPO_GATE_ROOT="$TMP/r2" bash "$GATE" >"$TMP/c2.log" 2>&1 &
+P2=$!
+wait "$P1"; wait "$P2"
+if grep -q 'one\.md' "$TMP/c1.log" && ! grep -q 'two\.md' "$TMP/c1.log" \
+   && grep -q 'two\.md' "$TMP/c2.log" && ! grep -q 'one\.md' "$TMP/c2.log"; then
+  ok "T15d concurrent runs each report only their own findings"
+else
+  nope "T15d a concurrent run's report leaked into the other's"
+fi
 
 
 echo

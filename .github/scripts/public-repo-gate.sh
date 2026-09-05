@@ -182,8 +182,39 @@ done
 
 findings=0
 suppressed=0
-: >/tmp/public-repo-gate-findings.txt
-: >/tmp/public-repo-gate-suppressed.txt
+
+# The findings and suppressed lists live in a RUN-PRIVATE directory.
+#
+# They used to be two fixed paths, /tmp/public-repo-gate-findings.txt and
+# /tmp/public-repo-gate-suppressed.txt. Every run truncated them on start and
+# appended to them as it went, so two gate runs sharing a machine interleaved:
+# the "Findings:" block printed at the end is read back from that file, and a
+# concurrent run could truncate it between the write and the read, or add its
+# own findings to it. One run could therefore print another run's findings, or
+# none of its own, while its exit code -- which comes from a shell variable and
+# is private to the process -- stayed correct. A gate whose REPORT disagrees
+# with its VERDICT is worse than one that simply fails.
+#
+# That was survivable while the only caller was one CI job. It stops being
+# survivable now the self-tests run the gate 45 times per invocation and CI
+# runs the gate and the self-tests concurrently.
+#
+# PUBLIC_REPO_GATE_OUTDIR pins the directory instead, and is NOT a debugging
+# leftover: comparing the finding and suppressed SETS between a branch and a
+# pristine main is the review step this gate is held to, and the lists have to
+# outlive the run for that to be possible. When it is unset the directory is
+# private and removed on exit, so the default has no shared state at all.
+if [ -n "${PUBLIC_REPO_GATE_OUTDIR:-}" ]; then
+  WORK_DIR="$PUBLIC_REPO_GATE_OUTDIR"
+  mkdir -p "$WORK_DIR" || { echo "::error::gate cannot create ${WORK_DIR}"; exit 2; }
+else
+  WORK_DIR="$(mktemp -d)" || { echo "::error::gate cannot create a work directory"; exit 2; }
+  trap 'rm -rf "$WORK_DIR"' EXIT
+fi
+FINDINGS_FILE="$WORK_DIR/findings.txt"
+SUPPRESSED_FILE="$WORK_DIR/suppressed.txt"
+: >"$FINDINGS_FILE"
+: >"$SUPPRESSED_FILE"
 
 # A rule is category|pattern|description, and the PATTERN is everything between
 # the first delimiter and the last -- not everything up to the second.
@@ -251,7 +282,7 @@ for rule in "${RULES[@]}"; do
     esac
     if [ "$is_annotation" = 1 ]; then
       suppressed=$((suppressed + 1))
-      echo "annotation_line|$file" >>/tmp/public-repo-gate-suppressed.txt
+      echo "annotation_line|$file" >>"$SUPPRESSED_FILE"
       continue
     fi
 
@@ -265,10 +296,10 @@ for rule in "${RULES[@]}"; do
 
     if allows "$file" "$category"; then
       suppressed=$((suppressed + 1))
-      echo "$category|$file" >>/tmp/public-repo-gate-suppressed.txt
+      echo "$category|$file" >>"$SUPPRESSED_FILE"
     else
       findings=$((findings + 1))
-      echo "[$category] $hit" >>/tmp/public-repo-gate-findings.txt
+      echo "[$category] $hit" >>"$FINDINGS_FILE"
       echo "::error file=${file#./}::${desc} (${category}): ${pattern}"
     fi
   # v18809: --exclude-dir, not a `grep -v` on the output.
@@ -336,7 +367,7 @@ echo "public-repo-gate: ${findings} finding(s), ${suppressed} suppressed by allo
 if [ "$findings" -gt 0 ]; then
   echo
   echo "Findings:"
-  sed -E 's/(.{200}).*/\1.../' /tmp/public-repo-gate-findings.txt | head -60
+  sed -E 's/(.{200}).*/\1.../' "$FINDINGS_FILE" | head -60
   echo
   echo "A [tracked_binary] finding has no annotation: a committed executable is"
   echo "removed with 'git rm --cached <file>' and kept out with .gitignore."
