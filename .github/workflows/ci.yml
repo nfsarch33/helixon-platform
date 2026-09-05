@@ -160,11 +160,28 @@ jobs:
             print-issued-lines: true
             print-linter-name: true
           YAML
-          if golangci-lint config verify -c "$bad"; then
+          out="$(golangci-lint config verify -c "$bad" 2>&1)" && rc=0 || rc=$?
+          echo "$out"
+          if [ "$rc" -eq 0 ]; then
             echo "::error::config verify accepted v1-era keys; this gate proves nothing"
             exit 1
           fi
-          echo "control OK: v1-era keys are rejected"
+          # A non-zero exit is NOT evidence on its own. A golangci-lint that
+          # cannot run at all exits non-zero too -- `go install` silently
+          # builds it with an older toolchain if the Go on PATH is below its
+          # minimum, and it then refuses every config with "the Go language
+          # version ... is lower than the targeted Go version". That would let
+          # this control pass while exercising no schema whatsoever. Require
+          # the schema to have named each key, so only a real rejection counts.
+          for key in disable-all format print-issued-lines print-linter-name; do
+            case "$out" in
+              *"'$key'"*) ;;
+              *) echo "::error::verify failed, but the schema never named '$key';"
+                 echo "::error::the control did not exercise the schema, so it proves nothing"
+                 exit 1 ;;
+            esac
+          done
+          echo "control OK: the v2 schema named every v1-era key"
 
       - name: Verify .golangci.yml against the v2 schema
         run: golangci-lint config verify
