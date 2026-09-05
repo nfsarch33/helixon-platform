@@ -147,3 +147,36 @@ jobs:
 
       - name: "Assert every actions/setup-go step pins cache: false"
         run: python3 tools/check-setup-go-cache.py
+
+  public-repo-gate-tests:
+    # ubuntu-latest ON PURPOSE, for the same reason setup-go-cache-gate is: a
+    # CONTROL for a gate must not queue behind the single self-hosted runner it
+    # is controlling. The public-repo-gate job above is `self-hosted`, and on a
+    # busy day it has sat queued for over half an hour behind other branches. A
+    # control that arrives that late has stopped being a control. This harness
+    # needs only bash, grep and git -- no Go toolchain, no repository secrets,
+    # no network -- so nothing ties it to that runner.
+    #
+    # A SEPARATE job rather than a step inside public-repo-gate, so the two give
+    # independent signals. `public-repo-gate` red means this repository is
+    # leaking something and the tree must change. `public-repo-gate-tests` red
+    # means the gate's own guarantees are unproven and the GATE must change.
+    # Those need different responses, and one shared job would collapse them
+    # into a single check that cannot tell you which happened.
+    #
+    # Why it exists at all: the harness was written alongside the gate and then
+    # never run by anything. Its 45 assertions include the controls that keep
+    # the gate honest -- that an unannotated violation still fails, that an
+    # allow-file header does NOT suppress a category it does not name, that a
+    # rule which cannot compile exits 2 rather than reading as a clean tree.
+    # None of that was being checked on any commit, so the gate could have been
+    # silently disarmed by a future edit and every run would still have been
+    # green.
+    #
+    # Cost: about 3 seconds.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prove the public-repo gate still catches what it must
+        run: .github/scripts/public-repo-gate-tests.sh
