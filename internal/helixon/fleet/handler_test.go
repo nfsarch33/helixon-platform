@@ -28,9 +28,12 @@ func newHandler(t *testing.T, exec TaskExecutor, claimer SprintboardClaimer, cfg
 	t.Helper()
 	h := NewHandler(exec, claimer, cfg)
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		// A short drain, then cancel. A test has no reason to sit through a
+		// retry backoff, and Shutdown joins the goroutines on either path —
+		// the deadline only chooses between draining them and canceling them.
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		if err := h.Shutdown(ctx); err != nil {
+		if err := h.Shutdown(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("handler shutdown: %v", err)
 		}
 	})

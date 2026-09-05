@@ -217,7 +217,7 @@ func (h *Handler) StartLeaseSweeper(ctx context.Context) (stop func()) {
 	h.lifeMu.Unlock()
 
 	sctx, cancel := context.WithCancel(ctx)
-	unwatch := context.AfterFunc(h.stopCtx, cancel)
+	unwatch := context.AfterFunc(h.sweepCtx, cancel)
 	done := make(chan struct{})
 	go func() {
 		defer h.lifeWG.Done()

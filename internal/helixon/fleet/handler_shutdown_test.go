@@ -48,9 +48,12 @@ func (e *gatedExecutor) ExecuteTask(ctx context.Context, _, _ string) (string, e
 // The contract that kills the whole class: when Shutdown returns, nothing the
 // handler started is still using the store.
 func TestHandlerShutdownJoinsSubmittedTaskGoroutines(t *testing.T) {
-	ignore := goleak.IgnoreCurrent()
 	ctx := context.Background()
 	store := mustTaskStore(t, filepath.Join(t.TempDir(), "tasks.db"))
+	// Captured with the store already open: database/sql keeps a
+	// connectionOpener goroutine for the life of the pool, and these
+	// assertions deliberately run before the store is closed.
+	ignore := goleak.IgnoreCurrent()
 
 	exec := &gatedExecutor{entered: make(chan struct{}), release: make(chan struct{})}
 	// Not newHandler: this test drives the shutdown itself.
@@ -97,9 +100,9 @@ func TestHandlerShutdownJoinsSubmittedTaskGoroutines(t *testing.T) {
 // does not return until the tasks it canceled have unwound. Returning early
 // is what would put a live goroutine on a closing database.
 func TestHandlerShutdownDeadlineCancelsButStillJoins(t *testing.T) {
-	ignore := goleak.IgnoreCurrent()
 	ctx := context.Background()
 	store := mustTaskStore(t, filepath.Join(t.TempDir(), "tasks.db"))
+	ignore := goleak.IgnoreCurrent()
 
 	exec := &blockingExecutor{started: make(chan struct{}), canceled: make(chan struct{})}
 	h := NewHandler(exec, nil, HandlerConfig{Store: store})
@@ -150,7 +153,6 @@ func TestHandlerShutdownDeadlineCancelsButStillJoins(t *testing.T) {
 // dispatches it locally. Those goroutines use the store exactly like a
 // submitted one, so Shutdown has to join them too.
 func TestHandlerShutdownJoinsSweeperRedispatch(t *testing.T) {
-	ignore := goleak.IgnoreCurrent()
 	ctx := context.Background()
 	dsn := filepath.Join(t.TempDir(), "tasks.db")
 
@@ -165,6 +167,7 @@ func TestHandlerShutdownJoinsSweeperRedispatch(t *testing.T) {
 
 	exec := &gatedExecutor{entered: make(chan struct{}), release: make(chan struct{})}
 	store := mustTaskStore(t, dsn)
+	ignore := goleak.IgnoreCurrent()
 	h := NewHandler(exec, nil, HandlerConfig{
 		Store:         store,
 		LeaseTTL:      2 * time.Second,

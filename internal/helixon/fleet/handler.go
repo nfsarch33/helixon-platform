@@ -162,11 +162,18 @@ type Handler struct {
 	// goroutine inherits the connection teardown — a WAL checkpoint and an
 	// fsync it never asked for, on a goroutine nobody is waiting for.
 	// lifeMu guards both fields below it so no Add can race Shutdown's Wait.
-	lifeMu     sync.Mutex
-	lifeWG     sync.WaitGroup
-	stopping   bool
-	stopCtx    context.Context
-	stopCancel context.CancelFunc
+	// Two cancel scopes, because the two kinds of goroutine want opposite
+	// treatment at shutdown. Tasks are drained: they have work to finish and
+	// a result to record. The sweep loop is a poller with nothing to drain
+	// and no natural end, so it is stopped FIRST — draining it would mean
+	// waiting for a loop that only stops when the drain is over.
+	lifeMu      sync.Mutex
+	lifeWG      sync.WaitGroup
+	stopping    bool
+	sweepCtx    context.Context
+	sweepCancel context.CancelFunc
+	stopCtx     context.Context
+	stopCancel  context.CancelFunc
 }
 
 // NewHandler creates a fleet task handler.
@@ -176,6 +183,7 @@ type Handler struct {
 func NewHandler(executor TaskExecutor, claimer SprintboardClaimer, cfg HandlerConfig) *Handler {
 	cfg = cfg.withDefaults()
 	stopCtx, stopCancel := context.WithCancel(context.Background())
+	sweepCtx, sweepCancel := context.WithCancel(context.Background())
 	return &Handler{
 		cfg:           cfg,
 		executor:      executor,
@@ -189,6 +197,8 @@ func NewHandler(executor TaskExecutor, claimer SprintboardClaimer, cfg HandlerCo
 		sweepInterval: cfg.SweepInterval,
 		stopCtx:       stopCtx,
 		stopCancel:    stopCancel,
+		sweepCtx:      sweepCtx,
+		sweepCancel:   sweepCancel,
 	}
 }
 
@@ -241,6 +251,12 @@ func (h *Handler) Shutdown(ctx context.Context) error {
 	h.lifeMu.Lock()
 	h.stopping = true
 	h.lifeMu.Unlock()
+
+	// Stop the pollers before waiting on anything. A sweep loop has no
+	// terminal state to reach, so it must be told to stop up front —
+	// including it in the drain would be a deadlock, since it would then be
+	// waiting for a signal this function only sends after the drain.
+	h.sweepCancel()
 
 	unwatch := context.AfterFunc(ctx, h.stopCancel)
 	defer unwatch()
