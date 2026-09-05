@@ -87,5 +87,5 @@ internal/
 
 ## Identity
 
-- Owner: `nfsarch33` / `jaslian@gmail.com`
+- Owner: `nfsarch33` / `<operator-email>`
 - NEVER use work identity for this repo.
