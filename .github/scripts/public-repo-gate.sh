@@ -211,8 +211,8 @@ else
   WORK_DIR="$(mktemp -d)" || { echo "::error::gate cannot create a work directory"; exit 2; }
   trap 'rm -rf "$WORK_DIR"' EXIT
 fi
-FINDINGS_FILE="$WORK_DIR/findings.txt"
-SUPPRESSED_FILE="$WORK_DIR/suppressed.txt"
+FINDINGS_FILE=/tmp/public-repo-gate-findings.txt
+SUPPRESSED_FILE=/tmp/public-repo-gate-suppressed.txt
 : >"$FINDINGS_FILE"
 : >"$SUPPRESSED_FILE"
 

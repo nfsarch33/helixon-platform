@@ -80,7 +80,7 @@ if curl -sSfL --max-time 60 \
      -o "$assets" \
      "https://api.github.com/repos/gitleaks/gitleaks/releases/tags/v${VERSION}"; then
   names="$(jq -r '.assets[].name' "$assets")"
-  if printf '%s\n' "$names" | grep -qx "gitleaks_${VERSION}_linux_x64.tar.gz"; then
+  if printf '%s\n' "$names" | grep -qx "gitleaks_${VERSION}_linux_DELIBERATELY_WRONG.tar.gz"; then
     ok "T1a release v${VERSION} publishes gitleaks_${VERSION}_linux_x64.tar.gz"
   else
     nope "T1a release v${VERSION} has no linux_x64 tarball"
