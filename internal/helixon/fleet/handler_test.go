@@ -17,6 +17,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// newHandler builds a handler and registers the shutdown every handler needs:
+// Submit spawns goroutines that keep using the store after the call returns,
+// so a test that ends without joining them leaves them racing its own
+// cleanup — which is how this package used to fail goleak intermittently.
+//
+// Cleanups run last-registered-first, so a handler built after its store
+// (the order every test uses) is joined before the store is closed.
+func newHandler(t *testing.T, exec TaskExecutor, claimer SprintboardClaimer, cfg HandlerConfig) *Handler {
+	t.Helper()
+	h := NewHandler(exec, claimer, cfg)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := h.Shutdown(ctx); err != nil {
+			t.Errorf("handler shutdown: %v", err)
+		}
+	})
+	return h
+}
+
 type mockExecutor struct {
 	mu        sync.Mutex
 	calls     []string
@@ -77,7 +97,7 @@ func (m *mockClaimer) CompleteTicket(_ context.Context, ticketID, evidence strin
 func TestHandlerSubmitAndComplete(t *testing.T) {
 	exec := &mockExecutor{result: "task done"}
 	claimer := newMockClaimer()
-	h := NewHandler(exec, claimer, HandlerConfig{MaxConcurrent: 2})
+	h := newHandler(t, exec, claimer, HandlerConfig{MaxConcurrent: 2})
 
 	ctx := context.Background()
 	taskID, err := h.Submit(ctx, TaskSubmission{
@@ -110,7 +130,7 @@ func TestHandlerSubmitAndComplete(t *testing.T) {
 
 func TestHandlerSubmitWithCustomID(t *testing.T) {
 	exec := &mockExecutor{result: "ok"}
-	h := NewHandler(exec, nil, HandlerConfig{})
+	h := newHandler(t, exec, nil, HandlerConfig{})
 
 	taskID, err := h.Submit(context.Background(), TaskSubmission{
 		TaskID:    "custom-id-42",
@@ -127,7 +147,7 @@ func TestHandlerSubmitWithCustomID(t *testing.T) {
 }
 
 func TestHandlerEmptyPromptReject(t *testing.T) {
-	h := NewHandler(&mockExecutor{}, nil, HandlerConfig{})
+	h := newHandler(t, &mockExecutor{}, nil, HandlerConfig{})
 	_, err := h.Submit(context.Background(), TaskSubmission{AgentName: "a"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "prompt is required")
@@ -138,7 +158,7 @@ func TestHandlerRetryOnTransientFailure(t *testing.T) {
 		result: "recovered",
 		failN:  2,
 	}
-	h := NewHandler(exec, nil, HandlerConfig{MaxRetries: 3})
+	h := newHandler(t, exec, nil, HandlerConfig{MaxRetries: 3})
 
 	taskID, err := h.Submit(context.Background(), TaskSubmission{
 		AgentName: "retry-agent",
@@ -159,7 +179,7 @@ func TestHandlerRetryOnTransientFailure(t *testing.T) {
 func TestHandlerPermanentFailure(t *testing.T) {
 	exec := &mockExecutor{err: errors.New("permanent failure")}
 	claimer := newMockClaimer()
-	h := NewHandler(exec, claimer, HandlerConfig{MaxRetries: 1})
+	h := newHandler(t, exec, claimer, HandlerConfig{MaxRetries: 1})
 
 	taskID, err := h.Submit(context.Background(), TaskSubmission{
 		AgentName: "fail-agent",
@@ -200,7 +220,7 @@ func TestHandlerConcurrencyLimit(t *testing.T) {
 		maxRunning: &maxRunning,
 	}
 
-	h := NewHandler(slowExec, nil, HandlerConfig{MaxConcurrent: 2})
+	h := newHandler(t, slowExec, nil, HandlerConfig{MaxConcurrent: 2})
 	ctx := context.Background()
 
 	for i := 0; i < 6; i++ {
@@ -247,7 +267,7 @@ func (e *countingExecutor) ExecuteTask(_ context.Context, _, _ string) (string, 
 
 func TestHandlerOnTaskCompleteCallback(t *testing.T) {
 	exec := &mockExecutor{result: "done"}
-	h := NewHandler(exec, nil, HandlerConfig{})
+	h := newHandler(t, exec, nil, HandlerConfig{})
 
 	var completed []TaskRecord
 	var mu sync.Mutex
@@ -276,7 +296,7 @@ func TestHandlerOnTaskCompleteCallback(t *testing.T) {
 
 func TestHandlerListTasks(t *testing.T) {
 	exec := &mockExecutor{result: "ok"}
-	h := NewHandler(exec, nil, HandlerConfig{})
+	h := newHandler(t, exec, nil, HandlerConfig{})
 
 	for i := 0; i < 3; i++ {
 		_, err := h.Submit(context.Background(), TaskSubmission{
@@ -296,7 +316,7 @@ func TestHandlerListTasks(t *testing.T) {
 
 func TestHandlerActiveCount(t *testing.T) {
 	exec := &mockExecutor{result: "ok", delay: 100 * time.Millisecond}
-	h := NewHandler(exec, nil, HandlerConfig{MaxConcurrent: 4})
+	h := newHandler(t, exec, nil, HandlerConfig{MaxConcurrent: 4})
 
 	for i := 0; i < 3; i++ {
 		_, _ = h.Submit(context.Background(), TaskSubmission{
@@ -311,7 +331,7 @@ func TestHandlerActiveCount(t *testing.T) {
 
 func TestHandlerNilClaimer(t *testing.T) {
 	exec := &mockExecutor{result: "ok"}
-	h := NewHandler(exec, nil, HandlerConfig{})
+	h := newHandler(t, exec, nil, HandlerConfig{})
 
 	taskID, err := h.Submit(context.Background(), TaskSubmission{
 		AgentName: "no-claimer",
@@ -330,7 +350,7 @@ func TestHandlerClaimFailureNonFatal(t *testing.T) {
 	exec := &mockExecutor{result: "ok"}
 	claimer := newMockClaimer()
 	claimer.claimErr = errors.New("sprintboard down")
-	h := NewHandler(exec, claimer, HandlerConfig{})
+	h := newHandler(t, exec, claimer, HandlerConfig{})
 
 	taskID, err := h.Submit(context.Background(), TaskSubmission{
 		AgentName: "claim-fail",
@@ -347,7 +367,7 @@ func TestHandlerClaimFailureNonFatal(t *testing.T) {
 
 func TestHandlerHTTPSubmit(t *testing.T) {
 	exec := &mockExecutor{result: "http-result"}
-	h := NewHandler(exec, nil, HandlerConfig{})
+	h := newHandler(t, exec, nil, HandlerConfig{})
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -368,7 +388,7 @@ func TestHandlerHTTPSubmit(t *testing.T) {
 
 func TestHandlerHTTPGetTask(t *testing.T) {
 	exec := &mockExecutor{result: "found"}
-	h := NewHandler(exec, nil, HandlerConfig{})
+	h := newHandler(t, exec, nil, HandlerConfig{})
 
 	taskID, _ := h.Submit(context.Background(), TaskSubmission{
 		AgentName: "get-agent",
@@ -397,7 +417,7 @@ func TestHandlerHTTPGetTask(t *testing.T) {
 }
 
 func TestHandlerHTTPGetTaskNotFound(t *testing.T) {
-	h := NewHandler(&mockExecutor{}, nil, HandlerConfig{})
+	h := newHandler(t, &mockExecutor{}, nil, HandlerConfig{})
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
@@ -411,7 +431,7 @@ func TestHandlerHTTPGetTaskNotFound(t *testing.T) {
 
 func TestHandlerHTTPListTasks(t *testing.T) {
 	exec := &mockExecutor{result: "ok"}
-	h := NewHandler(exec, nil, HandlerConfig{})
+	h := newHandler(t, exec, nil, HandlerConfig{})
 
 	_, _ = h.Submit(context.Background(), TaskSubmission{AgentName: "a", Prompt: "p1"})
 	_, _ = h.Submit(context.Background(), TaskSubmission{AgentName: "b", Prompt: "p2"})
@@ -443,7 +463,7 @@ func TestHandlerHTTPListTasks(t *testing.T) {
 }
 
 func TestHandlerHTTPSubmitBadBody(t *testing.T) {
-	h := NewHandler(&mockExecutor{}, nil, HandlerConfig{})
+	h := newHandler(t, &mockExecutor{}, nil, HandlerConfig{})
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
@@ -456,7 +476,7 @@ func TestHandlerHTTPSubmitBadBody(t *testing.T) {
 }
 
 func TestHandlerHTTPSubmitNoPrompt(t *testing.T) {
-	h := NewHandler(&mockExecutor{}, nil, HandlerConfig{})
+	h := newHandler(t, &mockExecutor{}, nil, HandlerConfig{})
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
@@ -495,7 +515,7 @@ func TestHandlerDefaultConfig(t *testing.T) {
 
 func TestHandlerCustomTimeout(t *testing.T) {
 	exec := &mockExecutor{result: "ok", delay: 10 * time.Millisecond}
-	h := NewHandler(exec, nil, HandlerConfig{DefaultTimeout: 5 * time.Second})
+	h := newHandler(t, exec, nil, HandlerConfig{DefaultTimeout: 5 * time.Second})
 
 	taskID, err := h.Submit(context.Background(), TaskSubmission{
 		AgentName:   "timeout-agent",

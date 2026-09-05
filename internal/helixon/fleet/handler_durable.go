@@ -204,10 +204,25 @@ func (h *Handler) StartLeaseSweeper(ctx context.Context) (stop func()) {
 	if h.store == nil {
 		return func() {}
 	}
+	// The sweep loop reads and writes the store on its own schedule, so it is
+	// tracked like a task goroutine: Shutdown must join it too, not just the
+	// tasks it dispatches. The returned stop still works on its own, for a
+	// caller that wants to halt reclaiming without shutting the handler down.
+	h.lifeMu.Lock()
+	if h.stopping {
+		h.lifeMu.Unlock()
+		return func() {}
+	}
+	h.lifeWG.Add(1)
+	h.lifeMu.Unlock()
+
 	sctx, cancel := context.WithCancel(ctx)
+	unwatch := context.AfterFunc(h.stopCtx, cancel)
 	done := make(chan struct{})
 	go func() {
+		defer h.lifeWG.Done()
 		defer close(done)
+		defer unwatch()
 		t := time.NewTicker(h.sweepInterval)
 		defer t.Stop()
 		for {
@@ -247,6 +262,13 @@ func (h *Handler) sweepOnce(ctx context.Context) {
 		if rec.TimeoutSecs > 0 {
 			timeout = time.Duration(rec.TimeoutSecs) * time.Second
 		}
-		go h.processTaskDurable(context.WithoutCancel(ctx), rec.ID, timeout)
+		id := rec.ID
+		if !h.spawn(ctx, func(taskCtx context.Context) {
+			h.processTaskDurable(taskCtx, id, timeout)
+		}) {
+			// Shutting down: leave the row pending. It is already requeued in
+			// the store, so the next sweeper to run claims it.
+			return
+		}
 	}
 }
