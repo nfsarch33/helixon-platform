@@ -1,41 +1,116 @@
-// Package lint contains tests that enforce the v18684-1 through v18684-3
-// lint-cleanup invariant. Each test asserts that the relevant golangci-lint
-// linter reports zero (or <= threshold) issues on the codebase.
+// Invariant tests for this repository's golangci-lint ceilings.
 //
-// These tests are TDD: write the test, run it (FAIL), apply the fix,
-// run it again (PASS), commit. Per v18684 plan + pat-264.
+// Each test asserts that a linter's issue count stays at or below a
+// measured ceiling. The ceilings are ratchets: lower one whenever the
+// count drops, and raise one only with a recorded justification in the
+// commit that raises it.
+//
+// Everything here runs golangci-lint exactly once per `go test` and shares
+// the output. The parsing rules live in parse.go and are unit-tested
+// against golden fixtures in parse_test.go, so the counting logic is
+// verifiable without invoking the linter at all.
 package lint
 
 import (
 	"errors"
+	"os"
 	"os/exec"
-	"regexp"
-	"strconv"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
-// runLint runs a full golangci-lint scan (all linters enabled, issue
-// cap lifted, same-issues cap lifted) so the per-category summary line
-// is always present. The Cmd.Dir is set to the repository root (2 levels
-// up from internal/lint/) so golangci-lint runs against the full repo.
+// repoRoot is where golangci-lint is invoked from: two levels up from
+// internal/lint. assertRepoRoot proves that assumption rather than
+// trusting it, because a wrong directory yields a scan of nothing, and a
+// scan of nothing would satisfy every ceiling in this file at once.
+const repoRoot = "../.."
+
+// Ceilings, measured on this repository. See the ratchet note above.
+const (
+	// gosecCeiling: measured 0. The headroom absorbs a single transient
+	// finding without hiding a class regression; gosec at 0 is carried by
+	// per-line //nolint:gosec directives, so a jump means either a new
+	// unannotated sink or a directive that stopped applying.
+	gosecCeiling = 5
+
+	// reviveCeiling: measured 0, from a baseline of 229 closed in v18684-2.
+	reviveCeiling = 10
+
+	// errcheckTestFileCeiling: measured 94. The headroom is wider because
+	// this population grows whenever tests are added, and a ceiling that
+	// tracks the count exactly would fail unrelated pull requests that add
+	// test coverage.
+	errcheckTestFileCeiling = 110
+)
+
+var (
+	lintOnce sync.Once
+	lintOut  string
+	lintErr  error
+	listOnce sync.Once
+	listOut  string
+	listErr  error
+)
+
+// runLint scans the whole repository once and shares the result.
 //
-// nosec G204: the input is a fixed set of flags, not user input.
-func runLint(t *testing.T) (string, error) { //nolint:gosec // G204 fixed args
+// One scan, not one per test. Each invocation takes golangci-lint's
+// host-wide lock and is authorized for five minutes, while `go test`
+// allows a package ten minutes in total: the previous harness issued six
+// scans from six tests and could therefore exhaust the package deadline,
+// which surfaces as `panic: test timed out` and reads like a failing
+// invariant rather than a harness that asked for too much.
+func runLint(t *testing.T) (string, error) {
 	t.Helper()
-	logLintBinary(t)
-	cmd := exec.Command("golangci-lint", "run", "--timeout", "5m",
-		"--max-issues-per-linter=9999", "--max-same-issues=9999") //nolint:gosec
-	cmd.Dir = "../.."
-	out, err := cmd.CombinedOutput()
-	requireLintVerdict(t, string(out), err)
-	return string(out), err
+	lintOnce.Do(func() {
+		logLintBinary(t)
+		// --allow-parallel-runners: golangci-lint serializes on a lock at a
+		// fixed path shared by every process on the host. Without this flag
+		// a scan started while CI, another agent session, or a developer's
+		// `task lint` holds that lock exits 3 with "parallel golangci-lint
+		// is running" — a red caused by a neighbor rather than by this
+		// repository. Measured with the lock held throughout: without the
+		// flag exit 3 and no verdict; with it, a verdict whose per-linter
+		// counts are byte-identical to an uncontended run.
+		cmd := exec.Command("golangci-lint", "run", //nolint:gosec // G204 fixed args
+			"--timeout", "5m",
+			"--allow-parallel-runners",
+			"--max-issues-per-linter=9999",
+			"--max-same-issues=9999")
+		cmd.Dir = repoRoot
+		out, err := cmd.CombinedOutput()
+		lintOut, lintErr = string(out), err
+	})
+	requireLintVerdict(t, lintOut, lintErr)
+	return lintOut, lintErr
 }
 
-// logLintBinary records which golangci-lint the PATH resolved to and its
-// version, so a count that differs between two environments (e.g. this
-// shell vs the CI runner) can be attributed to a binary rather than
-// guessed at. Best-effort: absence is handled by the callers' skip path.
+// enabledLinters asks golangci-lint which linters this configuration
+// actually turns on, once per `go test`.
+func enabledLinters(t *testing.T) (map[string]bool, error) {
+	t.Helper()
+	listOnce.Do(func() {
+		cmd := exec.Command("golangci-lint", "linters") //nolint:gosec // G204 fixed args
+		cmd.Dir = repoRoot
+		out, err := cmd.CombinedOutput()
+		listOut, listErr = string(out), err
+	})
+	if listErr != nil {
+		return nil, listErr
+	}
+	return EnabledLinters(listOut), nil
+}
+
+// logLintBinary records which golangci-lint ran and at what version, so a
+// count that differs between two environments is attributable to a binary
+// rather than guessed at.
+//
+// Only the file name is logged. This repository is public and `go test`
+// prints a failing test's logs into CI output, so the absolute path —
+// which contains the operator's home directory on every host in this
+// fleet — must not appear there.
 func logLintBinary(t *testing.T) {
 	t.Helper()
 	path, err := exec.LookPath("golangci-lint")
@@ -46,209 +121,128 @@ func logLintBinary(t *testing.T) {
 	if err != nil {
 		return
 	}
-	t.Logf("%s: %s", path, strings.TrimSpace(string(ver)))
+	t.Logf("%s: %s", filepath.Base(path), strings.TrimSpace(string(ver)))
 }
 
 // requireLintVerdict fails the test when golangci-lint terminated without
 // rendering a lint verdict. Exit 0 (clean) and exit 1 (issues found) are
-// verdicts; anything else — config rejected, run error, timeout, or a
-// signal kill (ExitCode -1, whose truncated output would parse as a low
-// count) — used to fall through categoryCount as "0 issues" and turn a
-// broken linter into a passing invariant, e.g. a v1 binary refusing this
-// v2 config. A non-ExitError (binary missing) keeps the callers' skip
-// semantics.
+// verdicts; anything else — a rejected config, a run error, a timeout, or
+// a signal kill, whose truncated output would parse as a low count — would
+// otherwise be counted as "no issues" and turn a broken linter into a
+// satisfied invariant.
 func requireLintVerdict(t *testing.T, out string, err error) {
 	t.Helper()
 	var ee *exec.ExitError
 	if err != nil && errors.As(err, &ee) && ee.ExitCode() != 1 {
-		t.Fatalf("golangci-lint exited %d without a lint verdict; output: %s",
+		t.Fatalf("golangci-lint exited %d without rendering a lint verdict; output: %s",
 			ee.ExitCode(), lastLines(out))
 	}
 }
 
-// categoryRe captures the per-linter summary line "  * <name>: <count>".
-var categoryRe = regexp.MustCompile(`^\s*\*\s*([a-z]+):\s+(\d+)\s*$`)
-
-// issueLineRe captures an issue line whose linter tag is "(<name>)" at end.
-// golangci-lint only emits a summary line for linters with >0 issues;
-// linters with 0 issues need to be counted by issue-line scan.
-var issueLineRe = regexp.MustCompile(`\((\w+)\)\s*$`)
-
-// categoryCount returns the issue count for the named linter, or -1 if
-// the linter did not appear in the run. v18684-3 fix: when the linter is
-// enabled but produces no summary line (because it has 0 issues), we
-// scan the issue lines directly and return 0. This is critical for
-// gosec/revive after the v18684-2/3 cleanup pass, where 0 issues is the
-// success state but golangci-lint v2 omits the summary line.
-func categoryCount(out, name string) int {
-	for _, line := range strings.Split(out, "\n") {
-		m := categoryRe.FindStringSubmatch(line)
-		if m == nil {
-			continue
-		}
-		if m[1] == name {
-			n, _ := strconv.Atoi(m[2])
-			return n
-		}
-	}
-	// No summary line: either the linter is disabled, or it ran and found 0 issues.
-	// Distinguish by scanning issue lines for any "(<name>)" tag.
-	count := 0
-	for _, line := range strings.Split(out, "\n") {
-		m := issueLineRe.FindStringSubmatch(line)
-		if m == nil {
-			continue
-		}
-		if m[1] == name {
-			count++
-		}
-	}
-	// Even if no issues were emitted, the linter is enabled (otherwise
-	// golangci-lint would have flagged that). Return 0 instead of -1
-	// so callers treat 0 as success (v18684-3 contract: linter enabled
-	// AND 0 issues is the post-cleanup invariant).
-	return count
-}
-
-// testFileErrcheck runs a test-file-only errcheck scan. golangci-lint
-// includes the file path in each issue line; we filter to lines ending
-// in _test.go or test.go.
-func testFileErrcheck(t *testing.T) (int, string, error) { //nolint:gosec // G204 fixed args
+// assertRepoRoot proves cmd.Dir points at the module root.
+func assertRepoRoot(t *testing.T) {
 	t.Helper()
-	cmd := exec.Command("golangci-lint", "run", "--timeout", "5m",
-		"-E=errcheck", "--max-issues-per-linter=9999", "--max-same-issues=9999",
-		"--tests=false") //nolint:gosec
-	cmd.Dir = "../.."
-	out, err := cmd.CombinedOutput()
-	requireLintVerdict(t, string(out), err)
-	count := 0
-	for _, line := range strings.Split(string(out), "\n") {
-		// Match patterns like "cmd/foo/main_test.go:10:5: ..." or
-		// "internal/foo/bar_test.go:20:3: ..."
-		if strings.Contains(line, "_test.go:") || strings.Contains(line, "/test.go:") {
-			count++
+	if _, err := os.Stat(filepath.Join(repoRoot, "go.mod")); err != nil {
+		t.Fatalf("no go.mod at %s: the scan would cover nothing and every ceiling "+
+			"in this package would pass vacuously (%v)", repoRoot, err)
+	}
+}
+
+// ceiling is the shared body of every invariant test: prove the harness
+// measured something, then compare one linter's count against its ceiling.
+func ceiling(t *testing.T, linter string, limit int, count func(string) int) {
+	t.Helper()
+	assertRepoRoot(t)
+	out, err := runLint(t)
+	if err != nil && out == "" {
+		t.Fatalf("golangci-lint produced no output at all: %v", err)
+	}
+
+	enabled, err := enabledLinters(t)
+	if err != nil {
+		t.Fatalf("cannot determine which linters are enabled, so a zero count is "+
+			"unreadable: %v", err)
+	}
+	if !enabled[linter] {
+		t.Fatalf("%s is not enabled by .golangci.yml; this invariant is guarding nothing",
+			linter)
+	}
+
+	got := count(out)
+	if got == LinterAbsent {
+		// Enabled, and no evidence in the output: a genuine clean result.
+		got = 0
+	}
+	if got > limit {
+		t.Errorf("%s count = %d, ceiling is %d; sample output: %s",
+			linter, got, limit, lastLines(out))
+	}
+	t.Logf("%s = %d (ceiling %d)", linter, got, limit)
+}
+
+// TestHarness_ParsedTheRun is the positive control for every ceiling in
+// this file.
+//
+// A gate built only from "count <= ceiling" assertions passes when the
+// measurement returns nothing — which is exactly what a drifted output
+// format, a wrong working directory, or a linter that never ran all look
+// like. This test asserts the opposite direction: the parser recognized
+// the same number of issues golangci-lint says it reported. If those
+// disagree, every ceiling below is meaningless and this says so.
+func TestHarness_ParsedTheRun(t *testing.T) {
+	assertRepoRoot(t)
+	out, err := runLint(t)
+	if err != nil && out == "" {
+		t.Fatalf("golangci-lint produced no output at all: %v", err)
+	}
+
+	total, ok := TotalIssues(out)
+	if !ok {
+		// No tally header is only legitimate on a completely clean tree.
+		if n := CountedIssueLines(out); n != 0 {
+			t.Fatalf("no issue tally in the output, yet %d issue lines parsed; "+
+				"the output format has changed under this harness", n)
 		}
+		t.Log("clean tree: no issues reported")
+		return
 	}
-	return count, string(out), err
+	if got := CountedIssueLines(out); got != total {
+		t.Fatalf("parsed %d issue lines but golangci-lint reports %d; the parser and "+
+			"the linter disagree, so every ceiling in this package is unreliable",
+			got, total)
+	}
+	t.Logf("parser agrees with golangci-lint: %d issues", total)
 }
 
-// TestErrcheck_Below350_TestFiles is the v18684-1 invariant for the
-// errcheck linter. The v18684-1 sub-scope is "bare x.Close() in test
-// files" — a single sub-category of errcheck. The remaining errcheck
-// issues (defer patterns, fmt.Fprintf, w.Write, etc.) are deferred to
-// v18685+ sub-stories.
+// TestGosec_Ceiling is the v18684-3 invariant: security findings stay
+// closed. Baseline 129, reduced to 0 in v18802.
+func TestGosec_Ceiling(t *testing.T) {
+	ceiling(t, "gosec", gosecCeiling, func(out string) int {
+		return CountIssues(out, "gosec")
+	})
+}
+
+// TestRevive_Ceiling is the v18684-2 invariant. Baseline 229, now 0.
+func TestRevive_Ceiling(t *testing.T) {
+	ceiling(t, "revive", reviveCeiling, func(out string) int {
+		return CountIssues(out, "revive")
+	})
+}
+
+// TestErrcheck_TestFileCeiling is the v18684-1 invariant: unchecked errors
+// in test files.
 //
-// Target: 413 → ≤350. The boundary is set to 350 (vs the 413 baseline)
-// to allow the test to pass after a meaningful subset is fixed while
-// not requiring the entire errcheck class to be closed (that's a 3-sprint
-// scope, not v18684-1).
-func TestErrcheck_Below350_TestFiles(t *testing.T) {
-	count, out, err := testFileErrcheck(t)
-	if err != nil && out == "" {
-		t.Skipf("errcheck test-file run failed: %v", err)
-	}
-	if count < 0 {
-		t.Skipf("could not determine test-file errcheck count: %s", out)
-	}
-	// v18684-1 target: 413 → ≤350 (63+ errcheck issues closed in test files)
-	if count >= 350 {
-		t.Errorf("test-file errcheck count = %d, want < 350 (v18684-1 target); sample output: %s",
-			count, lastLines(out))
-	}
-}
-
-// TestErrcheck_StableBoundary ensures the test-file errcheck count did
-// not regress above the v18684-1 starting point of 413.
-func TestErrcheck_StableBoundary(t *testing.T) {
-	count, out, _ := testFileErrcheck(t)
-	if count < 0 {
-		t.Skipf("could not determine test-file errcheck count: %s", out)
-	}
-	if count > 413 {
-		t.Errorf("test-file errcheck count = %d, must not regress above v18684-1 starting 413", count)
-	}
-}
-
-// TestRevive_Below100 is the v18684-2 invariant for the revive linter.
-// v18684-2 sub-scope (this sprint):
-//   - redefines-builtin-id: rename `min`/`max`/`len` parameter shadows (13 → 0)
-//   - unused-parameter: rename to `_` or `//nolint:revive` for interface-required (151 → ~15)
-//   - context-as-argument: ensure ctx is first param where applicable (2 remaining)
-//
-// The remaining revive issues (~50) are exported godoc comments on
-// stable callback/handler interfaces — these are deferred to v18685+
-// per sub-scope discipline. Target: 229 → <=100 (this sprint).
-func TestRevive_Below100(t *testing.T) {
-	out, err := runLint(t)
-	if err != nil && out == "" {
-		t.Skipf("golangci-lint run failed: %v", err)
-	}
-	got := categoryCount(out, "revive")
-	if got < 0 {
-		t.Skipf("no revive summary line: %s", out)
-	}
-	if got >= 100 {
-		t.Errorf("revive count = %d, want < 100 (v18684-2 target from 229); sample output: %s",
-			got, lastLines(out))
-	}
-}
-
-// TestRevive_StableBoundary ensures revive count did not regress above
-// the v18684-2 starting 229.
-func TestRevive_StableBoundary(t *testing.T) {
-	out, err := runLint(t)
-	if err != nil && out == "" {
-		t.Skipf("golangci-lint run failed: %v", err)
-	}
-	got := categoryCount(out, "revive")
-	if got < 0 {
-		t.Skipf("no revive summary line: %s", out)
-	}
-	if got > 229 {
-		t.Errorf("revive count = %d, must not regress above v18684-2 starting 229", got)
-	}
-}
-
-// TestGosec_Below10 is the v18684-3 invariant for the gosec linter.
-// v18684-3 sub-scope (this sprint):
-//   - G304 (file inclusion via variable): nolint with G304 justification
-//     for CLI tools reading operator-provided paths
-//   - G301 (file permission): nolint for runtime cache dirs accepting 0750
-//   - G104 (unchecked errors): suppress only on hash.Write (never errors)
-//   - G115 (int conversion overflow): excluded globally via .golangci.yml
-//   - G404 (weak rand): excluded globally via .golangci.yml
-//
-// Baseline 129 → target <=10 (this sprint). Achieved 0 by mechanical
-// pass (//nolint:gosec on legitimate cases + global excludes).
-func TestGosec_Below10(t *testing.T) {
-	out, err := runLint(t)
-	if err != nil && out == "" {
-		t.Skipf("golangci-lint run failed: %v", err)
-	}
-	got := categoryCount(out, "gosec")
-	if got < 0 {
-		t.Skipf("no gosec summary line: %s", out)
-	}
-	if got >= 10 {
-		t.Errorf("gosec count = %d, want < 10 (v18684-3 target from 129); sample output: %s",
-			got, lastLines(out))
-	}
-}
-
-// TestGosec_StableBoundary ensures gosec count did not regress above
-// the v18684-3 starting 129.
-func TestGosec_StableBoundary(t *testing.T) {
-	out, err := runLint(t)
-	if err != nil && out == "" {
-		t.Skipf("golangci-lint run failed: %v", err)
-	}
-	got := categoryCount(out, "gosec")
-	if got < 0 {
-		t.Skipf("no gosec summary line: %s", out)
-	}
-	if got > 129 {
-		t.Errorf("gosec count = %d, must not regress above v18684-3 starting 129", got)
-	}
+// This assertion was unfalsifiable from the day it was written until
+// v18813. It ran the scan with `--tests=false`, which removes every
+// `_test.go` file from the analysis, and then counted output lines whose
+// path contained `_test.go:` — two operations that are complements, so the
+// count was structurally pinned at 0 and the thresholds of 350 and 413
+// could never be crossed. The real population, counted by linter tag on
+// test-file paths, is 94.
+func TestErrcheck_TestFileCeiling(t *testing.T) {
+	ceiling(t, "errcheck", errcheckTestFileCeiling, func(out string) int {
+		return CountIssuesInTestFiles(out, "errcheck")
+	})
 }
 
 // lastLines returns the trailing non-empty lines for failure context.

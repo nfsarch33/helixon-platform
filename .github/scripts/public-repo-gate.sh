@@ -208,8 +208,52 @@ for rule in "${RULES[@]}"; do
     case "$file" in
       ./.github/scripts/public-repo-gate.sh|./.github/scripts/public-repo-gate-tests.sh) continue ;;
     esac
-    # Never let a file's own annotation line count as a finding.
-    case "$hit" in *"$SELF_NAME"*) continue ;; esac
+    # Never let a file's own annotation line count as a finding -- but the test
+    # for "this is an annotation" has to be the annotation's SHAPE and PLACE,
+    # not the marker's presence anywhere in the record.
+    #
+    # v18814: this was `case "$hit" in *"$SELF_NAME"*) continue ;; esac`, and
+    # $hit is the whole `path:line:TEXT` record from grep -rn -- the same shape
+    # that made the node_modules filter fail open two fixes ago. So ANY line in
+    # the repository that merely MENTIONS the marker -- a runbook, a comment
+    # explaining this gate, a fixture -- was skipped even when it also carried a
+    # blocked pattern. Measured: a line reading "A file exempted with
+    # <marker> must still never contain <operator home path>" produced no
+    # finding, while the same line with the marker removed produced one.
+    #
+    # And the skip ran BEFORE allows(), so such a hit was counted in NEITHER
+    # half of the report: not a finding, not suppressed, absent from both lists.
+    # It printed as a clean tree. That is a gate failing open in silence, which
+    # is the one failure mode this whole file exists to refuse.
+    #
+    # An operative annotation is one allows() would actually act on, so the test
+    # now asks exactly what allows() asks: is it inside the header window, and
+    # is it shaped `<marker>: allow-file <categories>`. Both halves are load
+    # bearing -- the window alone would exempt any violation on line 1..5, the
+    # shape alone would exempt a runbook that quotes the syntax.
+    #
+    # A hit that satisfies both is counted as SUPPRESSED rather than skipped.
+    # An exemption that leaves no trace in the report is how the previous one
+    # survived unnoticed; this one has to show up in a number someone reads.
+    rest="${hit#*:}"
+    lineno="${rest%%:*}"
+    text="${rest#*:}"
+    is_annotation=0
+    case "$lineno" in
+      ''|*[!0-9]*) : ;;   # no parseable line number -- treat as ordinary content
+      *)
+        if [ "$lineno" -le "$ANNOTATION_SCAN_LINES" ]; then
+          case "$text" in
+            *"${SELF_NAME}: allow-file "*) is_annotation=1 ;;
+          esac
+        fi
+        ;;
+    esac
+    if [ "$is_annotation" = 1 ]; then
+      suppressed=$((suppressed + 1))
+      echo "annotation_line|$file" >>/tmp/public-repo-gate-suppressed.txt
+      continue
+    fi
 
     # Preserved from the gate this replaces: private addressing is blocked in
     # production code and allowed in test fixtures, which legitimately need
