@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// mustTaskStore opens a store and closes it at test end. Build the handler
+// AFTER calling this: cleanups run last-registered-first, so newHandler's
+// shutdown then joins the task goroutines before this close runs.
 func mustTaskStore(t *testing.T, dsn string) *TaskStore {
 	t.Helper()
 	store, err := NewTaskStore(context.Background(), dsn)
@@ -28,7 +31,7 @@ func TestHandlerDurableCompleteSurvivesRestart(t *testing.T) {
 
 	exec := &mockExecutor{result: "durable result"}
 	storeA := mustTaskStore(t, dsn)
-	a := NewHandler(exec, nil, HandlerConfig{Store: storeA})
+	a := newHandler(t, exec, nil, HandlerConfig{Store: storeA})
 
 	taskID, err := a.Submit(ctx, TaskSubmission{AgentName: "durable", Prompt: "persist me"})
 	require.NoError(t, err)
@@ -36,10 +39,16 @@ func TestHandlerDurableCompleteSurvivesRestart(t *testing.T) {
 		rec, ok := a.GetTask(taskID)
 		return ok && rec.Status == TaskStatusCompleted
 	}, 5*time.Second, 10*time.Millisecond)
+
+	// Simulate the process exiting. The handler is joined first: a task
+	// goroutine is still unwinding after the status it wrote becomes
+	// visible, and closing the database under it is the bug this file's
+	// shutdown wiring exists to prevent.
+	require.NoError(t, a.Shutdown(ctx))
 	require.NoError(t, storeA.Close())
 
 	storeB := mustTaskStore(t, dsn)
-	b := NewHandler(&mockExecutor{result: "should never run"}, nil, HandlerConfig{Store: storeB})
+	b := newHandler(t, &mockExecutor{result: "should never run"}, nil, HandlerConfig{Store: storeB})
 
 	rec, ok := b.GetTask(taskID)
 	require.True(t, ok, "a restarted handler must see the previous process's tasks")
@@ -77,7 +86,7 @@ func TestHandlerDurableCrashResumeViaSweeper(t *testing.T) {
 	// The survivor: same database, fresh handler, sweeper running.
 	exec := &mockExecutor{result: "recovered"}
 	store := mustTaskStore(t, dsn)
-	h := NewHandler(exec, nil, HandlerConfig{
+	h := newHandler(t, exec, nil, HandlerConfig{
 		Store:         store,
 		LeaseTTL:      150 * time.Millisecond,
 		SweepInterval: 25 * time.Millisecond,
@@ -122,7 +131,7 @@ func TestHandlerDurableLeaseLossCancelsExecutor(t *testing.T) {
 	ctx := context.Background()
 	store := mustTaskStore(t, filepath.Join(t.TempDir(), "tasks.db"))
 	exec := &blockingExecutor{started: make(chan struct{}), canceled: make(chan struct{})}
-	h := NewHandler(exec, nil, HandlerConfig{
+	h := newHandler(t, exec, nil, HandlerConfig{
 		Store:    store,
 		LeaseTTL: 300 * time.Millisecond, // renewal ticks at 100ms
 	})
@@ -164,7 +173,7 @@ func TestHandlerDurableLeaseLossCancelsExecutor(t *testing.T) {
 func TestHandlerDurableDuplicateSubmitRejected(t *testing.T) {
 	ctx := context.Background()
 	store := mustTaskStore(t, filepath.Join(t.TempDir(), "tasks.db"))
-	h := NewHandler(&mockExecutor{result: "ok"}, nil, HandlerConfig{Store: store})
+	h := newHandler(t, &mockExecutor{result: "ok"}, nil, HandlerConfig{Store: store})
 
 	_, err := h.Submit(ctx, TaskSubmission{TaskID: "idem-1", AgentName: "a", Prompt: "p"})
 	require.NoError(t, err)
@@ -193,7 +202,7 @@ func TestHandlerDurableSweeperDeadLettersAndNotifies(t *testing.T) {
 	}
 
 	store := mustTaskStore(t, dsn)
-	h := NewHandler(&mockExecutor{result: "never"}, nil, HandlerConfig{
+	h := newHandler(t, &mockExecutor{result: "never"}, nil, HandlerConfig{
 		Store:         store,
 		LeaseTTL:      50 * time.Millisecond,
 		SweepInterval: 25 * time.Millisecond,
