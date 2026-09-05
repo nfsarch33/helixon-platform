@@ -27,7 +27,7 @@ lint:
   extends: .go_base
   stage: lint
   script:
-    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
     - golangci-lint run --timeout 5m ./...
   allow_failure: false  # v14507: lint is now a required check
 

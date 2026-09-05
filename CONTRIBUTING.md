@@ -32,7 +32,9 @@ go vet ./...
 ### Style
 
 - Follow standard Go conventions (`gofmt`, `go vet`)
-- Use `golangci-lint run` for additional checks
+- Use `golangci-lint run` for additional checks — install it with `task install`.
+  It pins v2.13.1 on the `/v2/` module path: `.golangci.yml` is a v2 config,
+  and a v1 binary rejects it and exits 3 instead of linting.
 - Structured logging with `log/slog` (include `component` tag)
 - Error wrapping: `fmt.Errorf("context: %w", err)`
 
