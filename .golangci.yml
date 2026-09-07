@@ -4,7 +4,14 @@ run:
   tests: true
 
 linters:
-  disable-all: true
+  # v2 spelling of v1's `disable-all: true`. The v1 key is not merely
+  # renamed, it is rejected by the v2 schema -- but `golangci-lint run`
+  # does not validate the config, so the stale key sat here silently while
+  # `linters.default` fell back to `standard`. That happened to be harmless
+  # (the enable list below is a superset of `standard`), which is exactly
+  # what made it invisible. `config verify` in CI is what makes the next
+  # one loud; see the lint-config job in .github/workflows/ci.yml.
+  default: none
   enable:
     - errcheck       # unchecked errors
     - govet          # standard go vet
@@ -30,9 +37,6 @@ linters:
     gosec:
       severity: medium
       confidence: medium
-      excludes:
-        - G115  # bounded by upstream length check (helixon-eval/tasks.go:93)
-        - G404  # weak rand OK in chaos test fixtures (bifrost_test.go:96)
     revive:
       severity: warning
     misspell:
@@ -50,11 +54,26 @@ linters:
       asserts: false
       comparison: false
   exclusions:
+    # These replace a repository-wide `linters.settings.gosec.excludes` of
+    # [G115, G404]. A repo-wide exclude silences the rule everywhere,
+    # including in code not yet written, and its justification named a
+    # single file -- one that turned out to carry no G115 finding at all.
+    # Each rule below is scoped to the files that actually raise it, so a
+    # G115 or G404 in any other file is a finding again.
     rules:
-      - path: examples/
+      # newTraceID encodes a ULID MSB-first: every `byte(ms >> n)` truncates
+      # by design, which is the whole point of the encoding. Six sites.
+      - path: internal/helixon/agentrace\.go
         linters:
-          - gocritic
           - gosec
+        text: G115
+
+      # `string(rune('a'+i))` derives a distinct key per iteration from a
+      # loop index bounded by a small literal, in test fixtures only.
+      - path: (internal/notify/notifydb/db|internal/notify/telegram/telegramop|internal/rtx/rtx)_test\.go$
+        linters:
+          - gosec
+        text: G115
 
 formatters:
   enable:
@@ -66,6 +85,14 @@ issues:
   max-same-issues: 5
 
 output:
-  format: tab
-  print-issued-lines: true
-  print-linter-name: true
+  # v1 carried `format: tab` plus `print-issued-lines` / `print-linter-name`
+  # at this level. All three were rejected by the v2 schema and therefore
+  # inert, so what CI and internal/lint have actually been parsing all along
+  # is the v2 *default*: `text`, with both flags on. This block states that
+  # default explicitly rather than dropping it, because internal/lint parses
+  # the linter name out of the "... (linter)" suffix -- `tab` was never in
+  # effect and restoring it would break that harness.
+  formats:
+    text:
+      print-issued-lines: true
+      print-linter-name: true

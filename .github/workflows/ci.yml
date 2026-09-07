@@ -117,6 +117,80 @@ jobs:
       - name: Scan for blocked terms
         run: .github/scripts/public-repo-gate.sh
 
+  lint-config:
+    # ubuntu-latest for the same reason as setup-go-cache-gate below: this
+    # gate reads one YAML file, needs no build of this repository, and must
+    # not queue behind the sole self-hosted runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          # Pinned false for every setup-go step in this repository; the
+          # setup-go-cache-gate job below asserts it. See its comments.
+          cache: false
+
+      # Pinned, never @latest: this step chooses the JSON schema the config is
+      # judged against, so an unpinned upgrade could flip this gate red or
+      # green with no commit to blame.
+      #
+      # This version MUST stay equal to the one #119 pinned for developers in
+      # Taskfile.yml, .devcontainer/devcontainer.json, .gitlab-ci.yml and
+      # ci/sentrux.gitlab-ci.yml. Two golangci-lint versions in one repository
+      # is how a count gets attributed to the wrong binary -- the reason
+      # internal/lint logs which binary produced its numbers.
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
+
+      # The control runs BEFORE the gate, like setup-go-cache-gate's does.
+      # `golangci-lint run` does not validate its own configuration -- that is
+      # precisely how `linters.disable-all` and three `output:` keys sat in
+      # this repository inert, describing a policy that was not in force. A
+      # `config verify` step that "passed" because the binary was missing or
+      # because the schema accepts anything would rebuild that same blind
+      # spot, so require a rejection of the v1 spelling first.
+      - name: Prove config verify rejects v1-era keys (negative control)
+        run: |
+          bad="${RUNNER_TEMP}/golangci-v1-keys.yml"
+          cat > "$bad" <<'YAML'
+          version: "2"
+          linters:
+            disable-all: true
+            enable:
+              - govet
+          output:
+            format: tab
+            print-issued-lines: true
+            print-linter-name: true
+          YAML
+          out="$(golangci-lint config verify -c "$bad" 2>&1)" && rc=0 || rc=$?
+          echo "$out"
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::config verify accepted v1-era keys; this gate proves nothing"
+            exit 1
+          fi
+          # A non-zero exit is NOT evidence on its own. A golangci-lint that
+          # cannot run at all exits non-zero too -- `go install` silently
+          # builds it with an older toolchain if the Go on PATH is below its
+          # minimum, and it then refuses every config with "the Go language
+          # version ... is lower than the targeted Go version". That would let
+          # this control pass while exercising no schema whatsoever. Require
+          # the schema to have named each key, so only a real rejection counts.
+          for key in disable-all format print-issued-lines print-linter-name; do
+            case "$out" in
+              *"'$key'"*) ;;
+              *) echo "::error::verify failed, but the schema never named '$key';"
+                 echo "::error::the control did not exercise the schema, so it proves nothing"
+                 exit 1 ;;
+            esac
+          done
+          echo "control OK: the v2 schema named every v1-era key"
+
+      - name: Verify .golangci.yml against the v2 schema
+        run: golangci-lint config verify
+
   setup-go-cache-gate:
     # ubuntu-latest ON PURPOSE, and it is not an optimisation. A gate whose
     # entire job is protecting the sole self-hosted runner's availability must
