@@ -49,7 +49,11 @@ type SprintboardConfig struct {
 	AgentName    string
 	Capabilities string
 	TenantID     string // optional: stamped on every outbound payload (v18685-1)
-	Logger       *slog.Logger
+	// Token is the shared bearer the board expects once its auth mode is
+	// required (v18836). Empty sends no Authorization header, which the board
+	// accepts only while it is still in bootstrap mode.
+	Token  string
+	Logger *slog.Logger
 }
 
 func (c SprintboardConfig) withDefaults() SprintboardConfig {
@@ -83,6 +87,26 @@ func NewSprintboardClient(cfg SprintboardConfig, logger *slog.Logger) *Sprintboa
 		http:   &http.Client{Timeout: 10 * time.Second},
 		logger: logger.With(slog.String("component", "helixon.controlplane.sprintboard")),
 	}
+}
+
+// newRequest builds every request this client sends, so the bearer and the
+// content type cannot be remembered on one verb and forgotten on another.
+func (c *SprintboardClient) newRequest(ctx context.Context, method, target string, body []byte) (*http.Request, error) {
+	var rd io.Reader
+	if body != nil {
+		rd = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, target, rd)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.cfg.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.cfg.Token)
+	}
+	return req, nil
 }
 
 // AgentRegistration is the payload for auto-registration.
@@ -176,7 +200,7 @@ func (c *SprintboardClient) SearchTickets(ctx context.Context, filter TicketFilt
 	if q := filter.values().Encode(); q != "" {
 		target += "?" + q
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	req, err := c.newRequest(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -271,8 +295,7 @@ func (c *SprintboardClient) AddComment(ctx context.Context, ticketID, author, bo
 
 // SprintStatus returns the current sprint status.
 func (c *SprintboardClient) SprintStatus(ctx context.Context, sprintID string) (map[string]any, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("%s/api/v1/sprints/%s", c.cfg.BaseURL, sprintID), nil)
+	req, err := c.newRequest(ctx, http.MethodGet, fmt.Sprintf("%s/api/v1/sprints/%s", c.cfg.BaseURL, sprintID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -301,11 +324,10 @@ func (c *SprintboardClient) SprintStatus(ctx context.Context, sprintID string) (
 // broken"), and it cannot do that once the transport has flattened both into
 // one generic error string.
 func (c *SprintboardClient) doPost(ctx context.Context, path string, body []byte) (int, []byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+path, bytes.NewReader(body))
+	req, err := c.newRequest(ctx, http.MethodPost, c.cfg.BaseURL+path, body)
 	if err != nil {
 		return 0, nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {

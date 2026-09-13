@@ -212,10 +212,17 @@ func buildServeRuntime(cfg helixon.RuntimeConfig) (*helixon.Runtime, error) {
 	}
 	rt := helixon.NewRuntime(provider, cfg)
 	if cfg.SprintboardURL != "" {
+		if cfg.SprintboardToken == "" {
+			// Loud on purpose: a board in required mode answers 401 to every
+			// call from this client, and `active` would say nothing about it.
+			slog.Warn("sprintboard client has no bearer token (sprintboard.token unset or expanded empty); " +
+				"the board rejects every call once its auth mode is required")
+		}
 		sbClient := controlplane.NewSprintboardClient(controlplane.SprintboardConfig{
 			BaseURL:      cfg.SprintboardURL,
 			AgentName:    cfg.AgentID,
 			Capabilities: cfg.SprintboardCapabilities,
+			Token:        cfg.SprintboardToken,
 		}, slog.Default())
 		if err := helixon.WithSprintboard(sbClient)(rt); err != nil {
 			return nil, fmt.Errorf("wire sprintboard: %w", err)

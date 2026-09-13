@@ -292,10 +292,23 @@ func TestServiceMap_AlertNotifierResolvesFieldByID(t *testing.T) {
 // llm-router service uses -- no regex, nothing to drift.
 func TestServiceMap_FleetAgentUsesRouterToken(t *testing.T) {
 	entries, ok := serviceMap["fleet-agent"]
-	if !ok || len(entries) != 1 {
-		t.Fatalf("fleet-agent entries = %d, want exactly 1 (LLM_ROUTER_TOKEN)", len(entries))
+	if !ok || len(entries) == 0 {
+		t.Fatal("fleet-agent has no serviceMap entries")
 	}
-	e := entries[0]
+	// v18836 put the board's shared bearer beside the router token. The
+	// property guarded here is that there is exactly ONE router-token entry
+	// and it is a direct read of the router's own item -- not that the
+	// router token is the only credential the agent has.
+	var routerEntries []EnvEntry
+	for _, re := range entries {
+		if re.EnvVar == "LLM_ROUTER_TOKEN" {
+			routerEntries = append(routerEntries, re)
+		}
+	}
+	if len(routerEntries) != 1 {
+		t.Fatalf("fleet-agent LLM_ROUTER_TOKEN entries = %d, want exactly 1", len(routerEntries))
+	}
+	e := routerEntries[0]
 	if e.EnvVar != "LLM_ROUTER_TOKEN" {
 		t.Errorf("EnvVar = %q, want LLM_ROUTER_TOKEN", e.EnvVar)
 	}
@@ -355,13 +368,23 @@ func TestServiceMap_RouterCallersShareOneToken(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.service, func(t *testing.T) {
 			entries, ok := serviceMap[tc.service]
-			if !ok || len(entries) != 1 {
-				t.Fatalf("%s entries = %d, want exactly 1 (%s)", tc.service, len(entries), tc.envVar)
+			if !ok || len(entries) == 0 {
+				t.Fatalf("%s has no serviceMap entries", tc.service)
 			}
-			e := entries[0]
-			if e.EnvVar != tc.envVar {
-				t.Errorf("%s EnvVar = %q, want %q (%s)", tc.service, e.EnvVar, tc.envVar, tc.why)
+			// Exactly one entry renders the variable this caller's YAML expands
+			// for the router (tc.why). Other credentials the service needs --
+			// v18836: the fleet agent's board bearer -- sit beside it and are
+			// pinned by their own tests.
+			var matches []EnvEntry
+			for _, re := range entries {
+				if re.EnvVar == tc.envVar {
+					matches = append(matches, re)
+				}
 			}
+			if len(matches) != 1 {
+				t.Fatalf("%s entries named %s = %d, want exactly 1 (%s)", tc.service, tc.envVar, len(matches), tc.why)
+			}
+			e := matches[0]
 			if e.ItemEnv != want {
 				t.Errorf("%s item ref %q != llm-router's LLM_ROUTER_TOKEN item ref %q; router callers must not diverge from the router",
 					tc.service, e.ItemEnv, want)

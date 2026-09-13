@@ -63,17 +63,25 @@ func BuildProvider(cfg ProviderConfig) (llm.Provider, error) {
 
 // expandEnv resolves a single ${VAR} placeholder. A literal value is returned as-is.
 func expandEnv(v string) (string, error) {
+	return expandEnvNamed(v, "api_key")
+}
+
+// expandEnvNamed is expandEnv with the config field named in every error, so
+// a sprintboard.token failure cannot read as an api_key one. A variable that
+// is set but EMPTY passes through as ""; callers that need a non-empty value
+// check for it themselves.
+func expandEnvNamed(v, field string) (string, error) {
 	v = strings.TrimSpace(v)
 	if !strings.HasPrefix(v, "${") || !strings.HasSuffix(v, "}") {
 		return v, nil
 	}
 	name := strings.TrimSuffix(strings.TrimPrefix(v, "${"), "}")
 	if name == "" {
-		return "", errors.New("helixon: empty env var reference in api_key")
+		return "", fmt.Errorf("helixon: empty env var reference in %s", field)
 	}
 	val, ok := os.LookupEnv(name)
 	if !ok {
-		return "", fmt.Errorf("helixon: api_key env var %q is not set", name)
+		return "", fmt.Errorf("helixon: %s env var %q is not set", field, name)
 	}
 	return val, nil
 }
