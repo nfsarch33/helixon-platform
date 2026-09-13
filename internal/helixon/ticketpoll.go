@@ -674,6 +674,50 @@ func TicketPrompt(t controlplane.Ticket) string {
 		fmt.Fprintf(&b, "\nAcceptance criteria:\n%s\n", t.AcceptanceCriteria)
 	}
 	b.WriteString("\nUse the available tools to do the work, then run the verifier to prove it. " +
-		"Report what you changed and the verifier result.")
+		"Report what you changed and the verifier result.\n")
+	b.WriteString(ticketVerificationGuidance)
 	return b.String()
 }
+
+// ticketVerificationGuidance is appended to every ticket prompt.
+//
+// It is a constant rather than prose in the deployed system prompt because each
+// line below was bought with a real run, and a system prompt in a machine-local
+// config file is the wrong place to keep evidence the whole fleet needs:
+//
+//   - the scoping line: `go test` extra args used to be APPENDED to ./..., so a
+//     student scoping to its own package ran the shared workspace's dozen
+//     half-finished packages too and spent its budget on code it never wrote.
+//   - the gofmt line: `gofmt -l` exits 0 while listing, so the check reported a
+//     pass exactly when it had findings. Fixed in the verifier; stated here
+//     because an agent that has read `pass` once will keep reading it.
+//   - the self-authored-test line: in the rq3 wave a student wrote a test case
+//     absent from its ticket's table, got the expectation wrong, and burned its
+//     entire 128k budget trying to reconcile a correct implementation with an
+//     incorrect test. A one-line correction landed in 98 seconds afterwards.
+//   - the escalation line: three waves in a row escalated `budget_exhausted` on
+//     work that already passed on the host. Saying plainly that a check did not
+//     pass is cheap; claiming an unobserved pass costs a human the review.
+const ticketVerificationGuidance = `
+How this ticket is judged, in order:
+  1. verifier_run go_build passes
+  2. verifier_run gofmt_check passes
+  3. verifier_run go_test passes
+
+Read the ` + "`pass`" + ` field, never the exit code. gofmt_check reports failure by
+PRINTING filenames while exiting 0; when a verdict is not what the exit code
+suggests, the ` + "`note`" + ` field says why.
+
+Scope go_build, go_test and go_vet to the package this ticket names by passing it
+in ` + "`args`" + `. It replaces the default ./... rather than adding to it, so other
+unfinished work in this workspace cannot fail your run.
+
+If a check fails, read output_excerpt and note before changing anything. A test
+YOU wrote that disagrees with your implementation is a hypothesis, not a verdict:
+re-derive the expected value from this ticket before assuming the implementation
+is wrong.
+
+If you cannot make a check pass, say so plainly and stop. Escalating with an
+accurate reason is a correct outcome; reporting a pass you did not observe is
+not. Quote the verifier output you relied on rather than paraphrasing it.
+`
