@@ -28,7 +28,15 @@ func TestBuildVerifierArgv_TableDriven(t *testing.T) {
 		wantErr string
 	}{
 		{name: "go_test with no extras", check: checks["go_test"], want: []string{"test", "./..."}},
-		{name: "go_test with a package pattern", check: checks["go_test"], extra: []string{"./internal/..."}, want: []string{"test", "./...", "./internal/..."}},
+		{
+			// v18832: this row previously expected {"test", "./...", "./internal/..."}
+			// and so pinned the defect. Appending a caller's package pattern to
+			// the default one runs the WHOLE tree and then that package, which
+			// in a shared workspace means every scoped request fails on some
+			// other agent's unfinished code. The scope now REPLACES the default.
+			name: "a package pattern REPLACES the default scope", check: checks["go_test"],
+			extra: []string{"./internal/..."}, want: []string{"test", "./internal/..."},
+		},
 		{name: "gofmt_check refuses extras", check: checks["gofmt_check"], extra: []string{"."}, wantErr: "does not accept extra arguments"},
 		{
 			// -toolexec runs an arbitrary binary for every compile; a check

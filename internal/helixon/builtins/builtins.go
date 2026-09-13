@@ -95,14 +95,26 @@ func ShellTool(cfg ShellConfig) tooldispatch.ToolDef {
 		allow[c] = struct{}{}
 	}
 	return tooldispatch.ToolDef{
-		Name:        "shell",
-		Description: "Execute an allow-listed shell command and return stdout/stderr.",
+		Name: "shell",
+		// The contract, not a summary of it. Three iterations of one run were
+		// once spent rediscovering that this tool is not a shell, because the
+		// description said "shell command" and the rules lived in a system
+		// prompt the model had long since scrolled past. A tool description is
+		// the one text a model reliably reads immediately before calling.
+		Description: fmt.Sprintf("Run ONE allow-listed program and return its combined output. This is NOT a shell: "+
+			"no interpreter is involved, so pipes, redirects, ';', '&&', '$(...)' and globs arrive as literal "+
+			"argument text and do nothing. Ask for the program and its arguments, then read the output yourself — "+
+			"there is no 'head' to pipe into. `command` must be a bare binary NAME drawn from: %s. "+
+			"A path such as ./script or /usr/bin/env is refused. At most %d arguments, each under %d bytes. "+
+			"Per-command flags that re-grant execution or redirect output (find -exec, find -delete, grep -f, "+
+			"sort -o) are refused before anything runs.",
+			strings.Join(cfg.AllowedCommands, ", "), sandbox.MaxArgs, sandbox.MaxArgLen),
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"required": ["command"],
 			"properties": {
-				"command": {"type": "string", "description": "Allow-listed binary name (e.g. 'git', 'ls')."},
-				"args":    {"type": "array", "description": "Arguments to pass to the command."}
+				"command": {"type": "string", "description": "Bare binary name from the allow-list in this tool's description; not a path."},
+				"args":    {"type": "array", "description": "Arguments, one per entry. Not a command line: they are passed to the program verbatim."}
 			}
 		}`),
 		Timeout: cfg.Timeout,
@@ -471,13 +483,15 @@ func validateAllowedPath(path string, allowedPaths []string) error {
 func FileReadTool(cfg FileReadConfig) tooldispatch.ToolDef {
 	cfg = cfg.withDefaults()
 	return tooldispatch.ToolDef{
-		Name:        "file_read",
-		Description: "Read the contents of a file at a given path. Returns the file content as a string.",
+		Name: "file_read",
+		Description: "Read a file from the workspace and return its content. " +
+			"Paths are relative to the workspace root. The same directory is mounted at /workspace for " +
+			"verifier_run, so the two spellings name one set of files. Large files come back truncated.",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"required": ["path"],
 			"properties": {
-				"path": {"type": "string", "description": "Absolute or relative file path to read."}
+				"path": {"type": "string", "description": "Workspace-relative path to read."}
 			}
 		}`),
 		Timeout: cfg.Timeout,
@@ -523,14 +537,17 @@ func (c FileWriteConfig) withDefaults() FileWriteConfig {
 func FileWriteTool(cfg FileWriteConfig) tooldispatch.ToolDef {
 	cfg = cfg.withDefaults()
 	return tooldispatch.ToolDef{
-		Name:        "file_write",
-		Description: "Write content to a file at a given path. Creates the file if it doesn't exist, overwrites if it does.",
+		Name: "file_write",
+		Description: "Write a file in the workspace. This REPLACES the whole file rather than patching it, " +
+			"so send the complete intended content: anything you leave out is deleted. " +
+			"Go files must already be gofmt-formatted when you write them, trailing newline included — " +
+			"gofmt_check fails a ticket by listing files it would reformat, and reformatting afterwards costs an iteration.",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"required": ["path", "content"],
 			"properties": {
-				"path":    {"type": "string", "description": "Absolute or relative file path to write."},
-				"content": {"type": "string", "description": "Content to write to the file."}
+				"path":    {"type": "string", "description": "Workspace-relative path to write."},
+				"content": {"type": "string", "description": "Complete file content; it replaces any existing content."}
 			}
 		}`),
 		Timeout: cfg.Timeout,

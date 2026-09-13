@@ -22,23 +22,49 @@ import (
 // `-toolexec=...`), and where PathArgs is set must resolve inside the
 // workspace mount.
 type VerifierCheck struct {
-	Name           string
-	Command        string
-	Args           []string
+	Name    string
+	Command string
+	// Args is the fixed prefix: the subcommand and its flags, never the target.
+	Args []string
+	// DefaultScope is the target the check runs against when the caller names
+	// none — the package pattern, the directory. A caller's extra arguments
+	// REPLACE it; they are not appended to it.
+	//
+	// v18832: this field exists because the two used to be one list. `go_test`
+	// was Args{"test", "./..."} with AllowExtraArgs, so a caller asking to
+	// scope the run to its own package got `go test ./... ./internal/foo` — the
+	// whole tree AND that package. In a shared workspace holding a dozen other
+	// agents' half-finished packages, every scoped request therefore ran
+	// everything and failed on somebody else's code, which reads to the caller
+	// as its own work being broken and costs it the rest of its budget trying
+	// to fix code it never wrote.
+	DefaultScope   []string
 	AllowExtraArgs bool
 	PathArgs       bool
 	MinExtraArgs   int
-	Description    string
+	// RequireEmptyOutput makes a zero-exit run that printed anything a FAIL.
+	//
+	// v18832: `gofmt -l` exits 0 while listing the files that are misformatted
+	// — that is its entire interface. The sandbox derives its outcome from the
+	// exit code alone, so this check reported `pass` precisely when it had
+	// found something to report. A lister needs an assertion on its output or
+	// it is not a gate, it is a green light with a list attached.
+	RequireEmptyOutput bool
+	Description        string
 }
 
 // DefaultVerifierChecks is the check table the agent gets unless an operator
 // narrows it.
 func DefaultVerifierChecks() []VerifierCheck {
 	return []VerifierCheck{
-		{Name: "go_build", Command: "go", Args: []string{"build", "./..."}, AllowExtraArgs: true, Description: "compile every package"},
-		{Name: "go_test", Command: "go", Args: []string{"test", "./..."}, AllowExtraArgs: true, Description: "run the test suite"},
-		{Name: "go_vet", Command: "go", Args: []string{"vet", "./..."}, AllowExtraArgs: true, Description: "run go vet"},
-		{Name: "gofmt_check", Command: "gofmt", Args: []string{"-l", "."}, Description: "list unformatted files (empty output means formatted)"},
+		{Name: "go_build", Command: "go", Args: []string{"build"}, DefaultScope: []string{"./..."}, AllowExtraArgs: true,
+			Description: "compile packages (default ./...; pass a package pattern to scope it)"},
+		{Name: "go_test", Command: "go", Args: []string{"test"}, DefaultScope: []string{"./..."}, AllowExtraArgs: true,
+			Description: "run tests (default ./...; pass a package pattern to scope it)"},
+		{Name: "go_vet", Command: "go", Args: []string{"vet"}, DefaultScope: []string{"./..."}, AllowExtraArgs: true,
+			Description: "run go vet (default ./...; pass a package pattern to scope it)"},
+		{Name: "gofmt_check", Command: "gofmt", Args: []string{"-l"}, DefaultScope: []string{"."}, RequireEmptyOutput: true,
+			Description: "FAIL if any file is not gofmt-formatted; the output lists the offending files"},
 		{Name: "file_exists", Command: "test", Args: []string{"-e"}, AllowExtraArgs: true, PathArgs: true, MinExtraArgs: 1, Description: "assert a workspace file exists"},
 		{Name: "file_contains", Command: "grep", Args: []string{"-q", "--"}, AllowExtraArgs: true, MinExtraArgs: 2, Description: "assert a workspace file contains a pattern (args: pattern, path)"},
 	}
@@ -109,6 +135,11 @@ type VerifierResult struct {
 	Truncated  bool   `json:"truncated"`
 	OutputSize int    `json:"output_bytes"`
 	Output     string `json:"output_excerpt"`
+	// Note carries the reason for a verdict the exit code does not explain —
+	// today, a check that failed having exited 0. Without it, pass:false beside
+	// exit_code:0 is unreadable, and an agent that cannot read its own verdict
+	// will argue with it instead of acting on it.
+	Note string `json:"note,omitempty"`
 }
 
 // VerifierToolName is the tool name the completion gate looks for.
@@ -132,7 +163,11 @@ func VerifierTool(cfg VerifierConfig) tooldispatch.ToolDef {
 		Name: VerifierToolName,
 		Description: "Run an allow-listed verification check inside the sandbox to PROVE the work is correct. " +
 			"Available checks: " + strings.Join(names, ", ") + ". " +
-			"Returns JSON: pass, outcome (passed|failed|timeout|error), exit_code, duration_ms, output_excerpt.",
+			"Returns JSON: pass, outcome (passed|failed|timeout|error), exit_code, duration_ms, output_excerpt, note. " +
+			"Read `pass`, never the exit code: a check can fail having exited 0 — gofmt_check fails by PRINTING " +
+			"the filenames it would reformat — and `note` explains any verdict the exit code does not. " +
+			"For go_build, go_test and go_vet, `args` may name the package pattern to run against; it REPLACES " +
+			"the default ./... rather than adding to it, so scoping to your own package will not run anyone else's.",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"required": ["check"],
@@ -182,8 +217,12 @@ func VerifierTool(cfg VerifierConfig) tooldispatch.ToolDef {
 				report(VerifierOutcomeError)
 				return "", fmt.Errorf("verifier_run %s: %w", name, err)
 			}
+			// Applied BEFORE both the counter and the JSON, so the two cannot
+			// disagree about whether the check passed. A downgrade that reached
+			// only one of them would be a worse defect than the one it fixes.
+			res, note := applyOutputAssertion(check, res)
 			report(verifierOutcome(res))
-			return encodeVerifierResult(name, res, cfg.MaxOutputBytes)
+			return encodeVerifierResultWithNote(name, res, cfg.MaxOutputBytes, note)
 		},
 	}
 }
@@ -224,6 +263,33 @@ func verifierOutcome(res sandbox.Result) string {
 //
 //nolint:gocritic // hugeParam: sandbox.Result is a value type by design
 func encodeVerifierResult(check string, res sandbox.Result, maxOutputBytes int) (string, error) {
+	return encodeVerifierResultWithNote(check, res, maxOutputBytes, "")
+}
+
+// applyOutputAssertion enforces VerifierCheck.RequireEmptyOutput.
+//
+// A lister reports what it found on stdout and exits 0 either way, so its exit
+// code carries no verdict at all. Where a check declares that any output is a
+// failure, the result is downgraded here — once, before the counter and the
+// agent-visible JSON are both derived from it.
+//
+//nolint:gocritic // hugeParam: sandbox.Result is a value type by design
+func applyOutputAssertion(check VerifierCheck, res sandbox.Result) (sandbox.Result, string) {
+	if !check.RequireEmptyOutput || res.Outcome != sandbox.OutcomePassed {
+		return res, ""
+	}
+	if strings.TrimSpace(res.Output) == "" {
+		return res, ""
+	}
+	res.Outcome = sandbox.OutcomeFailed
+	return res, "check " + check.Name + " exited 0 but printed output, and this check treats any output as a failure; output_excerpt lists what it found"
+}
+
+// encodeVerifierResultWithNote is encodeVerifierResult plus the reason for a
+// verdict the exit code does not explain.
+//
+//nolint:gocritic // hugeParam: sandbox.Result is a value type by design
+func encodeVerifierResultWithNote(check string, res sandbox.Result, maxOutputBytes int, note string) (string, error) {
 	out := VerifierResult{
 		Check:      check,
 		Command:    res.Command,
@@ -234,6 +300,7 @@ func encodeVerifierResult(check string, res sandbox.Result, maxOutputBytes int) 
 		Truncated:  res.Truncated,
 		OutputSize: res.OutputSize,
 		Output:     truncateBytes(res.Output, maxOutputBytes),
+		Note:       note,
 	}
 	// Truncating for the model is itself a truncation, even when the sandbox
 	// retained everything it saw.
@@ -296,7 +363,14 @@ func buildVerifierArgv(check VerifierCheck, extra []string, workspaceMount strin
 			extra[i] = canon
 		}
 	}
-	argv = append(argv, extra...)
+	// The caller's target REPLACES the default one. Appending the two is how
+	// `go test ./...` plus a package pattern became "the whole tree, and then
+	// that package as well" — see VerifierCheck.DefaultScope.
+	if len(extra) > 0 {
+		argv = append(argv, extra...)
+	} else {
+		argv = append(argv, check.DefaultScope...)
+	}
 	if err := sandbox.ValidateArgv(check.Command, argv); err != nil {
 		return nil, fmt.Errorf("verifier_run: check %q: %w", check.Name, err)
 	}
