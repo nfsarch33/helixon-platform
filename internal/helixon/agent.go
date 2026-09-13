@@ -43,6 +43,7 @@ type RuntimeConfig struct {
 	Provider                ProviderConfig
 	SprintboardURL          string
 	SprintboardCapabilities string
+	SprintboardToken        string
 	Logger                  *slog.Logger
 	// Sandbox describes the execution boundary for tool calls.
 	Sandbox sandbox.Config

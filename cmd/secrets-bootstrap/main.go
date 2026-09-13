@@ -121,6 +121,10 @@ var serviceMap = map[string][]EnvEntry{
 	// alert. A direct field read cannot drift the same way.
 	"fleet-agent": {
 		{EnvVar: "LLM_ROUTER_TOKEN", ItemEnv: "HLXN_OP_ITEM_LLM_ROUTER", Field: "password"},
+		// v18836: the agent's board client sends the board's shared bearer;
+		// same item and field the sprintboard-api service reads, so the two
+		// sides cannot drift onto different credentials.
+		{EnvVar: "SPRINTBOARD_API_TOKEN", ItemEnv: "HLXN_OP_ITEM_SPRINTBOARD", Field: "password"},
 	},
 	// v18778: evospined (the EvoSpine DRL runtime) is the THIRD caller of
 	// the local llm-cluster-router, and the only one secrets-bootstrap did
@@ -477,9 +481,11 @@ func bootstrapServiceEnv(name, outPath string, timeoutSec int, strict bool) erro
 		}
 		// formatEnvLine signals a failed op read by returning a comment
 		// line rather than an assignment; that is the only signal available
-		// without changing its contract, which other callers rely on.
-		if strings.HasPrefix(line, "# ") {
-			unresolved = append(unresolved, e.EnvVar)
+		// without changing its contract, which other callers rely on. A
+		// read that SUCCEEDED and returned nothing is the other way a unit
+		// starts without its credential, and --strict refuses that too.
+		if why := unresolvedReason(line); why != "" {
+			unresolved = append(unresolved, e.EnvVar+" ("+why+")")
 		}
 		fmt.Fprint(w, line)
 	}
@@ -510,6 +516,22 @@ func bootstrapServiceEnv(name, outPath string, timeoutSec int, strict bool) erro
 	}
 	_ = syscall.Chmod(outPath, 0600)
 	return nil
+}
+
+// unresolvedReason classifies one rendered env line for --strict. A comment
+// line is a failed op read ("unavailable"). A KEY="" assignment is a read that
+// succeeded against an unpopulated field ("empty"): the unit that sources the
+// file cannot tell it from a missing credential, and a service that sends an
+// empty bearer is rejected, not treated as anonymous. Anything else is
+// resolved. Non-strict rendering is unchanged.
+func unresolvedReason(line string) string {
+	if strings.HasPrefix(line, "# ") {
+		return "unavailable"
+	}
+	if strings.HasSuffix(strings.TrimRight(line, "\n"), `=""`) {
+		return "empty"
+	}
+	return ""
 }
 
 // resolveField maps "_extract" sentinel field to "notesPlain" for op-read API.

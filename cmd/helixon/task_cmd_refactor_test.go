@@ -41,7 +41,7 @@ func TestClaimAndBuildPrompt_PreservesExplicitPrompt(t *testing.T) {
 
 func TestBuildSprintboardClient_NilWhenURLEmpty(t *testing.T) {
 	t.Parallel()
-	got := buildSprintboardClient("", "agent-x")
+	got := buildSprintboardClient("", "", "agent-x")
 	if got != nil {
 		t.Fatalf("expected nil client for empty URL, got %+v", got)
 	}
@@ -49,7 +49,7 @@ func TestBuildSprintboardClient_NilWhenURLEmpty(t *testing.T) {
 
 func TestBuildSprintboardClient_BuiltWhenURLSet(t *testing.T) {
 	t.Parallel()
-	got := buildSprintboardClient("http://localhost:8787", "agent-x")
+	got := buildSprintboardClient("http://localhost:8787", "", "agent-x")
 	if got == nil {
 		t.Fatal("expected non-nil client when URL set")
 	}

@@ -49,7 +49,7 @@ func runTaskPipeline(ctx context.Context, args taskArgs, _ taskDeps, out io.Writ
 	if rt == nil {
 		return fmt.Errorf("task requires a configured LLM provider (kind != none)")
 	}
-	sbClient := buildSprintboardClient(cfg.SprintboardURL, cfg.AgentID)
+	sbClient := buildSprintboardClient(cfg.SprintboardURL, cfg.SprintboardToken, cfg.AgentID)
 	if sbClient != nil && args.ticketID != "" {
 		_ = sbClient.ClaimTicket(ctx, args.ticketID)
 	}
@@ -119,13 +119,14 @@ func claimAndBuildPrompt(ticketID, prompt string) string {
 // buildSprintboardClient returns a configured SprintboardClient when
 // sprintboardURL is non-empty, otherwise nil. Returns nil when the
 // configured URL is empty (the legacy "no Sprintboard" mode).
-func buildSprintboardClient(sprintboardURL, agentID string) *controlplane.SprintboardClient {
+func buildSprintboardClient(sprintboardURL, token, agentID string) *controlplane.SprintboardClient {
 	if sprintboardURL == "" {
 		return nil
 	}
 	return controlplane.NewSprintboardClient(controlplane.SprintboardConfig{
 		BaseURL:   sprintboardURL,
 		AgentName: agentID,
+		Token:     token,
 	}, slog.Default())
 }
 

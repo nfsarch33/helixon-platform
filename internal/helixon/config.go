@@ -130,10 +130,21 @@ type TicketsFileConfig struct {
 	Limit         int      `yaml:"limit"`
 }
 
+// MinSprintboardTokenBytes mirrors the board's own minimum for its shared
+// bearer; a shorter value is refused at config load rather than at the first
+// 401.
+const MinSprintboardTokenBytes = 32
+
 // SprintboardFileConfig is the YAML shape for sprintboard integration.
 type SprintboardFileConfig struct {
 	URL          string `yaml:"url"`
 	Capabilities string `yaml:"capabilities"`
+	// Token is the shared bearer the board expects; "${VAR}" is expanded from
+	// the environment. A non-empty value must be at least 32 bytes. An EMPTY
+	// expansion -- what the secret bootstrap renders for an unpopulated vault
+	// field -- means no token: the client then sends no Authorization header
+	// at all, and the board's own auth mode decides whether that is allowed.
+	Token string `yaml:"token"`
 }
 
 // RegistraFileConfig is the YAML shape for the service-registry wiring.
@@ -298,6 +309,20 @@ func (fc FileConfig) ToRuntimeConfig() (RuntimeConfig, error) {
 	cfg.Provider = fc.Provider
 	cfg.SprintboardURL = fc.Sprintboard.URL
 	cfg.SprintboardCapabilities = fc.Sprintboard.Capabilities
+	if fc.Sprintboard.Token != "" {
+		tok, err := expandEnvNamed(fc.Sprintboard.Token, "sprintboard.token")
+		if err != nil {
+			return RuntimeConfig{}, err
+		}
+		// Empty is "no token", so the config can be deployed ahead of the
+		// credential (serve warns loudly at start-up). Present-but-short is a
+		// misconfiguration and is refused here rather than at the first 401.
+		if tok != "" && len(tok) < MinSprintboardTokenBytes {
+			return RuntimeConfig{}, fmt.Errorf("helixon: sprintboard.token resolves to %d bytes; the board requires at least %d "+
+				"(an empty expansion means no token; a present token must be usable)", len(tok), MinSprintboardTokenBytes)
+		}
+		cfg.SprintboardToken = tok
+	}
 	if fc.Provider.TimeoutString != "" {
 		d, err := time.ParseDuration(fc.Provider.TimeoutString)
 		if err != nil {
