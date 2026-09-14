@@ -83,14 +83,28 @@ func TestSprintboardToken_ShortIsRefused(t *testing.T) {
 	}
 }
 
-func TestSprintboardToken_UnsetEnvNamesTheField(t *testing.T) {
+// An UNSET variable is "no token", not an error. This is the case that took
+// the agent down: the config comment promises an empty expansion means "send
+// no header", but an unprovisioned credential arrives as an UNSET variable and
+// the strict expansion rejected it, so `serve` refused to start and
+// restart-looped until the config was rolled back.
+func TestSprintboardToken_UnsetEnvMeansNoToken(t *testing.T) {
 	t.Parallel()
-	_, err := decodeSprintboard(t, `"${HLXN_TEST_BOARD_TOKEN_NEVER_SET_V18836}"`)
-	if err == nil || !strings.Contains(err.Error(), "sprintboard.token env var") {
-		t.Fatalf("error must name sprintboard.token, not api_key: %v", err)
+	cfg, err := decodeSprintboard(t, `"${HLXN_TEST_BOARD_TOKEN_NEVER_SET_V18836}"`)
+	if err != nil {
+		t.Fatalf("an unset board bearer must load as no token, got: %v", err)
 	}
-	if strings.Contains(err.Error(), "api_key") {
-		t.Fatalf("error blames api_key for a sprintboard.token failure: %v", err)
+	if cfg.SprintboardToken != "" {
+		t.Fatalf("token = %q, want empty", cfg.SprintboardToken)
+	}
+}
+
+// ... and the strictness it does NOT inherit is still in force for api_key,
+// where a vanished credential must remain fatal.
+func TestExpandEnv_APIKeyStillFatalWhenUnset(t *testing.T) {
+	t.Parallel()
+	if _, err := expandEnv("${HLXN_TEST_NEVER_SET_V18836_APIKEY2}"); err == nil {
+		t.Fatal("an unset api_key must still be an error")
 	}
 }
 
