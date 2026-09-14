@@ -310,7 +310,10 @@ func (fc FileConfig) ToRuntimeConfig() (RuntimeConfig, error) {
 	cfg.SprintboardURL = fc.Sprintboard.URL
 	cfg.SprintboardCapabilities = fc.Sprintboard.Capabilities
 	if fc.Sprintboard.Token != "" {
-		tok, err := expandEnvNamed(fc.Sprintboard.Token, "sprintboard.token")
+		// Optional: an UNSET variable is "no token", the same as an empty one.
+		// Anything stricter makes the config undeployable until the credential
+		// exists, which is the opposite of what its comment promises.
+		tok, err := expandEnvOptional(fc.Sprintboard.Token, "sprintboard.token")
 		if err != nil {
 			return RuntimeConfig{}, err
 		}

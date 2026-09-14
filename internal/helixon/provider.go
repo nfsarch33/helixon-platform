@@ -66,6 +66,32 @@ func expandEnv(v string) (string, error) {
 	return expandEnvNamed(v, "api_key")
 }
 
+// expandEnvOptional is expandEnvNamed for a credential whose ABSENCE is a
+// supported state. An unset variable resolves to "" instead of an error.
+//
+// It exists because the two are not the same thing and the difference decides
+// whether a service starts. The board bearer's config comment promises that an
+// empty expansion means "send no header", but what the secret bootstrap
+// produces for an unprovisioned credential is an UNSET variable, not an empty
+// one -- and expandEnvNamed rejects that. Deploying the config on that promise
+// crash-looped the fleet agent until it was rolled back.
+//
+// This is deliberately NOT the default. A provider api_key that vanishes must
+// still be fatal: the router refuses to boot when an auth_header node's key
+// expands empty, and the alternative is a service that looks healthy and 401s
+// on its first real request hours later.
+func expandEnvOptional(v, field string) (string, error) {
+	v = strings.TrimSpace(v)
+	if !strings.HasPrefix(v, "${") || !strings.HasSuffix(v, "}") {
+		return v, nil
+	}
+	name := strings.TrimSuffix(strings.TrimPrefix(v, "${"), "}")
+	if name == "" {
+		return "", fmt.Errorf("helixon: empty env var reference in %s", field)
+	}
+	return os.Getenv(name), nil
+}
+
 // expandEnvNamed is expandEnv with the config field named in every error, so
 // a sprintboard.token failure cannot read as an api_key one. A variable that
 // is set but EMPTY passes through as ""; callers that need a non-empty value

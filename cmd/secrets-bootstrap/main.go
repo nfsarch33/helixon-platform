@@ -86,6 +86,17 @@ type EnvEntry struct {
 	FieldEnv string
 	Field    string
 	Extract  string // if set, apply this regex to op-read notesPlain value (use first capture group)
+	// Optional marks a credential whose ABSENCE is a supported state, so
+	// --strict does not fail the whole service for it. The line is still
+	// rendered, so the consumer sees the variable set-and-empty rather than
+	// missing -- the difference decides whether a config that treats "empty"
+	// as a supported state can actually reach that state.
+	//
+	// Use it only where the consuming code genuinely tolerates the absence.
+	// The router token is NOT optional: a fleet agent that starts without it
+	// looks healthy and 401s on its first claimed ticket, hours later, with
+	// the ticket already taken.
+	Optional bool
 }
 
 var serviceMap = map[string][]EnvEntry{
@@ -124,7 +135,12 @@ var serviceMap = map[string][]EnvEntry{
 		// v18836: the agent's board client sends the board's shared bearer;
 		// same item and field the sprintboard-api service reads, so the two
 		// sides cannot drift onto different credentials.
-		{EnvVar: "SPRINTBOARD_API_TOKEN", ItemEnv: "HLXN_OP_ITEM_SPRINTBOARD", Field: "password"},
+		//
+		// Optional until the field is provisioned. Without this, --strict on
+		// this unit deletes the whole env file over a credential the agent is
+		// designed to run without -- taking the router token with it and
+		// failing ExecStartPre, so the unit never starts at all.
+		{EnvVar: "SPRINTBOARD_API_TOKEN", ItemEnv: "HLXN_OP_ITEM_SPRINTBOARD", Field: "password", Optional: true},
 	},
 	// v18778: evospined (the EvoSpine DRL runtime) is the THIRD caller of
 	// the local llm-cluster-router, and the only one secrets-bootstrap did
@@ -485,7 +501,13 @@ func bootstrapServiceEnv(name, outPath string, timeoutSec int, strict bool) erro
 		// read that SUCCEEDED and returned nothing is the other way a unit
 		// starts without its credential, and --strict refuses that too.
 		if why := unresolvedReason(line); why != "" {
-			unresolved = append(unresolved, e.EnvVar+" ("+why+")")
+			if e.Optional {
+				// Named, never silent: an operator reading the log must be
+				// able to tell "not provisioned yet" from "resolved fine".
+				fmt.Fprintf(os.Stderr, "optional %s: %s (service continues)\n", e.EnvVar, why)
+			} else {
+				unresolved = append(unresolved, e.EnvVar+" ("+why+")")
+			}
 		}
 		fmt.Fprint(w, line)
 	}
