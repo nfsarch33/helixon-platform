@@ -105,3 +105,32 @@ func TestExpandEnv_APIKeyMessagesUnchanged(t *testing.T) {
 		t.Fatalf("unset message changed: %v", err)
 	}
 }
+
+// The two sides of the shared bearer must agree on the same bytes. The board
+// trims what it reads from this variable; the secret bootstrap renders the
+// vault field with %q, so whitespace around a provisioned value survives into
+// the environment. If only one side trims, every write is a 401 whose cause is
+// invisible from either side's logs.
+func TestSprintboardToken_ResolvedValueIsTrimmed(t *testing.T) {
+	t.Setenv("HLXN_TEST_BOARD_TOKEN_PADDED", "  "+goodBoardToken+"\n")
+	cfg, err := decodeSprintboard(t, `"${HLXN_TEST_BOARD_TOKEN_PADDED}"`)
+	if err != nil {
+		t.Fatalf("ToRuntimeConfig: %v", err)
+	}
+	if cfg.SprintboardToken != goodBoardToken {
+		t.Fatalf("token = %q, want the trimmed value %q", cfg.SprintboardToken, goodBoardToken)
+	}
+}
+
+// A value that is ONLY whitespace is no token, not a short one: it must load
+// as absent (no header) rather than trip the length check.
+func TestSprintboardToken_WhitespaceOnlyIsNoToken(t *testing.T) {
+	t.Setenv("HLXN_TEST_BOARD_TOKEN_BLANK", "   \t\n")
+	cfg, err := decodeSprintboard(t, `"${HLXN_TEST_BOARD_TOKEN_BLANK}"`)
+	if err != nil {
+		t.Fatalf("a whitespace-only token must load as no token, got: %v", err)
+	}
+	if cfg.SprintboardToken != "" {
+		t.Fatalf("token = %q, want empty", cfg.SprintboardToken)
+	}
+}
