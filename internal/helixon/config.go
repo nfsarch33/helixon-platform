@@ -314,6 +314,14 @@ func (fc FileConfig) ToRuntimeConfig() (RuntimeConfig, error) {
 		if err != nil {
 			return RuntimeConfig{}, err
 		}
+		// Trim the RESOLVED value, not just the placeholder. The board trims
+		// what it reads from the same variable, and the secret bootstrap
+		// renders the vault field with %q, so whitespace around the
+		// provisioned value would otherwise reach the board as part of the
+		// bearer and fail a constant-time comparison against the trimmed
+		// form -- a 401 on every write whose cause appears in neither side's
+		// logs. Both ends must agree on the same bytes.
+		tok = strings.TrimSpace(tok)
 		// Empty is "no token", so the config can be deployed ahead of the
 		// credential (serve warns loudly at start-up). Present-but-short is a
 		// misconfiguration and is refused here rather than at the first 401.
