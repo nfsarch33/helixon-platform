@@ -181,7 +181,7 @@ This ADR commits the schema only. Implementation lives in v14510+:
 
 ## References
 
-- `internal/helixon/controlplane/heartbeat.go` — heartbeat payload schema (already exists)
+- heartbeat payload schema — REMOVED (v18839). The type was never constructed outside its own tests and posted to a route the control plane does not serve. Agent liveness is reported through the registration call in `internal/helixon/controlplane/sprintboard.go`.
 - `charts/helixon-control-plane/values.yaml` — chart config (already exists)
 - `session-handoffs/v14509-handoff.md` — sprint closeout
 - `cursor-global-kb/decisions/driftctl-eol-2026-07-09.md` — sibling ADR-style decision doc

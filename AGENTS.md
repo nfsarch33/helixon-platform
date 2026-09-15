@@ -46,7 +46,7 @@ internal/
     agent/             Agent loop + session store (SQLite + FTS5)
     builtins/          Built-in tools (shell, file read/write, web fetch)
     channel/           Channel adapters (MCP stdio, REPL, webhook)
-    controlplane/      SprintBoard client, heartbeat monitor, A2A client
+    controlplane/      SprintBoard client, A2A client
     dashboard/         HTTP dashboard views
     fleet/             Fleet task handler, delegation, reports, retry logic, durable task store (SQLite lease/reclaim)
     memory/            Engram, Mem0, workspace, hybrid memory
