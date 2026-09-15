@@ -14,17 +14,24 @@ repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
-      # Override the default gitleaks hook entry point to scan the entire
-      # git history (not just staged files). The upstream `id: gitleaks` hook
-      # uses `gitleaks protect --staged` which only sees staged-but-uncommitted
-      # changes. For pre-push we want full-history scanning so committed secrets
-      # are detected too.
+      # Override the default gitleaks hook entry point to scan committed
+      # history (not just staged files). The upstream `id: gitleaks` hook uses
+      # `gitleaks protect --staged`, which only sees staged-but-uncommitted
+      # changes, so committed secrets would slip past.
+      #
+      # --log-opts=HEAD scopes the walk to the history reachable from HEAD.
+      # Without it gitleaks runs `git log -p -U0 --full-history --all`, i.e.
+      # every ref the local clone happens to hold -- so a finding on an
+      # unrelated local branch blocks a push that does not contain it, and the
+      # scope depends on which branches a developer has lying around rather
+      # than on what is being pushed. Scoping to HEAD is strictly safer than a
+      # range: it still covers the whole history being published.
       - id: gitleaks
         name: Gitleaks (full-history scan)
         stages: [pre-push]
         # Override the entry: scan the entire repo with our custom ruleset.
         # --no-banner keeps output clean; --redact hides the secret in logs.
-        entry: gitleaks detect --no-banner --redact --config .gitleaks.toml --source .
+        entry: gitleaks detect --no-banner --redact --config .gitleaks.toml --source . --log-opts=HEAD
         language: golang
         # pre-push scans the entire repo, not per-file.
         pass_filenames: false
@@ -36,8 +43,16 @@ repos:
         name: TruffleHog (live verification)
         # Verify the key still works on the upstream provider. --only-verified
         # cuts noise from test fixtures + synthetic keys. --fail exits non-zero
-        # when a verified live secret is found.
-        entry: trufflehog git file://. --since-commit HEAD --only-verified --fail
+        # when a verified live secret is found. --no-update keeps the hook from
+        # reaching out to upgrade itself mid-push.
+        #
+        # Was: `trufflehog git file://. --since-commit HEAD --only-verified --fail`.
+        # TruffleHog's range is since..tip, EXCLUSIVE of since, so since=HEAD is
+        # the EMPTY range: the hook scanned nothing and passed every push since
+        # it was added. The same flag was measured elsewhere in this estate as
+        # 0 chunks / 0 bytes scanned while the history under test held verified
+        # live credentials. A hook that cannot fail is not a gate.
+        entry: trufflehog git file://. --only-verified --fail --no-update
         language: system
         stages: [pre-push]
         # TruffleHog scans the entire repo, not per-file.

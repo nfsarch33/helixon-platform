@@ -207,6 +207,13 @@ declare -a scan_args=(
 [ -f "$CONFIG_PATH" ] && scan_args+=(--config "$CONFIG_PATH")
 [ -f "$IGNORE_PATH" ] && scan_args+=(--gitleaks-ignore-path "$IGNORE_PATH")
 
+# Scope the walk to history reachable from HEAD, matching the pre-push hook in
+# .pre-commit-config.yaml. Without it gitleaks walks every ref present in the
+# checkout; at fetch-depth 0 that is one remote-tracking ref per branch, so CI
+# and the hook would disagree about what got scanned and a finding on an
+# unrelated branch would fail an unrelated pipeline.
+scan_args+=(--log-opts=HEAD)
+
 log "scanning ${SOURCE_DIR} (full history)"
 set +e
 "$GITLEAKS_BIN" "${scan_args[@]}"
