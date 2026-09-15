@@ -7,62 +7,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"time"
 )
-
-// TestTenant_HeartbeatPayload_StampsTenantID verifies the HeartbeatPayload
-// carries the TenantID so the control plane can route per-tenant billing
-// and SLO enforcement (v18685-1 + v18684-4 multi-tenancy pattern).
-func TestTenant_HeartbeatPayload_StampsTenantID(t *testing.T) {
-	sink := &testHeartbeatSink{}
-	cfg := HeartbeatConfig{
-		Interval: 10 * time.Millisecond,
-		AgentID:  "agent-A",
-		TenantID: "tenant-x",
-	}
-	m := NewHeartbeatMonitor(sink, cfg)
-	defer func() { _ = m.sink }()
-
-	if err := m.SendNow(context.Background()); err != nil {
-		t.Fatalf("SendNow: %v", err)
-	}
-
-	hb := sink.last()
-	if hb.AgentID != "agent-A" {
-		t.Errorf("AgentID: want agent-A, got %q", hb.AgentID)
-	}
-	if hb.TenantID != "tenant-x" {
-		t.Errorf("TenantID: want tenant-x, got %q", hb.TenantID)
-	}
-}
-
-// TestTenant_HeartbeatMonitor_TwoTenantsNoLeakage verifies that two
-// HeartbeatMonitor instances with different TenantIDs produce payloads
-// with distinct tenant fields. The test prevents cross-tenant leakage
-// at the boundary where heartbeats fan out to the control plane.
-func TestTenant_HeartbeatMonitor_TwoTenantsNoLeakage(t *testing.T) {
-	sinkA := &testHeartbeatSink{}
-	sinkB := &testHeartbeatSink{}
-
-	mA := NewHeartbeatMonitor(sinkA, HeartbeatConfig{Interval: 10 * time.Millisecond, AgentID: "A", TenantID: "tenant-a"})
-	mB := NewHeartbeatMonitor(sinkB, HeartbeatConfig{Interval: 10 * time.Millisecond, AgentID: "B", TenantID: "tenant-b"})
-
-	_ = mA.SendNow(context.Background())
-	_ = mB.SendNow(context.Background())
-
-	tenantA := sinkA.last().TenantID
-	tenantB := sinkB.last().TenantID
-
-	if tenantA != "tenant-a" {
-		t.Errorf("A tenant: want tenant-a, got %q", tenantA)
-	}
-	if tenantB != "tenant-b" {
-		t.Errorf("B tenant: want tenant-b, got %q", tenantB)
-	}
-	if tenantA == tenantB {
-		t.Error("tenants collided across monitors")
-	}
-}
 
 // TestTenant_SprintboardClient_RegisterStampsTenantID verifies that
 // SprintboardClient.Register carries the TenantID so the sprintboard

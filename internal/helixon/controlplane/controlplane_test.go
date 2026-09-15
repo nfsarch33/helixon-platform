@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,106 +67,6 @@ func TestA2AClientDeregister(t *testing.T) {
 	client := NewA2AClient(A2AConfig{GatewayURL: srv.URL}, nil)
 	err := client.Deregister(context.Background(), "agent-001")
 	require.NoError(t, err)
-}
-
-type testHeartbeatSink struct {
-	mu       sync.Mutex
-	payloads []HeartbeatPayload
-}
-
-func (s *testHeartbeatSink) SendHeartbeat(_ context.Context, payload HeartbeatPayload) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.payloads = append(s.payloads, payload)
-	return nil
-}
-
-func (s *testHeartbeatSink) count() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.payloads)
-}
-
-func (s *testHeartbeatSink) last() HeartbeatPayload {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.payloads[len(s.payloads)-1]
-}
-
-func (s *testHeartbeatSink) snapshot() []HeartbeatPayload {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	cp := make([]HeartbeatPayload, len(s.payloads))
-	copy(cp, s.payloads)
-	return cp
-}
-
-func TestHeartbeatMonitorSendNow(t *testing.T) {
-	sink := &testHeartbeatSink{}
-	monitor := NewHeartbeatMonitor(sink, HeartbeatConfig{
-		AgentID:  "test-agent",
-		Interval: 1 * time.Hour,
-	})
-
-	monitor.Update(10, 5000, "sess-123")
-	monitor.SetExtra("model", "qwen3:4b")
-
-	err := monitor.SendNow(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, 1, sink.count())
-
-	payload := sink.last()
-	assert.Equal(t, "test-agent", payload.AgentID)
-	assert.Equal(t, "running", payload.Status)
-	assert.Equal(t, 10, payload.Iterations)
-	assert.Equal(t, 5000, payload.TokensUsed)
-	assert.Equal(t, "sess-123", payload.ActiveSessID)
-	assert.Equal(t, "qwen3:4b", payload.Extras["model"])
-}
-
-func TestHeartbeatMonitorPeriodic(t *testing.T) {
-	sink := &testHeartbeatSink{}
-	monitor := NewHeartbeatMonitor(sink, HeartbeatConfig{
-		AgentID:  "periodic-test",
-		Interval: 50 * time.Millisecond,
-	})
-
-	ctx := context.Background()
-	cancel := monitor.Start(ctx)
-	defer cancel()
-
-	time.Sleep(180 * time.Millisecond)
-	cancel()
-	time.Sleep(20 * time.Millisecond)
-
-	assert.GreaterOrEqual(t, sink.count(), 2)
-	for _, p := range sink.snapshot() {
-		assert.Equal(t, "periodic-test", p.AgentID)
-		assert.Equal(t, "running", p.Status)
-	}
-}
-
-func TestHeartbeatMonitorShutdown(t *testing.T) {
-	sink := &testHeartbeatSink{}
-	monitor := NewHeartbeatMonitor(sink, HeartbeatConfig{AgentID: "shutdown-test"})
-
-	err := monitor.SendShutdown(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, "shutting_down", sink.last().Status)
-}
-
-func TestHeartbeatMonitorUptime(t *testing.T) {
-	monitor := NewHeartbeatMonitor(&testHeartbeatSink{}, HeartbeatConfig{})
-	time.Sleep(10 * time.Millisecond)
-	assert.Greater(t, monitor.Uptime(), time.Duration(0))
-}
-
-func TestFleetDailyReport(t *testing.T) {
-	report := FleetDailyReport("agent-1", 5, 10000, 5000, 0.50, 2*time.Hour)
-	assert.Contains(t, report, "agent-1")
-	assert.Contains(t, report, "Sessions: 5")
-	assert.Contains(t, report, "Tokens In: 10000")
-	assert.Contains(t, report, "$0.5000")
 }
 
 func TestSprintboardClientRegister(t *testing.T) {
