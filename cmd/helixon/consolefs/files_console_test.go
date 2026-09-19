@@ -24,7 +24,7 @@ func TestHandler_ServesTheExport(t *testing.T) {
 	}
 	srv := httptest.NewServer(Handler())
 	t.Cleanup(srv.Close)
-	for _, path := range []string{Prefix, Prefix + "runs/", Prefix + "evals/", Prefix + "costs/", Prefix + "memory/", Prefix + "runs/detail/"} {
+	for _, path := range []string{Prefix, Prefix + "runs/", Prefix + "board/", Prefix + "evals/", Prefix + "costs/", Prefix + "memory/", Prefix + "runs/detail/"} {
 		resp, err := http.Get(srv.URL + path)
 		if err != nil {
 			t.Fatal(err)
