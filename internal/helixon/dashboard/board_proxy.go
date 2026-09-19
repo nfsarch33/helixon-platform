@@ -19,16 +19,20 @@ import (
 // reverse proxy cannot grow into an open one by accident of pattern matching.
 type BoardProxy struct {
 	baseURL string
+	token   string
 	client  *http.Client
 }
 
-// NewBoardProxy creates a proxy for the board at baseURL.
-func NewBoardProxy(baseURL string) *BoardProxy {
+// NewBoardProxy creates a proxy for the board at baseURL. token is the
+// board's shared bearer (SPRINTBOARD_API_TOKEN); empty means the board is
+// running unauthenticated and no Authorization header is sent.
+func NewBoardProxy(baseURL, token string) *BoardProxy {
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:9400"
 	}
 	return &BoardProxy{
 		baseURL: baseURL,
+		token:   token,
 		client:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -38,11 +42,11 @@ func NewBoardProxy(baseURL string) *BoardProxy {
 //   - GET  /api/v1/board/sprints/{id}/tickets
 //   - POST /api/v1/board/tickets/{id}/requeue
 //   - POST /api/v1/board/tickets/{id}/resolve
-func MountBoardProxy(mux *http.ServeMux, baseURL string) {
+func MountBoardProxy(mux *http.ServeMux, baseURL, token string) {
 	if mux == nil {
 		return
 	}
-	p := NewBoardProxy(baseURL)
+	p := NewBoardProxy(baseURL, token)
 	mux.HandleFunc("GET /api/v1/board/sprints", p.forward("GET", "/api/v1/sprints"))
 	mux.HandleFunc("GET /api/v1/board/sprints/{id}/tickets",
 		p.forward("GET", "/api/v1/sprints/{id}/tickets"))
@@ -78,6 +82,9 @@ func (p *BoardProxy) serve(w http.ResponseWriter, r *http.Request, method, board
 		req.ContentLength = r.ContentLength
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if p.token != "" {
+		req.Header.Set("Authorization", "Bearer "+p.token)
+	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {

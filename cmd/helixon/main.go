@@ -361,7 +361,9 @@ func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Write
 	// The operator verbs for the console's board page (v18850): same-origin
 	// proxy to the board. Claim/complete are not proxied -- agents talk to the
 	// board directly.
-	dashboard.MountBoardProxy(mux, dcfg.SprintboardURL)
+	// The board's shared bearer (bootstrap/required auth, v18836/v18851); empty
+	// when unprovisioned, and then no Authorization header is sent.
+	dashboard.MountBoardProxy(mux, dcfg.SprintboardURL, os.Getenv("SPRINTBOARD_API_TOKEN"))
 	// The operator console's read API (v18809): runs, costs, evals, memory.
 	// Locations come from the environment with conventional defaults; the
 	// console renders absence as absence, so an unset path is not an error.

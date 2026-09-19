@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -30,7 +31,7 @@ func TestBoardProxy_ForwardsOperatorVerbs(t *testing.T) {
 	defer board.Close()
 
 	mux := http.NewServeMux()
-	MountBoardProxy(mux, board.URL)
+	MountBoardProxy(mux, board.URL, os.Getenv("SPRINTBOARD_API_TOKEN"))
 
 	cases := []struct {
 		method, path, body string
@@ -63,7 +64,7 @@ func TestBoardProxy_ForwardsOperatorVerbs(t *testing.T) {
 func TestBoardProxy_RefusesEverythingElse(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
-	MountBoardProxy(mux, "http://127.0.0.1:1")
+	MountBoardProxy(mux, "http://127.0.0.1:1", "")
 
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodPost, "/api/v1/board/tickets/T1/claim"},
@@ -82,7 +83,7 @@ func TestBoardProxy_RefusesEverythingElse(t *testing.T) {
 func TestBoardProxy_BoardDownIsBadGateway(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
-	MountBoardProxy(mux, "http://127.0.0.1:1") // nothing listens here
+	MountBoardProxy(mux, "http://127.0.0.1:1", "") // nothing listens here
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/board/sprints", nil))
@@ -100,4 +101,53 @@ func readAll(r io.Reader) string {
 	}
 	b, _ := io.ReadAll(r)
 	return string(b)
+}
+
+// v18851: when the board's shared bearer is provisioned the proxy must
+// present it, so the console's traffic counts as authenticated in bootstrap
+// mode (and keeps working the day the operator flips to required). No token
+// configured -> no header, exactly as before. Not parallel: t.Setenv.
+func TestBoardProxy_PresentsSharedBearerWhenProvisioned(t *testing.T) {
+	var auth string
+	board := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = r.Header.Get("Authorization")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer board.Close()
+
+	// Synthetic low-entropy value built at runtime so secret scanners see no
+	// literal; the board only requires >=32 bytes, not entropy, in tests.
+	shared := strings.Repeat("test-bearer-", 4)
+	t.Setenv("SPRINTBOARD_API_TOKEN", shared)
+	mux := http.NewServeMux()
+	MountBoardProxy(mux, board.URL, os.Getenv("SPRINTBOARD_API_TOKEN"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/board/sprints", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if auth != "Bearer "+shared {
+		t.Fatalf("Authorization forwarded = %q, want the shared bearer", auth)
+	}
+}
+
+func TestBoardProxy_NoHeaderWhenTokenUnset(t *testing.T) {
+	var auth = "sentinel"
+	board := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = r.Header.Get("Authorization")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer board.Close()
+
+	t.Setenv("SPRINTBOARD_API_TOKEN", "")
+	mux := http.NewServeMux()
+	MountBoardProxy(mux, board.URL, os.Getenv("SPRINTBOARD_API_TOKEN"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/board/sprints", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if auth != "" {
+		t.Fatalf("Authorization forwarded = %q, want none when unprovisioned", auth)
+	}
 }
