@@ -152,6 +152,9 @@ type TicketPoller struct {
 
 	mu    sync.Mutex
 	stats TicketPollerStats
+	// nudge wakes the idle backoff early (buffered 1: a nudge while one is
+	// already pending coalesces; nobody needs two).
+	nudge chan struct{}
 	// reserved is the in-process lock set: a ticket in here is either in
 	// flight or permanently escalated, and is never claimed again.
 	reserved map[string]struct{}
@@ -200,6 +203,7 @@ func NewTicketPoller(cfg TicketPollerConfig, board TicketBoard, work TicketWorke
 		work:      work,
 		agentName: agentName,
 		logger:    logger.With(slog.String("component", "helixon.ticketpoll")),
+		nudge:     make(chan struct{}, 1),
 		reserved:  make(map[string]struct{}),
 	}
 	for _, opt := range opts {
@@ -213,6 +217,20 @@ func (p *TicketPoller) Stats() TicketPollerStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.stats
+}
+
+// Nudge asks the poll loop to poll the board immediately instead of waiting
+// out its idle backoff. It never blocks and never spawns a poll by itself:
+// it only shortens the wait, so a nudge storm cannot outrun the loop's own
+// concurrency slot discipline. Returns whether a nudge was delivered (false
+// only when one is already pending, which is the same thing).
+func (p *TicketPoller) Nudge() bool {
+	select {
+	case p.nudge <- struct{}{}:
+		return true
+	default:
+		return false
+	}
 }
 
 // Config returns the effective (defaulted) configuration.
@@ -264,6 +282,13 @@ func (p *TicketPoller) Run(ctx context.Context) error {
 				timer.Stop()
 				p.logger.Info("ticket poller stopping; draining in-flight tickets")
 				return nil
+			case <-p.nudge:
+				// An operator (or any caller) says work may be waiting --
+				// poll now instead of sitting out the idle backoff, and
+				// reset the backoff so the next idle wait starts from the
+				// configured interval, not from wherever it had doubled to.
+				timer.Stop()
+				backoff = p.cfg.Interval
 			case <-timer.C:
 			}
 		}

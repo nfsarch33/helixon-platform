@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useBoardSprints, useBoardTickets } from "../../lib/hooks";
-import { api, boardTerminal, type BoardTicket, type BoardTicketStatus } from "../../lib/api";
+import { api, ApiError, boardTerminal, type BoardTicket, type BoardTicketStatus } from "../../lib/api";
 import { Panel, EmptyState, ErrorState, Loading } from "../../components/States";
 import { StatusBadge } from "../../components/StatusBadge";
 import { fmtTime } from "../../lib/format";
@@ -10,6 +10,36 @@ import { fmtTime } from "../../lib/format";
 // see every ticket with its status, and act with the two human verbs --
 // requeue closed work that should not be closed, resolve open work a person
 // is taking over. Agents claim and complete; the console never does.
+
+// The launch button: poke the agent's ticket poller out of its idle backoff
+// so freshly created or requeued work is picked up in seconds. A 503 means
+// ticket polling is off on this agent -- render that reason, not silence.
+function PollNowButton() {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "off" | "err">("idle");
+  const [msg, setMsg] = useState<string>("");
+  async function pollNow() {
+    setState("busy");
+    setMsg("");
+    try {
+      await api.boardPollNow();
+      setState("done");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 503) setState("off");
+      else { setState("err"); setMsg(e instanceof Error ? e.message : String(e)); }
+    }
+  }
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <button type="button" onClick={pollNow} disabled={state === "busy"}
+        className="rounded bg-blue-100 px-3 py-1.5 font-medium text-blue-900 hover:bg-blue-200 disabled:opacity-50 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800">
+        Poll now
+      </button>
+      {state === "done" ? <span className="text-emerald-700 dark:text-emerald-300" role="status">poll scheduled</span> : null}
+      {state === "off" ? <span className="text-amber-700 dark:text-amber-300" role="status">ticket polling is off on this agent</span> : null}
+      {state === "err" ? <span className="text-rose-700 dark:text-rose-300" role="alert">{msg}</span> : null}
+    </div>
+  );
+}
 
 const statusOrder: BoardTicketStatus[] = ["in_progress", "ready", "review", "ready_for_handoff", "blocked", "backlog", "done", "resolved_by_human"];
 
@@ -27,7 +57,7 @@ export default function BoardPage() {
     <main className="mx-auto max-w-6xl space-y-4 p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-semibold">Ticket board</h1>
-        <p className="text-sm text-slate-500">requeue and resolve are the operator verbs; claiming is agent-side</p>
+        <PollNowButton />
       </header>
 
       <Panel title="Sprint">

@@ -89,3 +89,32 @@ describe("BoardPage", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("sprintboard unreachable"));
   });
 });
+
+describe("BoardPage poll-now", () => {
+  it("nudges the agent and confirms", async () => {
+    const posts: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/board/sprints")) return new Response(JSON.stringify(sprintList), { status: 200 });
+      if (url.includes("/tickets")) return new Response(JSON.stringify({ sprint_id: "s-live", tickets: [] }), { status: 200 });
+      if (url.endsWith("/poll-now")) { posts.push(String(init?.method)); return new Response(JSON.stringify({ status: "scheduled" }), { status: 202 }); }
+      return new Response("{}", { status: 404 });
+    }));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Poll now" }));
+    await waitFor(() => expect(screen.getByText("poll scheduled")).toBeInTheDocument());
+    expect(posts).toEqual(["POST"]);
+  });
+
+  it("says polling is off on a 503", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/poll-now")) return new Response(JSON.stringify({ error: "ticket polling is not enabled on this agent" }), { status: 503 });
+      if (url.endsWith("/api/v1/board/sprints")) return new Response(JSON.stringify(sprintList), { status: 200 });
+      return new Response(JSON.stringify({ sprint_id: "s-live", tickets: [] }), { status: 200 });
+    }));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Poll now" }));
+    await waitFor(() => expect(screen.getByText("ticket polling is off on this agent")).toBeInTheDocument());
+  });
+});

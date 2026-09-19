@@ -361,7 +361,18 @@ func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Write
 	// The operator verbs for the console's board page (v18850): same-origin
 	// proxy to the board. Claim/complete are not proxied -- agents talk to the
 	// board directly.
-	dashboard.MountBoardProxy(mux, dcfg.SprintboardURL)
+	// The board's shared bearer (bootstrap/required auth, v18836/v18851); empty
+	// when unprovisioned, and then no Authorization header is sent.
+	dashboard.MountBoardProxy(mux, dcfg.SprintboardURL, os.Getenv("SPRINTBOARD_API_TOKEN"))
+	// The console's launch button (v18851): wake the ticket poller's idle
+	// backoff so operator-created/requeued work is picked up in seconds, not
+	// after a backoff that doubles to minutes. Nil when polling is off, which
+	// the route reports as 503.
+	var pollNudge func() bool
+	if p := rt.TicketPoller(); p != nil {
+		pollNudge = p.Nudge
+	}
+	dashboard.MountPollNow(mux, pollNudge)
 	// The operator console's read API (v18809): runs, costs, evals, memory.
 	// Locations come from the environment with conventional defaults; the
 	// console renders absence as absence, so an unset path is not an error.

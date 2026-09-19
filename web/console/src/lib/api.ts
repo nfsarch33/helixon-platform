@@ -170,6 +170,8 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ actor, reason }),
     }),
+  boardPollNow: () =>
+    fetchJSON<{ status: string }>("/api/v1/board/poll-now", { method: "POST" }),
   boardResolve: (ticketID: string, actor: string, reason: string) =>
     fetchJSON<BoardTicket>(`/api/v1/board/tickets/${encodeURIComponent(ticketID)}/resolve`, {
       method: "POST",
