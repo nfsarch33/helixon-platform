@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -100,4 +101,30 @@ func (p *BoardProxy) serve(w http.ResponseWriter, r *http.Request, method, board
 	}
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4*1024*1024))
+}
+
+// MountPollNow registers POST /api/v1/board/poll-now — the console's launch
+// button. nudge is expected to be the ticket poller's Nudge; a nil nudge
+// means ticket polling is not enabled on this agent, and the route says so
+// with 503 rather than pretending a launch happened.
+func MountPollNow(mux *http.ServeMux, nudge func() bool) {
+	if mux == nil {
+		return
+	}
+	mux.HandleFunc("POST /api/v1/board/poll-now", func(w http.ResponseWriter, r *http.Request) {
+		if nudge == nil {
+			writeJSONErr(w, http.StatusServiceUnavailable, "ticket polling is not enabled on this agent")
+			return
+		}
+		nudge()
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = io.WriteString(w, `{"status":"poll scheduled immediately"}`)
+	})
+}
+
+// writeJSONErr keeps the 503 body the console's ApiError can render.
+func writeJSONErr(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_, _ = io.WriteString(w, `{"error":`+strconv.Quote(msg)+`}`)
 }

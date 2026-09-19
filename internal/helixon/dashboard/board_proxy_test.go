@@ -151,3 +151,45 @@ func TestBoardProxy_NoHeaderWhenTokenUnset(t *testing.T) {
 		t.Fatalf("Authorization forwarded = %q, want none when unprovisioned", auth)
 	}
 }
+
+// v18851 poll-now: the console needs a launch button. POST /api/v1/board/
+// poll-now nudges the ticket poller out of its idle backoff via a callback
+// supplied by main (the dashboard package must not import the runtime). When
+// ticket polling is not enabled the route answers 503 so the console can say
+// so instead of showing a button that silently does nothing.
+func TestPollNow_Nudges(t *testing.T) {
+	t.Parallel()
+	called := 0
+	mux := http.NewServeMux()
+	MountPollNow(mux, func() bool { called++; return true })
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/board/poll-now", nil))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", rec.Code)
+	}
+	if called != 1 {
+		t.Fatalf("nudge called %d times, want 1", called)
+	}
+}
+
+func TestPollNow_NoPollerAnswers503(t *testing.T) {
+	t.Parallel()
+	mux := http.NewServeMux()
+	MountPollNow(mux, nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/board/poll-now", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 when ticket polling is off", rec.Code)
+	}
+}
+
+func TestPollNow_RejectsNonPOST(t *testing.T) {
+	t.Parallel()
+	mux := http.NewServeMux()
+	MountPollNow(mux, func() bool { return true })
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/board/poll-now", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rec.Code)
+	}
+}
