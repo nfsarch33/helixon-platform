@@ -118,6 +118,41 @@ export async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T>
   return body as T;
 }
 
+// The ticket board, reached through the agent's operator-verb proxy
+// (internal/helixon/dashboard/board_proxy.go). Claim and complete are agent
+// verbs and are deliberately absent: the console drives the human side of
+// the loop (requeue closed work, resolve open work).
+export type BoardTicketStatus =
+  | "backlog" | "ready" | "in_progress" | "review" | "blocked"
+  | "ready_for_handoff" | "done" | "resolved_by_human";
+
+export interface BoardSprint {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+}
+
+export interface BoardTicket {
+  id: string;
+  sprint_id?: string;
+  title: string;
+  status: BoardTicketStatus;
+  priority: number;
+  labels?: string[];
+  claimed_by?: string;
+  acceptance_criteria?: string;
+  evidence?: string;
+  resolved_by?: string;
+  resolution_reason?: string;
+  updated_at?: string;
+}
+
+export interface BoardSprintsResponse { count: number; sprints: BoardSprint[] }
+export interface BoardTicketsResponse { sprint_id: string; tickets: BoardTicket[] }
+
+export const boardTerminal = (s: BoardTicketStatus) => s === "done" || s === "resolved_by_human";
+
 export const api = {
   dashboard: () => fetchJSON<DashboardResponse>("/api/v1/dashboard"),
   runs: (status?: RunStatus | "", limit = 100) =>
@@ -126,4 +161,19 @@ export const api = {
   costs: () => fetchJSON<CostsResponse>("/api/v1/costs"),
   evals: (limit = 20) => fetchJSON<EvalsResponse>(`/api/v1/evals?limit=${limit}`),
   memory: (q: string, limit = 10) => fetchJSON<MemoryResponse>(`/api/v1/memory/search?${new URLSearchParams({ q, limit: String(limit) })}`),
+  boardSprints: () => fetchJSON<BoardSprintsResponse>("/api/v1/board/sprints"),
+  boardTickets: (sprintID: string) =>
+    fetchJSON<BoardTicketsResponse>(`/api/v1/board/sprints/${encodeURIComponent(sprintID)}/tickets`),
+  boardRequeue: (ticketID: string, actor: string, reason: string) =>
+    fetchJSON<BoardTicket>(`/api/v1/board/tickets/${encodeURIComponent(ticketID)}/requeue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actor, reason }),
+    }),
+  boardResolve: (ticketID: string, actor: string, reason: string) =>
+    fetchJSON<BoardTicket>(`/api/v1/board/tickets/${encodeURIComponent(ticketID)}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actor, reason }),
+    }),
 };

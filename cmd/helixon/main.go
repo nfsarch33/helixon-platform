@@ -352,7 +352,16 @@ func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Write
 		return nil
 	}
 	mux := http.NewServeMux()
-	dashboard.Mount(mux, runtimeView{rt: rt})
+	// MountAll (not Mount): the console's overview panel links /api/v1/agents,
+	// /api/v1/cicd and /api/v1/sprint; Mount left all three 404ing on the
+	// running agent (v18848 §3.3). The fetchers default to the live board
+	// port; HLXN_SPRINTBOARD_URL overrides.
+	dcfg := dashboard.DashboardConfig{SprintboardURL: os.Getenv("HLXN_SPRINTBOARD_URL")}
+	dashboard.MountAll(mux, runtimeView{rt: rt}, dcfg)
+	// The operator verbs for the console's board page (v18850): same-origin
+	// proxy to the board. Claim/complete are not proxied -- agents talk to the
+	// board directly.
+	dashboard.MountBoardProxy(mux, dcfg.SprintboardURL)
 	// The operator console's read API (v18809): runs, costs, evals, memory.
 	// Locations come from the environment with conventional defaults; the
 	// console renders absence as absence, so an unset path is not an error.

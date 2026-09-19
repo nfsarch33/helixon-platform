@@ -16,3 +16,9 @@ export function useEvals(limit = 20) { return useSWR(["evals", limit], () => api
 export function useMemorySearch(q: string) {
   return useSWR(q.trim() ? ["memory", q] : null, () => api.memory(q), { revalidateOnFocus: false });
 }
+export function useBoardSprints() {
+  return useSWR("board-sprints", api.boardSprints, { refreshInterval: 30000 });
+}
+export function useBoardTickets(sprintID: string | null) {
+  return useSWR(sprintID ? ["board-tickets", sprintID] : null, () => api.boardTickets(sprintID as string), { refreshInterval: 5000 });
+}

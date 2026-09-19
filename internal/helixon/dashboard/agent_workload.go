@@ -37,7 +37,7 @@ type AgentWorkloadFetcher struct {
 // NewAgentWorkloadFetcher creates a fetcher that queries the SprintBoard API.
 func NewAgentWorkloadFetcher(sprintboardURL string) *AgentWorkloadFetcher {
 	if sprintboardURL == "" {
-		sprintboardURL = "http://localhost:8585"
+		sprintboardURL = "http://127.0.0.1:9400"
 	}
 	return &AgentWorkloadFetcher{
 		sprintboardURL: sprintboardURL,
