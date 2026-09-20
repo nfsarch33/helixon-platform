@@ -42,6 +42,7 @@ func TestBoardProxy_ForwardsOperatorVerbs(t *testing.T) {
 		{http.MethodGet, "/api/v1/board/sprints/S1/tickets", "", http.StatusOK, "GET /api/v1/sprints/S1/tickets body="},
 		{http.MethodPost, "/api/v1/board/tickets/T1/requeue", `{"actor":"op","reason":"r"}`, http.StatusOK, "POST /api/v1/tickets/T1/requeue body=" + `{"actor":"op","reason":"r"}`},
 		{http.MethodPost, "/api/v1/board/tickets/T2/resolve", `{"actor":"op","reason":"r"}`, http.StatusOK, "POST /api/v1/tickets/T2/resolve body=" + `{"actor":"op","reason":"r"}`},
+		{http.MethodGet, "/api/v1/board/tickets/T1/comments", "", http.StatusOK, "GET /api/v1/tickets/T1/comments body="},
 		{http.MethodPost, "/api/v1/board/tickets/T9/requeue", `{"actor":"op","reason":"r"}`, http.StatusConflict, "POST /api/v1/tickets/T9/requeue body=" + `{"actor":"op","reason":"r"}`},
 	}
 	for _, tc := range cases {
@@ -70,12 +71,14 @@ func TestBoardProxy_RefusesEverythingElse(t *testing.T) {
 		{http.MethodPost, "/api/v1/board/tickets/T1/claim"},
 		{http.MethodPost, "/api/v1/board/tickets/T1/complete"},
 		{http.MethodDelete, "/api/v1/board/sprints/S1"},
-		{http.MethodGet, "/api/v1/board/tickets/T1/comments"},
+		{http.MethodPost, "/api/v1/board/tickets/T1/comments"},
 	} {
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
-		if rec.Code != http.StatusNotFound {
-			t.Fatalf("%s %s = %d, want 404 (only the operator verbs are proxied)", tc.method, tc.path, rec.Code)
+		// 404 = no route; 405 = the route exists for another method (e.g.
+		// comments is GET-only). Both mean "not proxied for this verb".
+		if rec.Code != http.StatusNotFound && rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("%s %s = %d, want 404/405 (only the operator verbs are proxied)", tc.method, tc.path, rec.Code)
 		}
 	}
 }

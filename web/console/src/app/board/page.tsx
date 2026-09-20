@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useBoardSprints, useBoardTickets } from "../../lib/hooks";
+import { useBoardComments, useBoardSprints, useBoardTickets } from "../../lib/hooks";
 import { api, ApiError, boardTerminal, type BoardTicket, type BoardTicketStatus } from "../../lib/api";
 import { Panel, EmptyState, ErrorState, Loading } from "../../components/States";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -143,7 +143,7 @@ function TicketRow({ ticket, onChanged }: { ticket: BoardTicket; onChanged: () =
 
   return (
     <li className="flex flex-wrap items-start justify-between gap-2 py-2">
-      <div className="min-w-0">
+      <div className="min-w-0 grow">
         <p className="truncate font-medium">
           <span className="font-mono text-sm text-slate-500">{ticket.id}</span> {ticket.title}
         </p>
@@ -152,8 +152,10 @@ function TicketRow({ ticket, onChanged }: { ticket: BoardTicket; onChanged: () =
           {ticket.claimed_by ? <span>claimed by {ticket.claimed_by}</span> : null}
           {ticket.acceptance_criteria ? <span className="truncate" title={ticket.acceptance_criteria}>AC: {ticket.acceptance_criteria}</span> : null}
           {ticket.updated_at ? <span>{fmtTime(ticket.updated_at)}</span> : null}
+          {ticket.resolved_by ? <span title={ticket.resolution_reason}>resolved by {ticket.resolved_by}</span> : null}
         </p>
         {err ? <p role="alert" className="mt-1 text-xs text-rose-700 dark:text-rose-300">{err}</p> : null}
+        <CommentsSection ticket={ticket} />
       </div>
       <div className="flex shrink-0 gap-2">
         {terminal ? (
@@ -169,5 +171,47 @@ function TicketRow({ ticket, onChanged }: { ticket: BoardTicket; onChanged: () =
         )}
       </div>
     </li>
+  );
+}
+
+// The escalation trail. An escalation is (status stays in_progress) plus (a
+// comment appears), so the comment list is the only place the reason a ticket
+// was handed to a human exists. Collapsed by default; expands to fetch once.
+function CommentsSection({ ticket }: { ticket: BoardTicket }) {
+  const [open, setOpen] = useState(false);
+  const { data, error, mutate } = useBoardComments(open ? ticket.id : null);
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        className="mt-1 text-xs text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">
+        Comments
+      </button>
+    );
+  }
+  return (
+    <div className="mt-1" data-testid={`comments-${ticket.id}`}>
+      <button type="button" onClick={() => setOpen(false)}
+        className="text-xs text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">
+        Comments {data ? `(${data.comments.length})` : ""} — hide
+      </button>
+      {error ? <ErrorState error={error} /> : !data ? <Loading label="Loading comments" /> : data.comments.length === 0 ? (
+        <p className="mt-1 text-xs text-slate-500">No comments — nothing was escalated on this ticket.</p>
+      ) : (
+        <ul className="mt-1 space-y-1">
+          {data.comments.map((c) => (
+            <li key={c.id} className="rounded bg-slate-50 p-2 text-xs dark:bg-slate-800">
+              <p className="font-medium text-slate-600 dark:text-slate-300">
+                {c.author} <span className="font-normal text-slate-400">{fmtTime(c.created_at)}</span>
+              </p>
+              <pre className="mt-0.5 whitespace-pre-wrap break-words font-sans">{c.body}</pre>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" onClick={() => mutate()} className="mt-1 text-xs text-slate-500 hover:underline">
+        refresh
+      </button>
+    </div>
   );
 }

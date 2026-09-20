@@ -118,3 +118,61 @@ describe("BoardPage poll-now", () => {
     await waitFor(() => expect(screen.getByText("ticket polling is off on this agent")).toBeInTheDocument());
   });
 });
+
+describe("BoardPage comments", () => {
+  const escalatedList = {
+    sprint_id: "s-live",
+    tickets: [
+      { id: "T-esc", title: "handed to human", status: "in_progress", priority: 1, claimed_by: "agent-a", updated_at: "2026-09-19T00:00:00Z" },
+    ],
+  };
+
+  it("expands a ticket's escalation comments on demand", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/board/sprints")) return new Response(JSON.stringify(sprintList), { status: 200 });
+      if (url.includes("/tickets/T-esc/comments")) {
+        return new Response(JSON.stringify({ ticket_id: "T-esc", comments: [
+          { id: 36, ticket_id: "T-esc", author: "helixon-fleet-wsl1", body: "Automated escalation.\n\nFailure: llm complete (iter 2)", created_at: "2026-09-19T00:00:00Z" },
+        ] }), { status: 200 });
+      }
+      if (url.includes("/tickets")) return new Response(JSON.stringify(escalatedList), { status: 200 });
+      return new Response("{}", { status: 404 });
+    }));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Comments" }));
+    await waitFor(() => expect(screen.getByText(/Automated escalation/)).toBeInTheDocument());
+    expect(screen.getByText(/Failure: llm complete/)).toBeInTheDocument();
+    expect(screen.getByText("helixon-fleet-wsl1")).toBeInTheDocument();
+  });
+
+  it("shows the empty state for a ticket with no comments", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/board/sprints")) return new Response(JSON.stringify(sprintList), { status: 200 });
+      if (url.includes("/comments")) return new Response(JSON.stringify({ ticket_id: "T-esc", comments: [] }), { status: 200 });
+      if (url.includes("/tickets")) return new Response(JSON.stringify(escalatedList), { status: 200 });
+      return new Response("{}", { status: 404 });
+    }));
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Comments" }));
+    await waitFor(() => expect(screen.getByText(/No comments/)).toBeInTheDocument());
+  });
+
+  it("does not fetch comments until expanded", async () => {
+    const fetches: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      fetches.push(url);
+      if (url.endsWith("/api/v1/board/sprints")) return new Response(JSON.stringify(sprintList), { status: 200 });
+      if (url.includes("/comments")) return new Response(JSON.stringify({ ticket_id: "T-esc", comments: [] }), { status: 200 });
+      if (url.includes("/tickets")) return new Response(JSON.stringify(escalatedList), { status: 200 });
+      return new Response("{}", { status: 404 });
+    }));
+    mount();
+    await screen.findByText("handed to human");
+    if (fetches.some((u) => u.includes("/comments"))) {
+      throw new Error("comments were fetched before expansion");
+    }
+  });
+});

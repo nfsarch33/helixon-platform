@@ -22,3 +22,11 @@ export function useBoardSprints() {
 export function useBoardTickets(sprintID: string | null) {
   return useSWR(sprintID ? ["board-tickets", sprintID] : null, () => api.boardTickets(sprintID as string), { refreshInterval: 5000 });
 }
+
+export function useBoardComments(ticketID: string | null) {
+  return useSWR(ticketID ? ["board-comments", ticketID] : null, () => api.boardComments(ticketID as string), {
+    // The escalation trail changes rarely; a fetch on expand + on focus is
+    // plenty. Revalidate after a requeue/resolve via mutate.
+    revalidateOnFocus: true, refreshInterval: 0,
+  });
+}

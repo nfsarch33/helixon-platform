@@ -148,7 +148,16 @@ export interface BoardTicket {
   updated_at?: string;
 }
 
+export interface BoardComment {
+  id: number;
+  ticket_id: string;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
 export interface BoardSprintsResponse { count: number; sprints: BoardSprint[] }
+export interface BoardCommentsResponse { ticket_id: string; comments: BoardComment[] }
 export interface BoardTicketsResponse { sprint_id: string; tickets: BoardTicket[] }
 
 export const boardTerminal = (s: BoardTicketStatus) => s === "done" || s === "resolved_by_human";
@@ -170,6 +179,8 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ actor, reason }),
     }),
+  boardComments: (ticketID: string) =>
+    fetchJSON<BoardCommentsResponse>(`/api/v1/board/tickets/${encodeURIComponent(ticketID)}/comments`),
   boardPollNow: () =>
     fetchJSON<{ status: string }>("/api/v1/board/poll-now", { method: "POST" }),
   boardResolve: (ticketID: string, actor: string, reason: string) =>
