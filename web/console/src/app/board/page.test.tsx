@@ -133,7 +133,7 @@ describe("BoardPage comments", () => {
       if (url.endsWith("/api/v1/board/sprints")) return new Response(JSON.stringify(sprintList), { status: 200 });
       if (url.includes("/tickets/T-esc/comments")) {
         return new Response(JSON.stringify({ ticket_id: "T-esc", comments: [
-          { id: 36, ticket_id: "T-esc", author: "helixon-fleet-wsl1", body: "Automated escalation.\n\nFailure: llm complete (iter 2)", created_at: "2026-09-19T00:00:00Z" },
+          { id: 36, ticket_id: "T-esc", author: "fleet-agent-a", body: "Automated escalation.\n\nFailure: llm complete (iter 2)", created_at: "2026-09-19T00:00:00Z" },
         ] }), { status: 200 });
       }
       if (url.includes("/tickets")) return new Response(JSON.stringify(escalatedList), { status: 200 });
@@ -143,7 +143,7 @@ describe("BoardPage comments", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Comments" }));
     await waitFor(() => expect(screen.getByText(/Automated escalation/)).toBeInTheDocument());
     expect(screen.getByText(/Failure: llm complete/)).toBeInTheDocument();
-    expect(screen.getByText("helixon-fleet-wsl1")).toBeInTheDocument();
+    expect(screen.getByText("fleet-agent-a")).toBeInTheDocument();
   });
 
   it("shows the empty state for a ticket with no comments", async () => {
