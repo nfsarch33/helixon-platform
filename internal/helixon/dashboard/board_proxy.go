@@ -55,6 +55,11 @@ func MountBoardProxy(mux *http.ServeMux, baseURL, token string) {
 		p.forward("POST", "/api/v1/tickets/{id}/requeue"))
 	mux.HandleFunc("POST /api/v1/board/tickets/{id}/resolve",
 		p.forward("POST", "/api/v1/tickets/{id}/resolve"))
+	// Read-only: the escalation trail ("why was this handed to me"). The
+	// agent's escalation is a comment, not a state change, so this is the
+	// only place the reason is visible.
+	mux.HandleFunc("GET /api/v1/board/tickets/{id}/comments",
+		p.forward("GET", "/api/v1/tickets/{id}/comments"))
 }
 
 // forward returns a handler that proxies to a fixed board path. A literal
