@@ -14,7 +14,13 @@ WorkingDirectory=%h/Code/helixon-platform
 EnvironmentFile=%h/.config/helixon/op-items.env
 ExecStartPre=/bin/sh -c 'export OP_SERVICE_ACCOUNT_TOKEN=$(cat %h/.config/op/service-account-token) && /home/jaslian/local/bin/secrets-bootstrap --service fleet-agent --out /run/user/%U/fleet-agent-env'
 EnvironmentFile=-/run/user/%U/fleet-agent-env
-ExecStart=/home/jaslian/local/bin/helixon serve --config %h/.config/helixon/wsl1-fleet-agent.yaml --http-addr 127.0.0.1:8686
+ExecStart=/home/jaslian/local/bin/helixon serve --config %h/.config/helixon/fleet-agent.yaml --http-addr 127.0.0.1:8686 --dashboard-addr 127.0.0.1:9410
+# v18858: the console is REQUIRED on the fleet agent (HITL surface). A
+# helixon binary built without -tags console serves 404 on /console/ and
+# the unit still reports healthy -- exactly the silent drift observed
+# 2026-09-21 when a redeploy dropped the tag. This check converts that
+# into a loud start failure.
+ExecStartPost=/bin/sh -c 'i=0; while [ "$i" -lt 20 ]; do code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:9410/console/ || true); [ "$code" = 200 ] && exit 0; i=$((i+1)); sleep 1; done; echo "fleet-agent: /console/ not serving -- binary rebuilt without -tags console?" >&2; exit 1'
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=60
