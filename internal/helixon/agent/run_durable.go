@@ -104,6 +104,15 @@ func (a *Agent) execute(ctx context.Context, run *RunRecord, claimed bool) (*Run
 		}
 	}
 
+	// v18846-3: the run's identity rides the context into every model call,
+	// where the identity doer stamps it as headers (X-HLXN-Run-Id et al).
+	// Attached here so RunDurable, Resume, and the recovery sweep - every
+	// path through execute - carry it.
+	ctx = llm.WithRunInfo(ctx, llm.RunInfo{
+		RunID:    run.ID,
+		TicketID: run.Meta["ticket_id"],
+		AgentID:  a.owner,
+	})
 	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
 	defer cancel()
 	stopRenew := a.startRenewal(ctx, cancel, run.ID)
