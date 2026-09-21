@@ -70,7 +70,12 @@ func newRootCmd() *cobra.Command {
 run the lifecycle (serve), and exercise tool dispatch interactively (repl).`,
 		SilenceUsage: true,
 	}
-	root.AddCommand(newServeCmd(), newDoctorCmd(), newReplCmd(), newVersionCmd(), newPlatformCmd(), newTaskCmd(), newMemoryCmd())
+	runsCmd := &cobra.Command{
+		Use:   "runs",
+		Short: "Inspect and export durable runs",
+	}
+	runsCmd.AddCommand(newRunsExportCmd())
+	root.AddCommand(newServeCmd(), newDoctorCmd(), newReplCmd(), newVersionCmd(), newPlatformCmd(), newTaskCmd(), newMemoryCmd(), runsCmd)
 	return root
 }
 
