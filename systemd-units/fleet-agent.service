@@ -14,7 +14,7 @@ WorkingDirectory=%h/Code/helixon-platform
 EnvironmentFile=%h/.config/helixon/op-items.env
 ExecStartPre=/bin/sh -c 'export OP_SERVICE_ACCOUNT_TOKEN=$(cat %h/.config/op/service-account-token) && /home/jaslian/local/bin/secrets-bootstrap --service fleet-agent --out /run/user/%U/fleet-agent-env'
 EnvironmentFile=-/run/user/%U/fleet-agent-env
-ExecStart=/home/jaslian/local/bin/helixon serve --config %h/.config/helixon/wsl1-fleet-agent.yaml --http-addr 127.0.0.1:8686 --dashboard-addr 127.0.0.1:9410
+ExecStart=/home/jaslian/local/bin/helixon serve --config %h/.config/helixon/fleet-agent.yaml --http-addr 127.0.0.1:8686 --dashboard-addr 127.0.0.1:9410
 # v18858: the console is REQUIRED on the fleet agent (HITL surface). A
 # helixon binary built without -tags console serves 404 on /console/ and
 # the unit still reports healthy -- exactly the silent drift observed
