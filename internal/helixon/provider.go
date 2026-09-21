@@ -3,6 +3,7 @@ package helixon
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -50,12 +51,17 @@ func BuildProvider(cfg ProviderConfig) (llm.Provider, error) {
 		if err != nil {
 			return nil, err
 		}
-		return llm.NewClient(llm.Config{
+		// v18846-3: every model call carries the run's identity headers.
+		timeout := cfg.Timeout
+		if timeout <= 0 {
+			timeout = 60 * time.Second
+		}
+		return llm.NewClientWithHTTP(llm.Config{
 			BaseURL: cfg.BaseURL,
 			APIKey:  key,
 			Model:   cfg.Model,
-			Timeout: cfg.Timeout,
-		}), nil
+			Timeout: timeout,
+		}, llm.NewIdentityDoer(&http.Client{Timeout: timeout})), nil
 	default:
 		return nil, fmt.Errorf("helixon: unknown provider kind %q", cfg.Kind)
 	}
