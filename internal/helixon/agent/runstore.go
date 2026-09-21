@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -103,6 +104,13 @@ CREATE TABLE IF NOT EXISTS runs (
 	final_content TEXT NOT NULL DEFAULT '',
 	err           TEXT NOT NULL DEFAULT '',
 	meta          TEXT NOT NULL DEFAULT '{}',
+	-- v18846-2 verdict trio: NULL means "not applicable / unknown", never
+	-- "checked and failed". verifier_passed and verifier_failures are set
+	-- only for runs that mutated state (the verifier evidence
+	-- requirement); mutated itself is 0/1 whenever the run finished.
+	verifier_passed   INTEGER NULL,
+	mutated           INTEGER NULL,
+	verifier_failures INTEGER NULL,
 	created_at    TEXT NOT NULL,
 	updated_at    TEXT NOT NULL
 );
@@ -132,6 +140,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_run_steps_seq ON run_steps(run_id, seq);
 func migrateRuns(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, runsDDL); err != nil {
 		return fmt.Errorf("run tables: %w", err)
+	}
+	// v18846-2: databases created before the verdict trio gain the columns
+	// on open. "duplicate column name" is the success case for a database
+	// that already has them, so it is swallowed; any other error is real.
+	for _, col := range []string{"verifier_passed INTEGER NULL", "mutated INTEGER NULL", "verifier_failures INTEGER NULL"} {
+		if _, err := db.ExecContext(ctx, `ALTER TABLE runs ADD COLUMN `+col); err != nil {
+			if !strings.Contains(err.Error(), "duplicate column") {
+				return fmt.Errorf("migrate runs verdict columns: %w", err)
+			}
+		}
 	}
 	return nil
 }
@@ -304,14 +322,29 @@ func (s *SessionStore) FinishRun(ctx context.Context, id, owner string, status R
 	}
 	var iterations, in, out int
 	final := ""
+	// v18846-2 verdict trio. verifier_passed/failures stay NULL for runs
+	// that never mutated (no verifier requirement -> no verdict; NULL, not
+	// false); mutated is a fact and is always stamped on a finished run.
+	var vPassed, vFailures, vMutated any
 	if result != nil {
 		iterations, in, out, final = result.Iterations, result.TokensIn, result.TokensOut, result.FinalContent
+		vMutated = 0
+		if result.Mutated {
+			vMutated = 1
+			vPassed = 0
+			if result.VerifierPassed {
+				vPassed = 1
+			}
+			vFailures = result.VerifierFailures
+		}
 	}
 	now := s.now()
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE runs SET status = ?, iterations = ?, tokens_in = ?, tokens_out = ?, final_content = ?, err = ?, updated_at = ?
+		`UPDATE runs SET status = ?, iterations = ?, tokens_in = ?, tokens_out = ?, final_content = ?, err = ?, updated_at = ?,
+			verifier_passed = ?, mutated = ?, verifier_failures = ?
 		 WHERE id = ? AND status = ? AND owner = ?`,
 		string(status), iterations, in, out, final, errStr, now.Format(time.RFC3339Nano),
+		vPassed, vMutated, vFailures,
 		id, string(RunRunning), owner)
 	if err != nil {
 		return false, fmt.Errorf("finish run: %w", err)
