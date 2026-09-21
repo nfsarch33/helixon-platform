@@ -267,20 +267,53 @@ func TestBootstrapServiceEnv_OutputIsOwnerOnly(t *testing.T) {
 // cost time on 2026-08-28: the Resend item's field is LABELED "api key" with
 // a space, and `op read op://vault/item/api key` fails on the space. The
 // stable field ID is the only reference that resolves.
+//
+// v18856 adds the urgent multi-channel delivery refs (two Slack incoming
+// webhooks and the Telegram bot token). They are Optional: the notifier
+// treats their absence as "channel not configured", never as a boot
+// failure, because email stays the always-required baseline.
 func TestServiceMap_AlertNotifierResolvesFieldByID(t *testing.T) {
 	entries, ok := serviceMap["alert-notifier"]
-	if !ok || len(entries) != 1 {
-		t.Fatalf("alert-notifier entries = %d, want exactly 1 (RESEND_API_KEY)", len(entries))
+	if !ok || len(entries) != 4 {
+		t.Fatalf("alert-notifier entries = %d, want exactly 4 (RESEND + 2 Slack webhooks + Telegram token)", len(entries))
 	}
-	e := entries[0]
-	if e.EnvVar != "RESEND_API_KEY" {
-		t.Errorf("EnvVar = %q, want RESEND_API_KEY", e.EnvVar)
+	byVar := make(map[string]EnvEntry, len(entries))
+	for _, e := range entries {
+		byVar[e.EnvVar] = e
+	}
+	e, ok := byVar["RESEND_API_KEY"]
+	if !ok {
+		t.Fatal("RESEND_API_KEY missing from alert-notifier map")
 	}
 	if strings.Contains(e.Field, " ") {
 		t.Errorf("Field %q contains a space; op read cannot resolve a spaced field label, use the field ID", e.Field)
 	}
 	if e.Extract != "" {
 		t.Errorf("alert-notifier must be a direct field read, got Extract=%q", e.Extract)
+	}
+	// The Slack items label their field "Webhook URL" WITH A SPACE, so the
+	// same field-ID rule as RESEND applies. The Telegram chat id is NOT
+	// mapped: the vault item carries a bot username, not a numeric chat
+	// id, and wiring the wrong field would send to an invalid chat.
+	slackWant := []struct{ env, itemEnv, fieldEnv string }{
+		{"SLACK_FLEET_CRITICAL_WEBHOOK", "HLXN_OP_ITEM_SLACK_FLEET_CRITICAL", "HLXN_OP_FIELD_SLACK_FLEET_CRITICAL"},
+		{"SLACK_CURSOR_UPDATES_WEBHOOK", "HLXN_OP_ITEM_SLACK_CURSOR_UPDATES", "HLXN_OP_FIELD_SLACK_CURSOR_UPDATES"},
+	}
+	for _, w := range slackWant {
+		got := byVar[w.env]
+		if got.ItemEnv != w.itemEnv || got.FieldEnv != w.fieldEnv {
+			t.Errorf("%s mapping = %+v, want ItemEnv=%s FieldEnv=%s", w.env, got, w.itemEnv, w.fieldEnv)
+		}
+		if !got.Optional {
+			t.Errorf("%s must be Optional: absence is a supported channel-off state", w.env)
+		}
+		if strings.Contains(got.Field, " ") {
+			t.Errorf("%s Field %q contains a space; use the field ID", w.env, got.Field)
+		}
+	}
+	tg, ok := byVar["TELEGRAM_BOT_TOKEN"]
+	if !ok || tg.ItemEnv != "HLXN_OP_ITEM_TELEGRAM_FLEET_AGENT" || tg.Field != "password" || !tg.Optional {
+		t.Errorf("TELEGRAM_BOT_TOKEN mapping = %+v ok=%v, want item HLXN_OP_ITEM_TELEGRAM_FLEET_AGENT field password Optional", tg, ok)
 	}
 }
 

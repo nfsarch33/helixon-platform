@@ -34,6 +34,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -45,11 +46,30 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/alertnotifier"
 	"github.com/nfsarch33/helixon-platform/internal/notify"
 	"github.com/nfsarch33/helixon-platform/internal/notify/metrics"
+	"github.com/nfsarch33/helixon-platform/internal/notify/slack"
+	"github.com/nfsarch33/helixon-platform/internal/notify/telegram"
 )
 
 // apiKeyEnv is the only channel by which the vendor credential enters this
 // process. The systemd unit renders it into an EnvironmentFile.
 const apiKeyEnv = "RESEND_API_KEY" //nolint:gosec // G101: an env var NAME, not a credential
+
+// v18856: the non-email delivery tiers. Urgent HITL items must reach
+// Slack and Telegram, not a quota-limited email vendor alone. These env
+// names are rendered by secrets-bootstrap from the fleet vault; a
+// missing var means "channel off", never "boot failure" — email stays the
+// required baseline the unit's ExecStartPre gate enforces.
+const (
+	slackFleetCriticalEnv = "SLACK_FLEET_CRITICAL_WEBHOOK" //nolint:gosec // G101: env var names
+	slackCursorUpdatesEnv = "SLACK_CURSOR_UPDATES_WEBHOOK"
+	telegramTokenEnv      = "TELEGRAM_BOT_TOKEN"
+	telegramChatEnv       = "TELEGRAM_CHAT_ID"
+)
+
+// maxChatBodyBytes bounds the text posted to chat channels. 2900 fits
+// both Slack's incoming-webhook text budget and Telegram's 4096 limit
+// with room for the subject line.
+const maxChatBodyBytes = 2900
 
 // Exit codes.
 const (
@@ -84,6 +104,22 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 		return code
 	}
 	opts.cfg.Sender = sender
+
+	// v18856: attach the non-email tiers. The always-on tier carries
+	// every digest to the ops Slack stream; the urgent tier fires only
+	// when the change holds a critical-severity alert.
+	chans := buildChannels(getenv, stderr)
+	if chans.empty() {
+		_, _ = fmt.Fprintf(stderr, "alert-notifier: no chat channels configured (set %s / %s / %s to enable multi-channel delivery)\n",
+			slackCursorUpdatesEnv, slackFleetCriticalEnv, telegramTokenEnv)
+	}
+	if ops := chans.opsSender(stderr); ops != nil {
+		opts.cfg.SecondarySender = ops
+	}
+	if urgent := chans.urgentSender(stderr); urgent != nil {
+		opts.cfg.UrgentSender = urgent
+		opts.cfg.UrgentWhen = alertnotifier.HasCriticalChange
+	}
 
 	// Bound the whole cycle, not just the individual calls: a wedged
 	// vendor socket must never leave a timer-driven process resident.
@@ -215,6 +251,125 @@ func buildSender(opts *options, stderr io.Writer) (alertnotifier.Sender, int) {
 		HTTPDoer: &http.Client{Timeout: opts.cfg.HTTPTimeout},
 	}).WithMetrics(metrics.NewRegistry(nil))
 	return client, exitOK
+}
+
+// channels is the configured non-email delivery surface (v18856).
+type channels struct {
+	fleetCritical *slack.Client
+	cursorUpdates *slack.Client
+	telegram      *telegram.Client
+}
+
+// empty reports whether any chat channel is configured at all.
+func (c channels) empty() bool {
+	return c.fleetCritical == nil && c.cursorUpdates == nil && c.telegram == nil
+}
+
+// buildChannels reads the chat-channel env vars. Telegram needs BOTH a
+// bot token and a numeric chat id; a token without a chat id is skipped
+// with a loud note instead of silently dropping the tier.
+func buildChannels(getenv func(string) string, stderr io.Writer) channels {
+	var c channels
+	if u := strings.TrimSpace(getenv(slackCursorUpdatesEnv)); u != "" {
+		c.cursorUpdates = slack.New(slack.Config{WebhookURL: u})
+	}
+	if u := strings.TrimSpace(getenv(slackFleetCriticalEnv)); u != "" {
+		c.fleetCritical = slack.New(slack.Config{WebhookURL: u})
+	}
+	token := strings.TrimSpace(getenv(telegramTokenEnv))
+	chatID := strings.TrimSpace(getenv(telegramChatEnv))
+	switch {
+	case token != "" && chatID != "":
+		c.telegram = telegram.New(telegram.Config{BotToken: token, ChatID: chatID})
+	case token != "":
+		_, _ = fmt.Fprintf(stderr, "alert-notifier: %s set without %s; telegram tier disabled until the chat id is provided\n",
+			telegramTokenEnv, telegramChatEnv)
+	}
+	return c
+}
+
+// tierSend is one named destination inside a fan-out tier.
+type tierSend struct {
+	name string
+	send func(ctx context.Context, text string) error
+}
+
+// tierSender implements alertnotifier.Sender by fanning the digest out
+// to every destination in the tier. Any-success semantics: one dead
+// webhook must not fail the tier while another channel delivered.
+type tierSender struct {
+	dests  []tierSend
+	stderr io.Writer
+}
+
+//nolint:gocritic // hugeParam: signature is fixed by the Sender interface
+func (t tierSender) Send(ctx context.Context, m notify.Email) error {
+	text := m.Subject + "\n\n" + truncateBody(m.TextBody, maxChatBodyBytes)
+	var errs []error
+	delivered := false
+	for _, d := range t.dests {
+		if err := d.send(ctx, text); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", d.name, err))
+			_, _ = fmt.Fprintf(t.stderr, "alert-notifier: channel %s failed: %v\n", d.name, err)
+			continue
+		}
+		delivered = true
+	}
+	if !delivered {
+		return fmt.Errorf("all channels in tier failed: %w", errors.Join(errs...))
+	}
+	return nil
+}
+
+// opsSender is the always-on tier: the ops Slack stream that mirrors
+// every digest, so the email vendor's quota can hide nothing.
+func (c channels) opsSender(stderr io.Writer) alertnotifier.Sender {
+	if c.cursorUpdates == nil {
+		return nil
+	}
+	return tierSender{
+		dests: []tierSend{
+			{name: "slack:#cursor-updates", send: func(ctx context.Context, text string) error {
+				return c.cursorUpdates.Send(ctx, text)
+			}},
+		},
+		stderr: stderr,
+	}
+}
+
+// urgentSender is the page tier: both Slack channels plus Telegram, per
+// the operator's decision that urgent HITL items must not travel on one
+// wire.
+func (c channels) urgentSender(stderr io.Writer) alertnotifier.Sender {
+	var dests []tierSend
+	if c.fleetCritical != nil {
+		dests = append(dests, tierSend{name: "slack:#fleet-critical", send: func(ctx context.Context, text string) error {
+			return c.fleetCritical.Send(ctx, text)
+		}})
+	}
+	if c.cursorUpdates != nil {
+		dests = append(dests, tierSend{name: "slack:#cursor-updates", send: func(ctx context.Context, text string) error {
+			return c.cursorUpdates.Send(ctx, text)
+		}})
+	}
+	if c.telegram != nil {
+		dests = append(dests, tierSend{name: "telegram", send: func(ctx context.Context, text string) error {
+			return c.telegram.SendMessage(ctx, text)
+		}})
+	}
+	if len(dests) == 0 {
+		return nil
+	}
+	return tierSender{dests: dests, stderr: stderr}
+}
+
+// truncateBody bounds a chat message to limit bytes, marking the cut with
+// an ellipsis so a truncated digest is visibly truncated.
+func truncateBody(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	return s[:limit-len("…")] + "…"
 }
 
 // firstNonEmpty returns the first non-blank value.

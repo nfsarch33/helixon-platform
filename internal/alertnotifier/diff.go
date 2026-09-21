@@ -29,6 +29,25 @@ func (c Change) Empty() bool {
 	return len(c.NewFiring) == 0 && len(c.Renotify) == 0 && len(c.Resolved) == 0
 }
 
+// HasCriticalChange reports whether anything in this change is urgent
+// enough for the dedicated tier (#fleet-critical Slack + Telegram,
+// v18856). It mirrors severityRank's top band — "critical" and the
+// page-grade alias "page" — and deliberately ignores Resolved: an alert
+// going away is not a page.
+func HasCriticalChange(c Change) bool {
+	for _, a := range c.NewFiring {
+		if severityRank(a.Severity()) == 0 {
+			return true
+		}
+	}
+	for _, a := range c.Renotify {
+		if severityRank(a.Severity()) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // severityRank orders severities most-urgent-first for rendering. Unknown
 // severities sort after the known ones but keep a stable order among
 // themselves via the alphabetical tiebreak in the sort comparators.

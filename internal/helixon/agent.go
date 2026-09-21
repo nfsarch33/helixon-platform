@@ -160,6 +160,7 @@ type Runtime struct {
 	provider   llm.Provider
 	registry   *tooldispatch.Registry
 	executor   agent.ToolExecutor
+	testGuard  *tooldispatch.TestFileGuard
 	traced     *tooldispatch.TracedExecutor
 	sandboxRun *sandbox.Runner
 	store      *agent.SessionStore
@@ -210,7 +211,12 @@ func (r *Runtime) Init(ctx context.Context) error {
 	r.store = store
 
 	r.registry = tooldispatch.NewRegistry(r.logger)
-	r.executor = r.registry
+	// v18857, §3.2 Q2a: the test-file write guard sits INNERMOST, against
+	// the registry, so later decorators (loop guard, agentrace, metrics)
+	// still observe denied calls. Inactive until a ticket run holds it —
+	// see TicketPoller.runTicket.
+	r.testGuard = &tooldispatch.TestFileGuard{}
+	r.executor = tooldispatch.NewTestFileGuardExecutor(r.registry, r.testGuard, r.logger)
 
 	r.phase = PhaseInit
 	r.logger.Info("runtime initialised",
@@ -513,7 +519,8 @@ func (r *Runtime) buildTicketPoller() error {
 			"pass WithSprintboard (set sprintboard.url in the config)")
 	}
 	p, err := NewTicketPoller(r.cfg.Tickets, r.sprintCtl, r.runTicketWork, r.cfg.AgentID, r.cfg.Timeout, r.logger,
-		WithPollerMetrics(r.metrics))
+		WithPollerMetrics(r.metrics),
+		WithTestFileGuard(r.testGuard))
 	if err != nil {
 		return fmt.Errorf("helixon: ticket poller: %w", err)
 	}

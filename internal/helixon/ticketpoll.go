@@ -12,6 +12,7 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agent"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agentmetrics"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/tooldispatch"
 )
 
 // TicketPoller closes the autonomy gap in serve mode.
@@ -149,6 +150,9 @@ type TicketPoller struct {
 	agentName string
 	logger    *slog.Logger
 	metrics   *agentmetrics.Metrics
+	// testGuard (v18857, §3.2 Q2a) is held for the life of each runTicket
+	// so the executor denies test-file writes during scored runs only.
+	testGuard *tooldispatch.TestFileGuard
 
 	mu    sync.Mutex
 	stats TicketPollerStats
@@ -171,6 +175,13 @@ type TicketPollerOption func(*TicketPoller)
 // and inert, so the caller does not need a branch.
 func WithPollerMetrics(m *agentmetrics.Metrics) TicketPollerOption {
 	return func(p *TicketPoller) { p.metrics = m }
+}
+
+// WithTestFileGuard attaches the Q2a write guard (v18857): while any ticket
+// run is in flight, file_write to *_test.go is denied at the executor.
+// A nil guard is accepted and inert.
+func WithTestFileGuard(g *tooldispatch.TestFileGuard) TicketPollerOption {
+	return func(p *TicketPoller) { p.testGuard = g }
 }
 
 // NewTicketPoller validates the wiring and returns a poller.
@@ -415,6 +426,15 @@ func (p *TicketPoller) claimNext(ctx context.Context, tickets []controlplane.Tic
 func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Ticket) {
 	ctx, cancel := context.WithTimeout(parent, p.cfg.TicketTimeout)
 	defer cancel()
+
+	// Q2a: hold the test-file write guard for exactly this run's life —
+	// including its report — so scored agents cannot touch the ruler and
+	// no other session inherits the restriction. Refcounted, so
+	// MaxConcurrent > 1 releases only when the last run finishes.
+	if p.testGuard != nil {
+		p.testGuard.Enter()
+		defer p.testGuard.Leave()
+	}
 
 	started := time.Now()
 	result, err := p.work(ctx, ticket)

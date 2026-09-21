@@ -197,8 +197,21 @@ var serviceMap = map[string][]EnvEntry{
 	// Because that ID is a 26-char identifier like an item UUID, it moves
 	// to the environment too (FieldEnv) rather than sitting in a public
 	// file. Entries whose field is an ordinary label keep it inline.
+	//
+	// v18856 adds the urgent multi-channel tier: two Slack incoming
+	// webhooks (field labeled "Webhook URL" WITH A SPACE, so FieldEnv
+	// carries the stable field ID like RESEND) and the Telegram bot
+	// token. All three are Optional: their absence means "channel off"
+	// in the notifier, not a boot failure — email stays the required
+	// baseline the unit's --strict gate enforces. The Telegram CHAT ID
+	// is deliberately absent: the vault item's username field holds the
+	// bot's name, not a numeric chat id, and wiring the wrong field
+	// would page an address that can never receive.
 	"alert-notifier": {
 		{EnvVar: "RESEND_API_KEY", ItemEnv: "HLXN_OP_ITEM_RESEND", FieldEnv: "HLXN_OP_FIELD_RESEND"},
+		{EnvVar: "SLACK_FLEET_CRITICAL_WEBHOOK", ItemEnv: "HLXN_OP_ITEM_SLACK_FLEET_CRITICAL", FieldEnv: "HLXN_OP_FIELD_SLACK_FLEET_CRITICAL", Optional: true},
+		{EnvVar: "SLACK_CURSOR_UPDATES_WEBHOOK", ItemEnv: "HLXN_OP_ITEM_SLACK_CURSOR_UPDATES", FieldEnv: "HLXN_OP_FIELD_SLACK_CURSOR_UPDATES", Optional: true},
+		{EnvVar: "TELEGRAM_BOT_TOKEN", ItemEnv: "HLXN_OP_ITEM_TELEGRAM_FLEET_AGENT", Field: "password", Optional: true},
 	},
 }
 
