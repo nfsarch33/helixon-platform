@@ -168,6 +168,13 @@ var serviceMap = map[string][]EnvEntry{
 	// per-request. Startup success proves nothing here.
 	"evospined": {
 		{EnvVar: "OPENAI_API_KEY", ItemEnv: "HLXN_OP_ITEM_LLM_ROUTER", Field: "password"},
+		// S1 flip (2026-09-22): the census caught this runtime registering
+		// with the board anonymously every ~30s -- its pinned dc8fcf5
+		// binary predates the Token field entirely. The replacement binary
+		// expands sprintboard.token from this var; same item and field as
+		// the board itself reads, Optional for the same --strict reason as
+		// the fleet agent's.
+		{EnvVar: "SPRINTBOARD_API_TOKEN", ItemEnv: "HLXN_OP_ITEM_SPRINTBOARD", Field: "password", Optional: true},
 	},
 	// v18776: per-key MiniMax coding-plan quota polling. The collector
 	// (`helix-dev-tools minimax-quota`) labels its metrics by ORDINAL
