@@ -56,6 +56,18 @@ type Config struct {
 	HTTPClient HTTPDoer
 	// Sender delivers the digest. Required unless DryRun.
 	Sender Sender
+	// SecondarySender is the always-on non-email tier: it receives the
+	// same digest as Sender on every change. v18856 exists because a
+	// quota-limited email vendor must not be the only wire urgent HITL
+	// items travel on. nil disables the tier.
+	SecondarySender Sender
+	// UrgentSender receives the digest only when UrgentWhen says the
+	// change is urgent (critical severity). nil disables the tier.
+	UrgentSender Sender
+	// UrgentWhen gates UrgentSender. nil keeps the tier off even when a
+	// sender is configured, so wiring a sender is never a behaviour
+	// change by accident.
+	UrgentWhen func(Change) bool
 	// Now is injectable so renotify windows are testable without sleeping.
 	Now func() time.Time
 
@@ -70,9 +82,14 @@ type Result struct {
 	Digest       Digest
 	Sent         bool
 	SendFailures int
-	Metrics      Metrics
-	StateNote    string
-	DryRun       bool
+	// SecondarySent and UrgentSent record which non-email tiers
+	// delivered, so the audit line alone shows whether urgent items
+	// reached the channels the operator actually watches.
+	SecondarySent bool
+	UrgentSent    bool
+	Metrics       Metrics
+	StateNote     string
+	DryRun        bool
 }
 
 // withDefaults fills the zero values so callers only set what they mean.
@@ -185,9 +202,12 @@ func pollAlerts(ctx context.Context, cfg *Config) ([]Alert, error) {
 	return NotifiableAlerts(raw), nil
 }
 
-// deliver hands the digest to the vendor and records the outcome. On
-// failure the caller must NOT persist the new state, so the next run
-// retries the same report instead of losing it.
+// deliver hands the digest to every configured tier and records the
+// outcome. v18856: a digest counts as delivered when ANY tier accepts it,
+// so one vendor outage (the live Resend 403) can no longer black-hole the
+// report; per-tier failures are still counted for the audit trail. On
+// total failure the caller must NOT persist the new state, so the next
+// run retries the same report instead of losing it.
 func deliver(ctx context.Context, cfg *Config, res *Result, next *State, now time.Time) error {
 	if cfg.Sender == nil {
 		res.SendFailures = 1
@@ -202,10 +222,40 @@ func deliver(ctx context.Context, cfg *Config, res *Result, next *State, now tim
 		IdempotencyKey: res.Digest.IdempotencyKey,
 		JobID:          cfg.JobID,
 	}
+
+	var errs []error
+	delivered := false
+
 	if err := cfg.Sender.Send(ctx, email); err != nil {
-		res.SendFailures = 1
-		res.Metrics.SendFailures = 1
-		return fmt.Errorf("send alert digest: %w", err)
+		res.SendFailures++
+		errs = append(errs, fmt.Errorf("email: %w", err))
+	} else {
+		delivered = true
+	}
+
+	if cfg.SecondarySender != nil {
+		if err := cfg.SecondarySender.Send(ctx, email); err != nil {
+			res.SendFailures++
+			errs = append(errs, fmt.Errorf("secondary: %w", err))
+		} else {
+			delivered = true
+			res.SecondarySent = true
+		}
+	}
+
+	if cfg.UrgentSender != nil && cfg.UrgentWhen != nil && cfg.UrgentWhen(res.Change) {
+		if err := cfg.UrgentSender.Send(ctx, email); err != nil {
+			res.SendFailures++
+			errs = append(errs, fmt.Errorf("urgent: %w", err))
+		} else {
+			delivered = true
+			res.UrgentSent = true
+		}
+	}
+
+	res.Metrics.SendFailures = res.SendFailures
+	if !delivered {
+		return fmt.Errorf("send alert digest: %w", errors.Join(errs...))
 	}
 	res.Sent = true
 	next.LastSuccessUnix = now.Unix()
@@ -213,9 +263,12 @@ func deliver(ctx context.Context, cfg *Config, res *Result, next *State, now tim
 	return nil
 }
 
-// statePtr returns the state to persist: none when the send failed.
+// statePtr returns the state to persist: none when a send was attempted
+// and every tier failed. Runs that delivered on at least one tier persist
+// (their failures are per-channel, already counted in the audit), and
+// quiet runs with no change always persist.
 func statePtr(res *Result, next *State) *State {
-	if res.SendFailures > 0 {
+	if !res.Sent && res.SendFailures > 0 {
 		return nil
 	}
 	return next
@@ -277,6 +330,8 @@ func emitAudit(cfg *Config, res *Result) error {
 		"html_len":         len(res.Digest.HTML),
 		"sent":             res.Sent,
 		"send_failures":    res.SendFailures,
+		"secondary_sent":   res.SecondarySent,
+		"urgent_sent":      res.UrgentSent,
 		"dry_run":          res.DryRun,
 		"state_path":       cfg.StatePath,
 		"textfile_path":    cfg.TextfilePath,
