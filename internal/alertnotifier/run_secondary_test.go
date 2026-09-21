@@ -61,7 +61,7 @@ func (s *errSequenceSender) callErrs(errs ...error) {
 // prove the urgent tier stays silent for non-critical changes.
 const warningOnlyAlerts = `[
  {"labels":{"alertname":"FleetDoctorRed","severity":"warning","instance":"127.0.0.1:9100","job":"node-exporter"},
-  "annotations":{"summary":"workspace-doctor verdict is RED on win1-wsl1"},
+  "annotations":{"summary":"workspace-doctor verdict is RED on fleet-node-a"},
   "startsAt":"2026-08-27T14:12:18.908Z","fingerprint":"0778352592826b0a","status":{"state":"active"}}
 ]`
 

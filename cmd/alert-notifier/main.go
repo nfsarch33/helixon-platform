@@ -56,7 +56,7 @@ const apiKeyEnv = "RESEND_API_KEY" //nolint:gosec // G101: an env var NAME, not 
 
 // v18856: the non-email delivery tiers. Urgent HITL items must reach
 // Slack and Telegram, not a quota-limited email vendor alone. These env
-// names are rendered by secrets-bootstrap from the HelixonSafe vault; a
+// names are rendered by secrets-bootstrap from the fleet vault; a
 // missing var means "channel off", never "boot failure" — email stays the
 // required baseline the unit's ExecStartPre gate enforces.
 const (
