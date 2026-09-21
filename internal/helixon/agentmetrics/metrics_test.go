@@ -79,8 +79,8 @@ func TestNewRegistersEveryContractName(t *testing.T) {
 			t.Errorf("metric %q is registered nowhere; the contract lists it", name)
 		}
 	}
-	if len(Names()) != 11 {
-		t.Errorf("Names() returned %d entries, want the 11 in the frozen contract", len(Names()))
+	if len(Names()) != 12 {
+		t.Errorf("Names() returned %d entries, want the 12 in the frozen contract (v18855 added %s)", len(Names()), NameInfraRetries)
 	}
 }
 

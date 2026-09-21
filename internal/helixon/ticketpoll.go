@@ -13,6 +13,7 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agentmetrics"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/helixon/tooldispatch"
+	"github.com/nfsarch33/helixon-platform/internal/llm"
 )
 
 // TicketPoller closes the autonomy gap in serve mode.
@@ -62,6 +63,10 @@ const (
 	DefaultTicketTimeout      = 15 * time.Minute
 	DefaultTicketStatus       = "ready"
 	DefaultTicketConcurrency  = 1
+	// DefaultMaxInfraRetries is how many times an infra-class LLM failure
+	// (provider 429/5xx — llm.IsInfraFailure) is retried under the existing
+	// claim before escalating (v18855). Two retries = three attempts total.
+	DefaultMaxInfraRetries = 2
 	// maxEvidenceBytes bounds what is written back to the board. Agent output
 	// is model-controlled and unbounded; the board column is not.
 	maxEvidenceBytes = 4000
@@ -79,6 +84,11 @@ type TicketPollerConfig struct {
 	MaxConcurrent int
 	// TicketTimeout is the hard per-ticket deadline.
 	TicketTimeout time.Duration
+	// MaxInfraRetries bounds how many times an infra-class LLM failure
+	// (llm.IsInfraFailure: provider 429/5xx) is retried under the existing
+	// claim before escalating. Zero means DefaultMaxInfraRetries; negative
+	// disables in-place retry entirely (pre-v18855 behaviour).
+	MaxInfraRetries int
 	// Status, SprintID, Labels, PriorityMin, Limit narrow the board search.
 	Status      string
 	SprintID    string
@@ -103,6 +113,12 @@ func (c TicketPollerConfig) withDefaults() TicketPollerConfig {
 	}
 	if c.TicketTimeout <= 0 {
 		c.TicketTimeout = DefaultTicketTimeout
+	}
+	if c.MaxInfraRetries == 0 {
+		c.MaxInfraRetries = DefaultMaxInfraRetries
+	}
+	if c.MaxInfraRetries < 0 {
+		c.MaxInfraRetries = 0
 	}
 	if c.Status == "" {
 		c.Status = DefaultTicketStatus
@@ -133,13 +149,14 @@ type TicketWorker func(ctx context.Context, ticket controlplane.Ticket) (string,
 // TicketPollerStats is the observable outcome tally. Tests assert on it; the
 // runtime logs it.
 type TicketPollerStats struct {
-	Polls     int
-	Claimed   int
-	Conflicts int
-	Completed int
-	Escalated int
-	Abandoned int
-	Errors    int
+	Polls       int
+	Claimed     int
+	Conflicts   int
+	Completed   int
+	Escalated   int
+	Abandoned   int
+	Errors      int
+	InfraRetried int
 }
 
 // TicketPoller pulls ready work off the board and runs it.
@@ -437,7 +454,45 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 	}
 
 	started := time.Now()
-	result, err := p.work(ctx, ticket)
+	// v18855: infra-class LLM failures (provider 429/5xx) are retried under
+	// the SAME claim instead of escalating on the first one. The board census
+	// that motivated this: 23 of 44 escalations were `llm api error (status
+	// 502)` — transient provider outages that permanently stranded claimed
+	// tickets ("will not be retried automatically"). The retry is bounded by
+	// MaxInfraRetries, backs off by the poll interval, and stays inside the
+	// per-ticket deadline: a ctx that expires mid-backoff makes the next
+	// attempt fail with a non-infra deadline error, which breaks the loop and
+	// escalates as a timeout — the pre-existing budget semantics are
+	// unchanged. Caller-fault errors never enter the loop.
+	var (
+		result  string
+		err     error
+		retries int
+	)
+	for attempt := 0; ; attempt++ {
+		result, err = p.work(ctx, ticket)
+		if err == nil || parent.Err() != nil || !llm.IsInfraFailure(err) {
+			break
+		}
+		if retries >= p.cfg.MaxInfraRetries {
+			// Surface the retry budget in the escalation cause itself; %w
+			// keeps the APIError detectable for EscalationReason.
+			err = fmt.Errorf("infra llm failure persisted after %d retries: %w", retries, err)
+			break
+		}
+		retries++
+		p.bump(func(s *TicketPollerStats) { s.InfraRetried++ })
+		p.metrics.InfraRetry()
+		p.logger.Warn("infra-class llm failure; retrying under the existing claim",
+			slog.String("ticket", ticket.ID),
+			slog.Int("retry", retries),
+			slog.Int("of", p.cfg.MaxInfraRetries),
+			slog.String("error", err.Error()))
+		select {
+		case <-ctx.Done():
+		case <-time.After(p.cfg.Interval):
+		}
+	}
 
 	// Shutdown mid-ticket. The run did not fail and it did not succeed; it
 	// was interrupted by us. Writing either verdict to a durable board would
