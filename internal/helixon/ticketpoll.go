@@ -67,6 +67,10 @@ const (
 	// (provider 429/5xx — llm.IsInfraFailure) is retried under the existing
 	// claim before escalating (v18855). Two retries = three attempts total.
 	DefaultMaxInfraRetries = 2
+	// DefaultClaimRenewInterval is how often a live run renews its claim
+	// lease (v18860-1). 10 minutes sits comfortably under the board's
+	// default stale window and survives one missed renewal.
+	DefaultClaimRenewInterval = 10 * time.Minute
 	// maxEvidenceBytes bounds what is written back to the board. Agent output
 	// is model-controlled and unbounded; the board column is not.
 	maxEvidenceBytes = 4000
@@ -89,6 +93,11 @@ type TicketPollerConfig struct {
 	// claim before escalating. Zero means DefaultMaxInfraRetries; negative
 	// disables in-place retry entirely (pre-v18855 behaviour).
 	MaxInfraRetries int
+	// ClaimRenewInterval is how often the poller renews its claim lease
+	// while a run is alive (v18860-1), so the board's stale-claim sweeper
+	// cannot release a ticket out from under live work. Zero means
+	// DefaultClaimRenewInterval; negative disables renewal.
+	ClaimRenewInterval time.Duration
 	// Status, SprintID, Labels, PriorityMin, Limit narrow the board search.
 	Status      string
 	SprintID    string
@@ -120,6 +129,12 @@ func (c TicketPollerConfig) withDefaults() TicketPollerConfig {
 	if c.MaxInfraRetries < 0 {
 		c.MaxInfraRetries = 0
 	}
+	if c.ClaimRenewInterval == 0 {
+		c.ClaimRenewInterval = DefaultClaimRenewInterval
+	}
+	if c.ClaimRenewInterval < 0 {
+		c.ClaimRenewInterval = 0
+	}
 	if c.Status == "" {
 		c.Status = DefaultTicketStatus
 	}
@@ -138,6 +153,10 @@ type TicketBoard interface {
 	ClaimTicket(ctx context.Context, ticketID string) error
 	CompleteTicket(ctx context.Context, ticketID, evidence string) error
 	AddComment(ctx context.Context, ticketID, author, body string) error
+	// RenewClaim extends the claim lease (v18860-1). Implementations built
+	// against boards that predate the route may return an error on every
+	// call; the poller treats renewal as best-effort.
+	RenewClaim(ctx context.Context, ticketID string) error
 }
 
 // TicketWorker executes one ticket and returns the evidence text. It is
@@ -149,14 +168,15 @@ type TicketWorker func(ctx context.Context, ticket controlplane.Ticket) (string,
 // TicketPollerStats is the observable outcome tally. Tests assert on it; the
 // runtime logs it.
 type TicketPollerStats struct {
-	Polls       int
-	Claimed     int
-	Conflicts   int
-	Completed   int
-	Escalated   int
-	Abandoned   int
-	Errors      int
+	Polls        int
+	Claimed      int
+	Conflicts    int
+	Completed    int
+	Escalated    int
+	Abandoned    int
+	Errors       int
 	InfraRetried int
+	ClaimRenewed int
 }
 
 // TicketPoller pulls ready work off the board and runs it.
@@ -454,6 +474,40 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 	}
 
 	started := time.Now()
+
+	// v18860-1: renew the claim lease while the run (including v18855's
+	// in-place infra retries, which can legitimately hold a claim for tens of
+	// minutes) is alive, so the board's stale-claim sweeper never releases a
+	// ticket out from under live work. Renewal is best-effort: a board that
+	// predates the renew route answers 404, which is logged and swallowed —
+	// the lease only becomes load-bearing once the sweeper is enabled on the
+	// board side (its flag defaults to disabled).
+	if p.cfg.ClaimRenewInterval > 0 {
+		renewCtx, renewCancel := context.WithCancel(ctx)
+		renewDone := make(chan struct{})
+		go func() {
+			defer close(renewDone)
+			ticker := time.NewTicker(p.cfg.ClaimRenewInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-renewCtx.Done():
+					return
+				case <-ticker.C:
+					rctx, rcancel := context.WithTimeout(renewCtx, 10*time.Second)
+					if err := p.board.RenewClaim(rctx, ticket.ID); err != nil {
+						p.logger.Warn("claim lease renewal failed",
+							slog.String("ticket", ticket.ID), slog.String("error", err.Error()))
+					} else {
+						p.bump(func(s *TicketPollerStats) { s.ClaimRenewed++ })
+					}
+					rcancel()
+				}
+			}
+		}()
+		defer func() { renewCancel(); <-renewDone }()
+	}
+
 	// v18855: infra-class LLM failures (provider 429/5xx) are retried under
 	// the SAME claim instead of escalating on the first one. The board census
 	// that motivated this: 23 of 44 escalations were `llm api error (status

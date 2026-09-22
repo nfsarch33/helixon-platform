@@ -38,6 +38,7 @@ type fakeBoard struct {
 	claims    []string
 	completed map[string]string
 	comments  map[string][]string
+	renewals  []string
 	// searchErr, when set, makes every search fail (backoff exercise).
 	searchErr bool
 }
@@ -113,6 +114,18 @@ func (b *fakeBoard) server(t *testing.T) *httptest.Server {
 		b.comments[id] = append(b.comments[id], req.Author+": "+req.Body)
 		b.mu.Unlock()
 		w.WriteHeader(http.StatusCreated)
+	})
+	mux.HandleFunc("POST /api/v1/tickets/{id}/renew", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		var req struct {
+			AgentID string `json:"agent_id"`
+		}
+		_ = json.Unmarshal(body, &req)
+		b.mu.Lock()
+		id := r.PathValue("id")
+		b.renewals = append(b.renewals, id+" by "+req.AgentID)
+		b.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "ticket_id": id, "claimed_by": req.AgentID})
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -560,6 +573,8 @@ func (b *failingBoard) AddComment(context.Context, string, string, string) error
 	return nil
 }
 
+func (b *failingBoard) RenewClaim(context.Context, string) error { return nil }
+
 func (b *failingBoard) counts() (claims, completes, comments int) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -840,3 +855,4 @@ func (s stubBoard) CompleteTicket(context.Context, string, string) error { retur
 func (s stubBoard) AddComment(context.Context, string, string, string) error {
 	return nil
 }
+func (s stubBoard) RenewClaim(context.Context, string) error { return nil }

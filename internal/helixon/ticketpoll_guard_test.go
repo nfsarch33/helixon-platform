@@ -33,6 +33,8 @@ func (b *guardBoard) AddComment(context.Context, string, string, string) error {
 	return nil
 }
 
+func (b *guardBoard) RenewClaim(context.Context, string) error { return nil }
+
 // TestRunTicketHoldsTestFileGuardForTicketLife proves the activation
 // window: active inside work, released once the run reports.
 func TestRunTicketHoldsTestFileGuardForTicketLife(t *testing.T) {
