@@ -124,15 +124,21 @@ func TestCallerFaultErrorNeverRetries(t *testing.T) {
 	}
 	board, p := runInfraRetryPoller(t, work)
 
+	// Escalated is counted BEFORE the comment is posted (same ordering as
+	// the budget test), so the comment is the completion signal.
 	waitFor(t, "caller-fault error escalates immediately", func() bool {
-		s := p.Stats()
-		return s.Escalated == 1 && s.InfraRetried == 0
+		_, _, comments := board.snapshot()
+		return len(comments["t-infra"]) == 1
 	})
+	s := p.Stats()
+	if s.Escalated != 1 || s.InfraRetried != 0 {
+		t.Fatalf("escalated=%d infraRetried=%d, want 1/0", s.Escalated, s.InfraRetried)
+	}
 	if calls != 1 {
 		t.Fatalf("work ran %d times, want 1 (no retries for caller-fault)", calls)
 	}
 	_, _, comments := board.snapshot()
-	if len(comments["t-infra"]) != 1 || strings.Contains(comments["t-infra"][0], "persisted after") {
+	if strings.Contains(comments["t-infra"][0], "persisted after") {
 		t.Fatalf("escalation must be the plain error, comments = %v", comments["t-infra"])
 	}
 }
