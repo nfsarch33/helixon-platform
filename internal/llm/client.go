@@ -41,6 +41,22 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("llm api error (status %d): %s", e.StatusCode, e.Body)
 }
 
+// IsInfraFailure reports whether err is a provider-AVAILABILITY failure: an
+// APIError whose status says the upstream cannot serve right now (429, 5xx)
+// rather than rejecting the request (4xx). v18855: the board's escalation
+// census showed 23/44 escalations were exactly this class — transient
+// outages that permanently stranded claimed tickets — so the poller retries
+// infra failures under the existing claim instead of escalating on the first
+// one. Caller-fault statuses (400/401/404...) and every non-APIError stay
+// escalation-class: a wrong model name must still surface immediately.
+func IsInfraFailure(err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.StatusCode == http.StatusTooManyRequests || apiErr.StatusCode >= 500
+}
+
 // HTTPDoer abstracts HTTP execution for testing.
 type HTTPDoer interface {
 	Do(req *http.Request) (*http.Response, error)

@@ -141,6 +141,7 @@ const (
 	NameTicketsClaimed   = "hlxn_agent_tickets_claimed_total"
 	NameTicketsCompleted = "hlxn_agent_tickets_completed_total"
 	NameEscalations      = "hlxn_agent_escalations_total"
+	NameInfraRetries     = "hlxn_agent_infra_retries_total"
 	NameVerifierRuns     = "hlxn_agent_verifier_runs_total"
 	NameLoopIterations   = "hlxn_agent_loop_iterations_total"
 	NameToolCalls        = "hlxn_agent_tool_calls_total"
@@ -159,6 +160,7 @@ const (
 func Names() []string {
 	return []string{
 		NameTicketsClaimed, NameTicketsCompleted, NameEscalations,
+		NameInfraRetries,
 		NameVerifierRuns, NameLoopIterations, NameToolCalls,
 		NameSandboxFailures, NameTokens, NameRunDuration, NameBuildInfo,
 		NameGoroutines,
@@ -170,6 +172,7 @@ type Metrics struct {
 	ticketsClaimed   prometheus.Counter
 	ticketsCompleted prometheus.Counter
 	escalations      *prometheus.CounterVec
+	infraRetries     prometheus.Counter
 	verifierRuns     *prometheus.CounterVec
 	loopIterations   prometheus.Counter
 	toolCalls        *prometheus.CounterVec
@@ -208,6 +211,10 @@ func New(reg prometheus.Registerer, revision string) (*Metrics, error) {
 			Name: NameEscalations,
 			Help: "Tickets escalated to a human and deliberately NOT completed.",
 		}, []string{"reason"}),
+		infraRetries: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: NameInfraRetries,
+			Help: "Infra-class LLM failures (provider 429/5xx) retried under the existing claim instead of escalating.",
+		}),
 		verifierRuns: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: NameVerifierRuns,
 			Help: "verifier_run invocations by verdict.",
@@ -256,7 +263,7 @@ func New(reg prometheus.Registerer, revision string) (*Metrics, error) {
 
 func (m *Metrics) collectors() []prometheus.Collector {
 	return []prometheus.Collector{
-		m.ticketsClaimed, m.ticketsCompleted, m.escalations, m.verifierRuns,
+		m.ticketsClaimed, m.ticketsCompleted, m.escalations, m.infraRetries, m.verifierRuns,
 		m.loopIterations, m.toolCalls, m.sandboxFailures, m.tokens,
 		m.runDuration, m.buildInfo, m.goroutines,
 	}
@@ -342,6 +349,17 @@ func (m *Metrics) Escalated(reason string) {
 		return
 	}
 	m.escalations.WithLabelValues(normalise(reason, acceptedEscalationReasons, ReasonRunError)).Inc()
+}
+
+// InfraRetry records one infra-class LLM failure the poller retried under the
+// existing claim (v18855). It counts RETRIES, not tickets: a ticket that fails
+// twice and succeeds on the third attempt moves this counter by 2 and
+// tickets_completed by 1.
+func (m *Metrics) InfraRetry() {
+	if m == nil {
+		return
+	}
+	m.infraRetries.Inc()
 }
 
 // VerifierRun records one verifier_run invocation.
