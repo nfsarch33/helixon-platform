@@ -84,6 +84,33 @@ func TestStrict_OptionalEntryDoesNotFail(t *testing.T) {
 	}
 }
 
+// evospined is the THIRD board caller (S1 census 2026-09-22: its pinned
+// dc8fcf5 binary registered anonymously every ~30s). Its replacement binary
+// reads sprintboard.token from this env var, so the mapping must exist, must
+// share the board's item/field, and must be Optional for the same
+// --strict reason as the fleet agent's.
+func TestEvospinedBearerMapping(t *testing.T) {
+	t.Parallel()
+	var bearer *EnvEntry
+	for i := range serviceMap["evospined"] {
+		if serviceMap["evospined"][i].EnvVar == "SPRINTBOARD_API_TOKEN" {
+			bearer = &serviceMap["evospined"][i]
+		}
+	}
+	if bearer == nil {
+		t.Fatal("evospined must map SPRINTBOARD_API_TOKEN: without it the runtime registers anonymously and the board's required mode 401s every registration")
+	}
+	board, agent := "sprintboard-api", "fleet-agent"
+	if bearer.ItemEnv != serviceMap[board][0].ItemEnv || bearer.Field != serviceMap[board][0].Field {
+		t.Fatalf("evospined reads (%s,%s); the board reads (%s,%s); they must match",
+			bearer.ItemEnv, bearer.Field, serviceMap[board][0].ItemEnv, serviceMap[board][0].Field)
+	}
+	if !bearer.Optional {
+		t.Error("the board bearer must be Optional: --strict would otherwise take evospined down over an unprovisioned credential")
+	}
+	_ = agent // readability: the fleet-agent entry is covered by its own test above
+}
+
 // THE CONTROL. A non-optional entry must still fail --strict, or the tightening
 // this sits beside has been switched off rather than scoped.
 func TestStrict_NonOptionalEntryStillFails(t *testing.T) {
