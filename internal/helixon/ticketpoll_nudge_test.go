@@ -58,6 +58,8 @@ func (b *nudgeBoard) AddComment(context.Context, string, string, string) error {
 	return nil
 }
 
+func (b *nudgeBoard) RenewClaim(context.Context, string) error { return nil }
+
 type noopWorker struct{}
 
 func (noopWorker) Run(context.Context, string) (string, error) { return "ok", nil }

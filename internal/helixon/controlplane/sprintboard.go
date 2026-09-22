@@ -269,6 +269,26 @@ func claimHolder(body []byte) string {
 	return res.ClaimedBy
 }
 
+// RenewClaim extends the claim lease on a ticket this agent already holds
+// (v18860-1). The board refreshes claimed_at so the stale-claim sweeper does
+// not release a ticket out from under a long run — which v18855's in-place
+// infra retry deliberately makes possible (a bounded retry chain can hold a
+// claim well past any fixed staleness window). A 404 means the running board
+// predates the renew route: the poller logs and carries on, so renewal is
+// best-effort until every board deployment is current.
+func (c *SprintboardClient) RenewClaim(ctx context.Context, ticketID string) error {
+	data, _ := json.Marshal(map[string]string{"agent_id": c.cfg.AgentName})
+	path := fmt.Sprintf("/api/v1/tickets/%s/renew", ticketID)
+	status, body, err := c.doPost(ctx, path, data)
+	if err != nil {
+		return fmt.Errorf("sprintboard renew %s: %w", ticketID, err)
+	}
+	if status >= 400 {
+		return fmt.Errorf("sprintboard renew %s: error %d: %s", ticketID, status, string(body))
+	}
+	return nil
+}
+
 // CompleteTicket marks a ticket as completed with evidence.
 func (c *SprintboardClient) CompleteTicket(ctx context.Context, ticketID, evidence string) error {
 	data, _ := json.Marshal(map[string]string{
