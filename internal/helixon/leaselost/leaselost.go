@@ -55,12 +55,6 @@ func Classify(status int, err error) Outcome {
 	return BestEffort
 }
 
-// ShouldCancelRun reports whether the run should be canceled for this outcome.
-// Only LeaseLost returns true.
-func ShouldCancelRun(o Outcome) bool {
-	return o == LeaseLost
-}
-
 // Tracker counts consecutive Retry outcomes so the poller can give up after a
 // threshold instead of looping forever on a sick board.
 type Tracker struct {

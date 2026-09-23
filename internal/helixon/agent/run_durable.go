@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 	"github.com/nfsarch33/helixon-platform/internal/llm"
 )
 
@@ -134,12 +135,27 @@ func (a *Agent) execute(ctx context.Context, run *RunRecord, claimed bool) (*Run
 //     the ticket that already got the timeout escalated must not be reported
 //     a second time by the sweep.
 func (a *Agent) finish(ctx context.Context, run *RunRecord, result *RunResult, loopErr error) (*RunResult, error) {
+	// A board-lease cancellation is TERMINAL, not resumable. The poller's
+	// renewal loop cancels the run context WITH
+	// controlplane.ErrTicketNotClaimedBy as the cause; a resumable run here
+	// would let the recovery sweep resume it and complete a ticket this
+	// agent no longer owns on the board.
 	if errors.Is(ctx.Err(), context.Canceled) {
-		a.logger.Warn("run attempt canceled; leaving the run resumable", slog.String("run_id", run.ID))
-		if loopErr == nil {
-			loopErr = ctx.Err()
+		if cause := context.Cause(ctx); errors.Is(cause, controlplane.ErrTicketNotClaimedBy) {
+			if loopErr == nil {
+				loopErr = context.Canceled
+			}
+			loopErr = fmt.Errorf("%w: %w", controlplane.ErrTicketNotClaimedBy, loopErr)
+			a.logger.Warn("run attempt canceled: board lease lost; failing the run so recovery cannot resume it",
+				slog.String("run_id", run.ID))
+			// Fall through to the owner-guarded finish write: RunFailed.
+		} else {
+			a.logger.Warn("run attempt canceled; leaving the run resumable", slog.String("run_id", run.ID))
+			if loopErr == nil {
+				loopErr = ctx.Err()
+			}
+			return result, loopErr
 		}
-		return result, loopErr
 	}
 	if ctx.Err() != nil && loopErr == nil {
 		loopErr = ErrTimeout
