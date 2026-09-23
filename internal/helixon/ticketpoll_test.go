@@ -41,6 +41,10 @@ type fakeBoard struct {
 	renewals  []string
 	// searchErr, when set, makes every search fail (backoff exercise).
 	searchErr bool
+	// renewStatus, when non-zero, makes the renew route answer that HTTP
+	// status with an error body instead of a successful lease extension —
+	// the lever for the lease-lost (409) and best-effort (404) paths.
+	renewStatus int
 }
 
 func newFakeBoard(ready ...controlplane.Ticket) *fakeBoard {
@@ -124,7 +128,13 @@ func (b *fakeBoard) server(t *testing.T) *httptest.Server {
 		b.mu.Lock()
 		id := r.PathValue("id")
 		b.renewals = append(b.renewals, id+" by "+req.AgentID)
+		status := b.renewStatus
 		b.mu.Unlock()
+		if status != 0 {
+			w.WriteHeader(status)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": "renew refused"})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "ticket_id": id, "claimed_by": req.AgentID})
 	})
 	srv := httptest.NewServer(mux)

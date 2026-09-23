@@ -31,6 +31,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/nfsarch33/helixon-platform/internal/helixon/leaselost"
 )
 
 // DefaultSprintboardURL is the live board's address. The previous default,
@@ -42,6 +44,13 @@ const DefaultSprintboardURL = "http://127.0.0.1:9400"
 // an ordinary outcome of a poll race, not a failure: the caller moves on to
 // the next ticket rather than treating it as an error worth stopping for.
 var ErrClaimConflict = errors.New("controlplane: ticket already claimed by another agent")
+
+// ErrTicketNotClaimedBy reports that the renew route answered 409: the claim
+// lease was swept or taken by another agent. It is the one renew outcome that
+// is definitive — the caller no longer owns the ticket, so continuing the run
+// or reporting on it writes someone else's ticket. A board that predates the
+// renew route answers 404, which stays a generic error and best-effort.
+var ErrTicketNotClaimedBy = errors.New("controlplane: ticket not claimed by this agent")
 
 // SprintboardConfig configures the sprintboard auto-registration.
 type SprintboardConfig struct {
@@ -275,13 +284,19 @@ func claimHolder(body []byte) string {
 // infra retry deliberately makes possible (a bounded retry chain can hold a
 // claim well past any fixed staleness window). A 404 means the running board
 // predates the renew route: the poller logs and carries on, so renewal is
-// best-effort until every board deployment is current.
+// best-effort until every board deployment is current. A 409 is definitive
+// and is returned as ErrTicketNotClaimedBy (classified by
+// internal/helixon/leaselost): the lease was swept or taken, and the caller
+// must cancel the run rather than renew it again.
 func (c *SprintboardClient) RenewClaim(ctx context.Context, ticketID string) error {
 	data, _ := json.Marshal(map[string]string{"agent_id": c.cfg.AgentName})
 	path := fmt.Sprintf("/api/v1/tickets/%s/renew", ticketID)
 	status, body, err := c.doPost(ctx, path, data)
 	if err != nil {
 		return fmt.Errorf("sprintboard renew %s: %w", ticketID, err)
+	}
+	if leaselost.Classify(status, nil) == leaselost.LeaseLost {
+		return fmt.Errorf("sprintboard renew %s: error %d: %s: %w", ticketID, status, string(body), ErrTicketNotClaimedBy)
 	}
 	if status >= 400 {
 		return fmt.Errorf("sprintboard renew %s: error %d: %s", ticketID, status, string(body))
