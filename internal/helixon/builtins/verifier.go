@@ -42,6 +42,15 @@ type VerifierCheck struct {
 	AllowExtraArgs bool
 	PathArgs       bool
 	MinExtraArgs   int
+	// ScopeArgs, when set, turns the caller's scope arguments into the
+	// full argv for the check's command, REPLACING both Args and
+	// DefaultScope. It is how a check whose target needs normalization
+	// (gofmt_check: "./pkg/..." -> the directory "pkg", whole-tree
+	// subsumption, refusal of flags and escapes) keeps that policy in one
+	// testable place instead of the generic append path. The generic
+	// guards (AllowExtraArgs, MinExtraArgs, no flag prefixes) still apply
+	// before it runs.
+	ScopeArgs func(scope []string) ([]string, error)
 	// RequireEmptyOutput makes a zero-exit run that printed anything a FAIL.
 	//
 	// v18832: `gofmt -l` exits 0 while listing the files that are misformatted
@@ -63,8 +72,9 @@ func DefaultVerifierChecks() []VerifierCheck {
 			Description: "run tests (default ./...; pass a package pattern to scope it)"},
 		{Name: "go_vet", Command: "go", Args: []string{"vet"}, DefaultScope: []string{"./..."}, AllowExtraArgs: true,
 			Description: "run go vet (default ./...; pass a package pattern to scope it)"},
-		{Name: "gofmt_check", Command: "gofmt", Args: []string{"-l"}, DefaultScope: []string{"."}, RequireEmptyOutput: true,
-			Description: "FAIL if any file is not gofmt-formatted; the output lists the offending files"},
+		{Name: "gofmt_check", Command: "gofmt", Args: []string{"-l"}, DefaultScope: []string{"."},
+			AllowExtraArgs: true, ScopeArgs: GofmtScopeArgs, RequireEmptyOutput: true,
+			Description: "FAIL if any file is not gofmt-formatted (default the whole tree; pass package paths or files to scope it — ./pkg/... means the pkg directory)"},
 		{Name: "file_exists", Command: "test", Args: []string{"-e"}, AllowExtraArgs: true, PathArgs: true, MinExtraArgs: 1, Description: "assert a workspace file exists"},
 		{Name: "file_contains", Command: "grep", Args: []string{"-q", "--"}, AllowExtraArgs: true, MinExtraArgs: 2, Description: "assert a workspace file contains a pattern (args: pattern, path)"},
 	}
@@ -166,8 +176,9 @@ func VerifierTool(cfg VerifierConfig) tooldispatch.ToolDef {
 			"Returns JSON: pass, outcome (passed|failed|timeout|error), exit_code, duration_ms, output_excerpt, note. " +
 			"Read `pass`, never the exit code: a check can fail having exited 0 — gofmt_check fails by PRINTING " +
 			"the filenames it would reformat — and `note` explains any verdict the exit code does not. " +
-			"For go_build, go_test and go_vet, `args` may name the package pattern to run against; it REPLACES " +
-			"the default ./... rather than adding to it, so scoping to your own package will not run anyone else's.",
+			"For go_build, go_test, go_vet and gofmt_check, `args` may name the scope to run against " +
+			"(package patterns for the go checks; package paths or files for gofmt_check); it REPLACES the default " +
+			"whole-tree run rather than adding to it, so scoping to your own package will not run anyone else's.",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"required": ["check"],
@@ -352,6 +363,16 @@ func buildVerifierArgv(check VerifierCheck, extra []string, workspaceMount strin
 		if strings.HasPrefix(a, "-") {
 			return nil, fmt.Errorf("verifier_run: check %q: argument %d may not be a flag (%q)", check.Name, i, a)
 		}
+	}
+	if check.ScopeArgs != nil {
+		argv, err := check.ScopeArgs(extra)
+		if err != nil {
+			return nil, fmt.Errorf("verifier_run: check %q: %w", check.Name, err)
+		}
+		if err := sandbox.ValidateArgv(check.Command, argv); err != nil {
+			return nil, fmt.Errorf("verifier_run: check %q: %w", check.Name, err)
+		}
+		return argv, nil
 	}
 	argv := append([]string(nil), check.Args...)
 	if check.PathArgs {

@@ -37,7 +37,9 @@ func TestBuildVerifierArgv_TableDriven(t *testing.T) {
 			name: "a package pattern REPLACES the default scope", check: checks["go_test"],
 			extra: []string{"./internal/..."}, want: []string{"test", "./internal/..."},
 		},
-		{name: "gofmt_check refuses extras", check: checks["gofmt_check"], extra: []string{"."}, wantErr: "does not accept extra arguments"},
+		// v18860-3: gofmt_check now ACCEPTS scope args (normalized by
+		// GofmtScopeArgs); a flag in them is still refused.
+		{name: "gofmt_check refuses flags in scope", check: checks["gofmt_check"], extra: []string{"-w"}, wantErr: "may not be a flag"},
 		{
 			// -toolexec runs an arbitrary binary for every compile; a check
 			// that accepted "extra arguments" without this rule would be a
