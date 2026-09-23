@@ -472,6 +472,24 @@ func (r *Runtime) RecoverInterruptedRuns(ctx context.Context) (RecoveryStats, er
 		if ctx.Err() != nil {
 			return st, ctx.Err()
 		}
+		// Board guard before resuming a ticket run: if the claim was swept
+		// or taken while this process was down, resuming would complete
+		// someone else's ticket. Terminalise the run instead - the 409 is
+		// definitive, and whoever holds the ticket now decides it.
+		if tid := run.Meta["ticket_id"]; tid != "" && r.sprintCtl != nil {
+			if rerr := r.sprintCtl.RenewClaim(ctx, tid); errors.Is(rerr, controlplane.ErrTicketNotClaimedBy) {
+				termErr := fmt.Errorf("board claim lost while the worker was down: %w", rerr)
+				if _, ferr := r.store.FinishRun(ctx, run.ID, run.Owner, agent.RunFailed,
+					&agent.RunResult{SessionID: run.SessionID}, termErr); ferr != nil {
+					r.logger.Error("recovery: failed to terminalise a run whose board claim is gone",
+						slog.String("run_id", run.ID), slog.String("error", ferr.Error()))
+				}
+				st.Failed++
+				r.logger.Warn("recovery: board claim no longer held; run terminalised, not resumed",
+					slog.String("run_id", run.ID), slog.String("ticket_id", tid))
+				continue
+			}
+		}
 		res, runErr := r.agent.Resume(ctx, run.ID)
 		if errors.Is(runErr, agent.ErrLeaseHeld) || errors.Is(runErr, agent.ErrRunFinished) {
 			continue // another worker took it, or finished it, between the listing and the claim

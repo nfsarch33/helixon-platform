@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nfsarch33/helixon-platform/internal/helixon/agent"
@@ -153,9 +154,11 @@ type TicketBoard interface {
 	ClaimTicket(ctx context.Context, ticketID string) error
 	CompleteTicket(ctx context.Context, ticketID, evidence string) error
 	AddComment(ctx context.Context, ticketID, author, body string) error
-	// RenewClaim extends the claim lease (v18860-1). Implementations built
-	// against boards that predate the route may return an error on every
-	// call; the poller treats renewal as best-effort.
+	// RenewClaim extends the claim lease. Implementations built against
+	// boards that predate the route may return an error on every call; the
+	// poller treats renewal as best-effort — EXCEPT an error wrapping
+	// ErrTicketNotClaimedBy (409), which is definitive: the lease was swept
+	// or taken, and the poller cancels the run without reporting.
 	RenewClaim(ctx context.Context, ticketID string) error
 }
 
@@ -177,6 +180,9 @@ type TicketPollerStats struct {
 	Errors       int
 	InfraRetried int
 	ClaimRenewed int
+	// LeaseLost counts runs canceled because the renew route answered 409:
+	// the claim was swept or taken by another agent.
+	LeaseLost int
 }
 
 // TicketPoller pulls ready work off the board and runs it.
@@ -461,8 +467,15 @@ func (p *TicketPoller) claimNext(ctx context.Context, tickets []controlplane.Tic
 //
 //nolint:gocritic // hugeParam: the ticket is a value snapshot handed to a goroutine
 func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Ticket) {
-	ctx, cancel := context.WithTimeout(parent, p.cfg.TicketTimeout)
-	defer cancel()
+	// The per-ticket deadline is a plain timeout; the lease-lost
+	// cancellation rides ON TOP of it as a CAUSE, so the layers below
+	// (the durable agent loop) can tell "the deadline fired" from "the
+	// board took the ticket back" and terminalise instead of leaving a
+	// run resumable that would complete a ticket this agent no longer owns.
+	deadlineCtx, deadlineCancel := context.WithTimeout(parent, p.cfg.TicketTimeout)
+	defer deadlineCancel()
+	ctx, cancel := context.WithCancelCause(deadlineCtx)
+	defer cancel(context.Canceled)
 
 	// Q2a: hold the test-file write guard for exactly this run's life —
 	// including its report — so scored agents cannot touch the ruler and
@@ -475,13 +488,19 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 
 	started := time.Now()
 
-	// v18860-1: renew the claim lease while the run (including v18855's
-	// in-place infra retries, which can legitimately hold a claim for tens of
+	// Renew the claim lease while the run (including the in-place
+	// infra retries, which can legitimately hold a claim for tens of
 	// minutes) is alive, so the board's stale-claim sweeper never releases a
-	// ticket out from under live work. Renewal is best-effort: a board that
-	// predates the renew route answers 404, which is logged and swallowed —
+	// ticket out from under live work. Renewal is best-effort EXCEPT for a
+	// definitive refusal: a board that predates the renew route answers
+	// 404, which is logged and swallowed —
 	// the lease only becomes load-bearing once the sweeper is enabled on the
-	// board side (its flag defaults to disabled).
+	// board side (its flag defaults to disabled). The one definitive answer is
+	// a 409 (ErrTicketNotClaimedBy): the lease was swept or taken by another
+	// agent, so the run is canceled and its result is discarded — completing
+	// or escalating would write a ticket this agent no longer owns.
+	var leaseLost atomic.Bool
+	stopRenewal := func() {}
 	if p.cfg.ClaimRenewInterval > 0 {
 		renewCtx, renewCancel := context.WithCancel(ctx)
 		renewDone := make(chan struct{})
@@ -495,17 +514,40 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 					return
 				case <-ticker.C:
 					rctx, rcancel := context.WithTimeout(renewCtx, 10*time.Second)
-					if err := p.board.RenewClaim(rctx, ticket.ID); err != nil {
-						p.logger.Warn("claim lease renewal failed",
-							slog.String("ticket", ticket.ID), slog.String("error", err.Error()))
-					} else {
-						p.bump(func(s *TicketPollerStats) { s.ClaimRenewed++ })
-					}
+					err := p.board.RenewClaim(rctx, ticket.ID)
 					rcancel()
+					if err == nil {
+						p.bump(func(s *TicketPollerStats) { s.ClaimRenewed++ })
+						continue
+					}
+					if errors.Is(err, controlplane.ErrTicketNotClaimedBy) {
+						leaseLost.Store(true)
+						p.bump(func(s *TicketPollerStats) { s.LeaseLost++ })
+						p.logger.Warn("claim lease lost; canceling the run",
+							slog.String("ticket", ticket.ID), slog.String("error", err.Error()))
+						// Cancel first, WITH the sentinel as the cause so the
+						// durable loop below terminalises the run instead of
+						// leaving it resumable: every tick of work past this
+						// point is spent on a ticket this agent no longer owns,
+						// and a resumable run would let the recovery sweep
+						// complete someone else's ticket. The board notice is
+						// bookkeeping and must never delay the cancel.
+						cancel(controlplane.ErrTicketNotClaimedBy)
+						p.notifyLeaseLost(parent, ticket)
+						return
+					}
+					p.logger.Warn("claim lease renewal failed",
+						slog.String("ticket", ticket.ID), slog.String("error", err.Error()))
 				}
 			}
 		}()
-		defer func() { renewCancel(); <-renewDone }()
+		// Idempotent by construction: cancel twice is a no-op, and a
+		// receive on a closed renewDone returns immediately.
+		stopRenewal = func() {
+			renewCancel()
+			<-renewDone
+		}
+		defer stopRenewal()
 	}
 
 	// v18855: infra-class LLM failures (provider 429/5xx) are retried under
@@ -525,7 +567,10 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 	)
 	for attempt := 0; ; attempt++ {
 		result, err = p.work(ctx, ticket)
-		if err == nil || parent.Err() != nil || !llm.IsInfraFailure(err) {
+		// ctx.Err() != nil covers a deadline AND a lease-lost cancel: after
+		// either, re-entering p.work would spend another model call on a
+		// ticket that is over budget or no longer ours.
+		if err == nil || parent.Err() != nil || ctx.Err() != nil || !llm.IsInfraFailure(err) {
 			break
 		}
 		if retries >= p.cfg.MaxInfraRetries {
@@ -548,6 +593,13 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 		}
 	}
 
+	// Join the renewal goroutine BEFORE deciding anything about the report.
+	// A 409 that lands while report() is in flight (it can take up to 30 s)
+	// would otherwise post a "no completion was posted" notice next to a
+	// completion that did go out — a check-then-act the join removes: from
+	// here on, leaseLost can no longer flip.
+	stopRenewal()
+
 	// Shutdown mid-ticket. The run did not fail and it did not succeed; it
 	// was interrupted by us. Writing either verdict to a durable board would
 	// be a fabrication, so the ticket is left claimed for the next start (or
@@ -563,9 +615,47 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 		return
 	}
 
+	// The claim lease was lost mid-run and the renewal loop canceled the
+	// work. The ticket is another agent's now — completing would post a
+	// verdict the board will refuse (or worse, accept over the new owner's
+	// work), and escalating would strand it on a false failure — so the
+	// result is discarded and the board comment posted at cancellation
+	// time is the only record. Counted as LeaseLost only: it is not an
+	// abandonment (we chose to stop) and it has no terminal outcome to
+	// observe.
+	if leaseLost.Load() {
+		st := p.Stats()
+		p.logger.Warn("ticket run discarded: claim lease lost mid-run; not reporting on a ticket this agent no longer owns",
+			slog.String("ticket", ticket.ID),
+			slog.Int("claim_renewed", st.ClaimRenewed),
+			slog.Int("lease_lost", st.LeaseLost))
+		return
+	}
+
 	// A detached context: the parent is alive, but the per-ticket deadline may
 	// have fired, and the report must still get out.
 	p.report(context.WithoutCancel(parent), ticket, result, err, started)
+}
+
+// notifyLeaseLost posts the human-facing record of a lease-lost cancellation.
+// It is deliberately NOT escalate(): escalation holds the ticket in this
+// process's escalated set and implies a failure of the work, while a lost
+// lease means the ticket was swept or reclaimed under us — the board's new
+// owner (or the next claimant) decides what happens to it.
+//
+//nolint:gocritic // hugeParam: see runTicket
+func (p *TicketPoller) notifyLeaseLost(parent context.Context, ticket controlplane.Ticket) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 30*time.Second)
+	defer cancel()
+	body := "Automated notice from " + p.agentName + ".\n\n" +
+		"This agent's claim lease was lost mid-run (the renew route answered 409: " +
+		"the claim was swept or taken by another agent). The run was canceled and " +
+		"its result discarded; no completion was posted for this attempt."
+	if err := p.board.AddComment(ctx, ticket.ID, p.agentName, body); err != nil {
+		p.bump(func(s *TicketPollerStats) { s.Errors++ })
+		p.logger.Error("lease-lost notice failed to post; the cancellation is only in the logs",
+			slog.String("ticket", ticket.ID), slog.String("error", err.Error()))
+	}
 }
 
 // report posts a run's outcome to the board: escalate on error or on empty
