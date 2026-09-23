@@ -505,14 +505,14 @@ func TestRenewLease_LostLeaseCancelsTheRun(t *testing.T) {
 
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	assert.True(t, a.renewOnce(runCtx, cancel, "run-1"), "a live lease renews")
+	assert.True(t, a.renewOnce(runCtx, cancel, "run-1", &renewState{}), "a live lease renews")
 	assert.NoError(t, runCtx.Err())
 
 	clock.Add(2 * time.Minute)
 	ok, err = store.ClaimRun(ctx, "run-1", "other-worker", time.Minute)
 	require.NoError(t, err)
 	require.True(t, ok)
-	assert.False(t, a.renewOnce(runCtx, cancel, "run-1"), "a lost lease does not renew")
+	assert.False(t, a.renewOnce(runCtx, cancel, "run-1", &renewState{}), "a lost lease does not renew")
 	assert.ErrorIs(t, runCtx.Err(), context.Canceled, "and the run is canceled")
 }
 

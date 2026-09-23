@@ -597,6 +597,19 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 		return
 	}
 
+	// v18860-1 run-lease-transient-timeout: the agent's own run-store lease
+	// was lost or lapsed under it, and the attempt is resumable, not failed.
+	// The recovery sweep resumes the run on its next tick and reports through
+	// ReportRecovered; escalating here would strand a ticket whose work is
+	// still alive (fleet log 2026-09-23 10:59: the resumable run was never
+	// resumed because the ticket had already been escalated).
+	if errors.Is(err, agent.ErrLeaseLost) {
+		p.bump(func(s *TicketPollerStats) { s.Abandoned++ })
+		p.logger.Warn("run lease lost mid-ticket; left claimed for the recovery sweep; not escalating",
+			slog.String("ticket", ticket.ID))
+		return
+	}
+
 	// A detached context: the parent is alive, but the per-ticket deadline may
 	// have fired, and the report must still get out.
 	p.report(context.WithoutCancel(parent), ticket, result, err, started)
