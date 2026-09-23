@@ -46,11 +46,12 @@ type VerifierCheck struct {
 	// full argv for the check's command, REPLACING both Args and
 	// DefaultScope. It is how a check whose target needs normalization
 	// (gofmt_check: "./pkg/..." -> the directory "pkg", whole-tree
-	// subsumption, refusal of flags and escapes) keeps that policy in one
-	// testable place instead of the generic append path. The generic
-	// guards (AllowExtraArgs, MinExtraArgs, no flag prefixes) still apply
-	// before it runs.
-	ScopeArgs func(scope []string) ([]string, error)
+	// subsumption, refusal of flags and escapes, and per-scope resolution
+	// against the workspace) keeps that policy in one testable place
+	// instead of the generic append path. The generic guards
+	// (AllowExtraArgs, MinExtraArgs, no flag prefixes) still apply before
+	// it runs.
+	ScopeArgs func(scope []string, workspaceRoot string) ([]string, error)
 	// RequireEmptyOutput makes a zero-exit run that printed anything a FAIL.
 	//
 	// v18832: `gofmt -l` exits 0 while listing the files that are misformatted
@@ -365,7 +366,7 @@ func buildVerifierArgv(check VerifierCheck, extra []string, workspaceMount strin
 		}
 	}
 	if check.ScopeArgs != nil {
-		argv, err := check.ScopeArgs(extra)
+		argv, err := check.ScopeArgs(extra, workspaceMount)
 		if err != nil {
 			return nil, fmt.Errorf("verifier_run: check %q: %w", check.Name, err)
 		}

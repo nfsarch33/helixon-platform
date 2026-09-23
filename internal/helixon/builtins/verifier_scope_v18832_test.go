@@ -67,7 +67,8 @@ func TestScopeReplacesDefaultRatherThanAppending(t *testing.T) {
 }
 
 // TestGofmtCheckArgvIsUnchanged: splitting Args from DefaultScope must not alter
-// what actually runs for a check that never accepted extra arguments.
+// the UNSCOPED argv - gofmt_check now accepts scope arguments, and this pin
+// keeps the no-argument default exactly the whole tree.
 func TestGofmtCheckArgvIsUnchanged(t *testing.T) {
 	t.Parallel()
 	got, err := buildVerifierArgv(checkByName(t, "gofmt_check"), nil, sandbox.DefaultWorkspaceMount)
