@@ -6,10 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
+<<<<<<< HEAD
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
+=======
+	"github.com/nfsarch33/helixon-platform/internal/helixon/leaselost"
+>>>>>>> b0d398c (fix(agent): classify run-store renew failures - transient retries, lease-lost cancels (v18860-1))
 	"github.com/nfsarch33/helixon-platform/internal/llm"
 )
 
@@ -33,7 +38,13 @@ var (
 	// ErrLeaseHeld is returned when another worker holds the run's lease.
 	ErrLeaseHeld = errors.New("agent: run lease held by another worker")
 	// ErrLeaseLost is returned when this worker's lease lapsed mid-run and was
-	// taken over, so the result it computed was refused.
+	// taken over, so the result it computed was refused. It is produced in two
+	// places: a refused finish write (another owner already moved the run on),
+	// and a renewal verdict that canceled the loop (the run-store lease was
+	// reclaimed, or enough consecutive renewal ticks failed that the lease had
+	// effectively lapsed). Both mean the same thing to a caller: this attempt
+	// is over, the run is resumable, and reporting it as a failure would
+	// strand work the recovery sweep should finish.
 	ErrLeaseLost = errors.New("agent: run lease lost during execution")
 	// ErrRunFinished wraps the stored error of a run that already ended.
 	ErrRunFinished = errors.New("agent: run already finished")
@@ -116,12 +127,12 @@ func (a *Agent) execute(ctx context.Context, run *RunRecord, claimed bool) (*Run
 	})
 	ctx, cancel := context.WithTimeout(ctx, a.cfg.Timeout)
 	defer cancel()
-	stopRenew := a.startRenewal(ctx, cancel, run.ID)
+	stopRenew, renew := a.startRenewal(ctx, cancel, run.ID)
 	defer stopRenew()
 
 	result := &RunResult{SessionID: run.SessionID}
 	loopErr := a.resumeLoop(ctx, run, result)
-	return a.finish(ctx, run, result, loopErr)
+	return a.finish(ctx, run, result, loopErr, renew)
 }
 
 // finish maps the loop's outcome to a terminal status and records it under
@@ -134,14 +145,14 @@ func (a *Agent) execute(ctx context.Context, run *RunRecord, claimed bool) (*Run
 //     restart must not hand a run that exhausted its budget a fresh one, and
 //     the ticket that already got the timeout escalated must not be reported
 //     a second time by the sweep.
-func (a *Agent) finish(ctx context.Context, run *RunRecord, result *RunResult, loopErr error) (*RunResult, error) {
-	// A board-lease cancellation is TERMINAL, not resumable. The poller's
-	// renewal loop cancels the run context WITH
-	// controlplane.ErrTicketNotClaimedBy as the cause; a resumable run here
-	// would let the recovery sweep resume it and complete a ticket this
-	// agent no longer owns on the board.
+func (a *Agent) finish(ctx context.Context, run *RunRecord, result *RunResult, loopErr error, renew *renewState) (*RunResult, error) {
 	if errors.Is(ctx.Err(), context.Canceled) {
 		if cause := context.Cause(ctx); errors.Is(cause, controlplane.ErrTicketNotClaimedBy) {
+			// A board-lease cancellation is TERMINAL, not resumable. The poller's
+			// renewal loop cancels the run context WITH
+			// controlplane.ErrTicketNotClaimedBy as the cause; a resumable run here
+			// would let the recovery sweep resume it and complete a ticket this
+			// agent no longer owns on the board.
 			if loopErr == nil {
 				loopErr = context.Canceled
 			}
@@ -149,6 +160,19 @@ func (a *Agent) finish(ctx context.Context, run *RunRecord, result *RunResult, l
 			a.logger.Warn("run attempt canceled: board lease lost; failing the run so recovery cannot resume it",
 				slog.String("run_id", run.ID))
 			// Fall through to the owner-guarded finish write: RunFailed.
+		} else if renew != nil && renew.lost.Load() {
+			// The renewer canceled this attempt because the RUN-STORE lease is
+			// gone (typed 409, not a transient store error — renewOnce only
+			// raises this flag on the definitive refusal). Tag it so the caller
+			// (the ticket poller) can abandon the ticket instead of escalating:
+			// the run is resumable and the recovery sweep, not a human, owns
+			// finishing it.
+			if loopErr == nil {
+				loopErr = ctx.Err()
+			}
+			loopErr = errors.Join(ErrLeaseLost, loopErr)
+			a.logger.Warn("run attempt canceled: lease lost; leaving the run resumable", slog.String("run_id", run.ID))
+			return result, loopErr
 		} else {
 			a.logger.Warn("run attempt canceled; leaving the run resumable", slog.String("run_id", run.ID))
 			if loopErr == nil {
@@ -255,11 +279,27 @@ func lastAssistantTurn(turns []Turn) (*Turn, int) {
 	return last, count
 }
 
+// renewState is one run's renewal-loop bookkeeping: whether the loop canceled
+// the run because the lease is gone, and the consecutive-failed-ticks streak
+// that decides when a transient problem has spanned the lease TTL.
+type renewState struct {
+	lost atomic.Bool
+	tr   leaselost.Tracker
+}
+
+// renewMissesBudget is how many consecutive renewal ticks may fully fail
+// (after in-tick retries) before the run is canceled. Ticks fire at a third
+// of the TTL: after the second missed tick the remaining lease cannot span
+// the next one, so a third tick would fire on an expired lease - that is the
+// "TTL would actually lapse" boundary (v18860-1 run-lease-transient-timeout).
+const renewMissesBudget = 2
+
 // startRenewal renews the lease at a third of the TTL until stop is called.
 // The goroutine is joined by stop, so the package's goleak check sees it end.
-func (a *Agent) startRenewal(ctx context.Context, cancel context.CancelFunc, runID string) func() {
+func (a *Agent) startRenewal(ctx context.Context, cancel context.CancelFunc, runID string) (func(), *renewState) {
 	done := make(chan struct{})
 	finished := make(chan struct{})
+	state := &renewState{}
 	go func() {
 		defer close(finished)
 		ticker := time.NewTicker(a.cfg.LeaseTTL / 3)
@@ -271,7 +311,7 @@ func (a *Agent) startRenewal(ctx context.Context, cancel context.CancelFunc, run
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if !a.renewOnce(ctx, cancel, runID) {
+				if !a.renewOnce(ctx, cancel, runID, state) {
 					return
 				}
 			}
@@ -280,26 +320,58 @@ func (a *Agent) startRenewal(ctx context.Context, cancel context.CancelFunc, run
 	return func() {
 		close(done)
 		<-finished
-	}
+	}, state
 }
 
-// renewOnce extends the lease; when the store refuses, the run is canceled
-// and false is returned. Exposed at package level for the contract test.
-func (a *Agent) renewOnce(ctx context.Context, cancel context.CancelFunc, runID string) bool {
-	renewCtx, rcancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer rcancel()
-	ok, err := a.store.RenewRun(renewCtx, runID, a.owner, a.cfg.LeaseTTL)
-	if err != nil {
-		a.logger.Warn("lease renewal errored; canceling the run", slog.String("run_id", runID), slog.String("error", err.Error()))
-		cancel()
-		return false
+// renewOnce extends the lease for one renewal tick. Errors are not verdicts:
+// a transient store failure (deadline, SQLITE_BUSY - concurrent runs share
+// one SQLite file and this host's fsync is slow) is retried inside the tick,
+// and only ends the run when enough consecutive ticks have failed that the
+// lease would actually lapse. A definitive refusal (another owner holds the
+// run) cancels immediately. Exposed at package level for the contract tests.
+func (a *Agent) renewOnce(ctx context.Context, cancel context.CancelFunc, runID string, state *renewState) bool {
+	const attempts = 3
+	var (
+		ok  bool
+		err error
+	)
+	for i := 0; i < attempts; i++ {
+		renewCtx, rcancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		ok, err = a.renewals.RenewRun(renewCtx, runID, a.owner, a.cfg.LeaseTTL)
+		rcancel()
+		if err == nil || i == attempts-1 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			// The run itself is ending; nothing left to renew for.
+			return true
+		case <-time.After(time.Duration(i+1) * 250 * time.Millisecond):
+		}
 	}
-	if !ok {
+	switch {
+	case err == nil && ok:
+		state.tr.Record(leaselost.Renewed)
+		return true
+	case err == nil:
+		state.lost.Store(true)
+		state.tr.Record(leaselost.LeaseLost)
 		a.logger.Warn("lease lost; canceling the run", slog.String("run_id", runID))
 		cancel()
 		return false
+	default:
+		streak := state.tr.Record(leaselost.Retry)
+		if state.tr.Exhausted(renewMissesBudget) {
+			state.lost.Store(true)
+			a.logger.Warn("lease renewal failed on consecutive ticks spanning the TTL; canceling the run",
+				slog.String("run_id", runID), slog.Int("missed_ticks", streak))
+			cancel()
+			return false
+		}
+		a.logger.Warn("lease renewal failed (transient); run continues, retrying next tick",
+			slog.String("run_id", runID), slog.String("error", err.Error()))
+		return true
 	}
-	return true
 }
 
 // markActive registers a run as executing in this process; false when it
