@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -114,8 +115,12 @@ func TestRunTicketRenew409CancelsRunAndNeverCompletes(t *testing.T) {
 	}, quietLogger())
 
 	canceled := make(chan struct{})
+	var leaseCause atomic.Value
 	work := func(ctx context.Context, _ controlplane.Ticket) (string, error) {
 		<-ctx.Done()
+		if c := context.Cause(ctx); c != nil {
+			leaseCause.Store(c)
+		}
 		close(canceled)
 		// SUCCESS evidence: if the discard guard is deleted, this result is
 		// reported and Completed becomes 1 - the test fails.
@@ -156,6 +161,9 @@ func TestRunTicketRenew409CancelsRunAndNeverCompletes(t *testing.T) {
 	s := p.Stats()
 	if s.Completed != 0 {
 		t.Fatalf("Completed = %d after lease loss; want 0 (never complete a ticket this agent no longer owns)", s.Completed)
+	}
+	if got, _ := leaseCause.Load().(error); !errors.Is(got, controlplane.ErrTicketNotClaimedBy) {
+		t.Fatalf("run context cause = %v, want the lease-lost sentinel", got)
 	}
 	if s.Escalated != 0 {
 		t.Fatalf("Escalated = %d after lease loss; want 0 (the ticket is not this agent's to escalate)", s.Escalated)

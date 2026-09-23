@@ -488,7 +488,7 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 
 	started := time.Now()
 
-	// Renew the claim lease while the run (including v18855's in-place
+	// Renew the claim lease while the run (including the in-place
 	// infra retries, which can legitimately hold a claim for tens of
 	// minutes) is alive, so the board's stale-claim sweeper never releases a
 	// ticket out from under live work. Renewal is best-effort EXCEPT for a

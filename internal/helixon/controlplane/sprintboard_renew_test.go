@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// v18860-1 renew-409: RenewClaim must keep the renew verdicts apart. A 409 is
+// RenewClaim must keep the renew verdicts apart. A 409 is
 // definitive (the lease was swept or taken) and is surfaced as
 // ErrTicketNotClaimedBy so the poller can cancel the run; 404 and 5xx stay
 // generic errors, because a board that predates the route or a sick board is
