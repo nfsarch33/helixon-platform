@@ -32,16 +32,16 @@ func gofmtWorkspace(t *testing.T) string {
 		"docs":      {"readme.md"},
 		"deep/dgrp": {"n.go"},
 	} {
-		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o750); err != nil {
 			t.Fatal(err)
 		}
 		for _, f := range files {
-			if err := os.WriteFile(filepath.Join(root, dir, f), []byte("package p\n"), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(root, dir, f), []byte("package p\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
-	if err := os.MkdirAll(filepath.Join(root, "empty"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "empty"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	return root
@@ -224,10 +224,10 @@ func TestGofmtScopedCheckResolvesAgainstHostWorkspace(t *testing.T) {
 func TestGofmtScopeLiteralFlagDirectoryIsRefused(t *testing.T) {
 	root := gofmtWorkspace(t)
 	flagDir := filepath.Join(root, "-w")
-	if err := os.MkdirAll(flagDir, 0o755); err != nil {
+	if err := os.MkdirAll(flagDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(flagDir, "victim.go"), []byte("package w\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(flagDir, "victim.go"), []byte("package w\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	_, err := GofmtScopeArgs([]string{"./-w"}, root)
@@ -246,10 +246,10 @@ func TestGofmtScopeLiteralFlagDirectoryIsRefused(t *testing.T) {
 func TestGofmtScopeSymlinkEscapesAreRefused(t *testing.T) {
 	root := gofmtWorkspace(t)
 	outside := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(outside, "pkg"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(outside, "pkg"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(outside, "pkg", "a.go"), []byte("package p\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outside, "pkg", "a.go"), []byte("package p\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -267,7 +267,7 @@ func TestGofmtScopeSymlinkEscapesAreRefused(t *testing.T) {
 	}
 
 	// A directory whose only content is a symlink is a vacuous scope.
-	if err := os.MkdirAll(filepath.Join(root, "onlylink"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "onlylink"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(filepath.Join(outside, "pkg", "a.go"), filepath.Join(root, "onlylink", "in.go")); err != nil {
@@ -285,18 +285,18 @@ func TestGofmtScopeSymlinkEscapesAreRefused(t *testing.T) {
 func TestGofmtScopeDotAndUnderscoreNamesDoNotSatisfyScope(t *testing.T) {
 	root := gofmtWorkspace(t)
 	hidden := filepath.Join(root, "hidden")
-	if err := os.MkdirAll(hidden, 0o755); err != nil {
+	if err := os.MkdirAll(hidden, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{".x.go", "_y.go"} {
-		if err := os.WriteFile(filepath.Join(hidden, name), []byte("package h\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(hidden, name), []byte("package h\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := os.MkdirAll(filepath.Join(root, "dotdir", ".sub"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "dotdir", ".sub"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "dotdir", ".sub", "z.go"), []byte("package s\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "dotdir", ".sub", "z.go"), []byte("package s\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, scope := range []string{"hidden", "dotdir"} {
