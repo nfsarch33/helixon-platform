@@ -377,6 +377,33 @@ func (s *SessionStore) ListInterruptedRuns(ctx context.Context) ([]RunRecord, er
 	return out, rows.Err()
 }
 
+// FindInterruptedRunByTicket returns the oldest interrupted run bound to a
+// ticket, or nil when there is none. It is the one-run-per-ticket guard's
+// read: before a worker starts a fresh run for a claimed ticket, it asks
+// whether an earlier attempt for the same ticket is still resumable, so a
+// re-claimed ticket continues its interrupted run instead of forking a
+// second one that races the first to the finish write.
+//
+// The filter runs over the interrupted set rather than a dedicated index:
+// the resumable population is small by construction (it is bounded by the
+// tickets this fleet is actually working), and reusing ListInterruptedRuns
+// keeps one definition of "interrupted".
+func (s *SessionStore) FindInterruptedRunByTicket(ctx context.Context, ticketID string) (*RunRecord, error) {
+	if ticketID == "" {
+		return nil, nil
+	}
+	runs, err := s.ListInterruptedRuns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range runs {
+		if runs[i].Meta["ticket_id"] == ticketID {
+			return &runs[i], nil
+		}
+	}
+	return nil, nil
+}
+
 // BeginStep records that a tool call is about to be dispatched. It is
 // idempotent on (run, iteration, tool_call_id): a step that already exists is
 // returned with created = false, which is how a resumed run learns a tool

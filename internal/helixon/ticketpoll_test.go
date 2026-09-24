@@ -37,8 +37,11 @@ type fakeBoard struct {
 	searches  int
 	claims    []string
 	completed map[string]string
-	comments  map[string][]string
-	renewals  []string
+	// completions counts complete calls per ticket, so a test can tell
+	// "completed" from "completed exactly once" (the map above overwrites).
+	completions map[string]int
+	comments    map[string][]string
+	renewals    []string
 	// searchErr, when set, makes every search fail (backoff exercise).
 	searchErr bool
 	// renewStatus, when non-zero, makes the renew route answer that HTTP
@@ -49,10 +52,11 @@ type fakeBoard struct {
 
 func newFakeBoard(ready ...controlplane.Ticket) *fakeBoard {
 	return &fakeBoard{
-		ready:     ready,
-		heldBy:    map[string]string{},
-		completed: map[string]string{},
-		comments:  map[string][]string{},
+		ready:       ready,
+		heldBy:      map[string]string{},
+		completed:   map[string]string{},
+		completions: map[string]int{},
+		comments:    map[string][]string{},
 	}
 }
 
@@ -103,6 +107,7 @@ func (b *fakeBoard) server(t *testing.T) *httptest.Server {
 		_ = json.Unmarshal(body, &req)
 		b.mu.Lock()
 		b.completed[r.PathValue("id")] = req.Evidence
+		b.completions[r.PathValue("id")]++
 		b.mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	})

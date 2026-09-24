@@ -69,7 +69,7 @@ const (
 	// claim before escalating (v18855). Two retries = three attempts total.
 	DefaultMaxInfraRetries = 2
 	// DefaultClaimRenewInterval is how often a live run renews its claim
-	// lease (v18860-1). 10 minutes sits comfortably under the board's
+	// lease. 10 minutes sits comfortably under the board's
 	// default stale window and survives one missed renewal.
 	DefaultClaimRenewInterval = 10 * time.Minute
 	// maxEvidenceBytes bounds what is written back to the board. Agent output
@@ -95,7 +95,7 @@ type TicketPollerConfig struct {
 	// disables in-place retry entirely (pre-v18855 behaviour).
 	MaxInfraRetries int
 	// ClaimRenewInterval is how often the poller renews its claim lease
-	// while a run is alive (v18860-1), so the board's stale-claim sweeper
+	// while a run is alive, so the board's stale-claim sweeper
 	// cannot release a ticket out from under live work. Zero means
 	// DefaultClaimRenewInterval; negative disables renewal.
 	ClaimRenewInterval time.Duration
@@ -632,12 +632,11 @@ func (p *TicketPoller) runTicket(parent context.Context, ticket controlplane.Tic
 		return
 	}
 
-	// v18860-1 run-lease-transient-timeout: the agent's own run-store lease
-	// was lost or lapsed under it, and the attempt is resumable, not failed.
-	// The recovery sweep resumes the run on its next tick and reports through
+	// The agent's own run-store lease was lost or lapsed under it, and the
+	// attempt is resumable, not failed. The runtime's periodic recovery sweep
+	// resumes the run within one interval and reports through
 	// ReportRecovered; escalating here would strand a ticket whose work is
-	// still alive (fleet log 2026-09-23 10:59: the resumable run was never
-	// resumed because the ticket had already been escalated).
+	// still alive (an escalated ticket is never resumed).
 	if errors.Is(err, agent.ErrLeaseLost) {
 		p.bump(func(s *TicketPollerStats) { s.Abandoned++ })
 		p.logger.Warn("run lease lost mid-ticket; left claimed for the recovery sweep; not escalating",

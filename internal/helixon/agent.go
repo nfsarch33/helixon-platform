@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +56,14 @@ type RuntimeConfig struct {
 	Agentrace AgentraceConfig
 	// Tickets configures the serve-mode ticket poller. Default OFF.
 	Tickets TicketPollerConfig
+	// RecoveryInterval is the period of the in-process interrupted-run
+	// sweep. The first sweep always runs at start-up; this field governs
+	// the periodic ones, so a run whose lease lapsed mid-flight (a lost
+	// run-store lease abandons the attempt but leaves the run resumable)
+	// is resumed within one interval instead of waiting for a restart.
+	// Zero means the default (2 minutes); negative disables the periodic
+	// sweep, keeping only the start-up one.
+	RecoveryInterval time.Duration
 	// Metrics configures the Prometheus agent-runtime series. Default ON.
 	Metrics MetricsConfig
 	// Memory configures loop memory (Engram) on the ticket path.
@@ -295,17 +304,13 @@ func (r *Runtime) Run(ctx context.Context) error {
 
 	// Runs whose worker died (this process, last time) are finished first, so
 	// a ticket left claimed by a crash is completed or escalated instead of
-	// sitting claimed until a human notices.
+	// sitting claimed until a human notices; the same sweep then repeats on
+	// a jittered interval, so a run abandoned mid-flight by a lost lease is
+	// resumed within one interval rather than at the next restart.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		stats, err := r.RecoverInterruptedRuns(ctx)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			r.logger.Warn("run recovery stopped early", slog.String("error", err.Error()))
-		}
-		r.logger.Info("run recovery finished",
-			slog.Int("dead_lettered", stats.DeadLettered), slog.Int("resumed", stats.Resumed),
-			slog.Int("completed", stats.Completed), slog.Int("escalated", stats.Escalated), slog.Int("failed", stats.Failed))
+		r.recoveryLoop(ctx)
 	}()
 
 	if r.sprintCtl != nil {
@@ -472,6 +477,13 @@ func (r *Runtime) RecoverInterruptedRuns(ctx context.Context) (RecoveryStats, er
 		if ctx.Err() != nil {
 			return st, ctx.Err()
 		}
+		// In-flight here beats interrupted on the listing: the listing
+		// races the lease renewal, so a run this process is executing can
+		// appear. Resuming it would deadlock on markActive's refusal and
+		// misreport it as another worker's; skip instead.
+		if r.agent.Active(run.ID) {
+			continue
+		}
 		// Board guard before resuming a ticket run: if the claim was swept
 		// or taken while this process was down, resuming would complete
 		// someone else's ticket. Terminalise the run instead - the 409 is
@@ -514,6 +526,55 @@ func (r *Runtime) RecoverInterruptedRuns(ctx context.Context) (RecoveryStats, er
 			slog.Bool("completed", runErr == nil))
 	}
 	return st, nil
+}
+
+// defaultRecoveryInterval is the periodic sweep period when the config
+// leaves RecoveryInterval at zero.
+const defaultRecoveryInterval = 2 * time.Minute
+
+// jitterRecoveryInterval spreads sweep starts across a fleet of processes so
+// a shared board or store does not see every worker's recovery arrive in the
+// same second: ±20% around the base period.
+func jitterRecoveryInterval(base time.Duration) time.Duration {
+	f := 0.8 + 0.4*rand.Float64()
+	return time.Duration(f * float64(base))
+}
+
+// recoveryLoop runs the interrupted-run sweep once immediately (the start-up
+// semantics this runtime has always had) and then on a jittered interval. A
+// negative configured interval keeps only the start-up sweep. Each sweep is
+// the same sequential RecoverInterruptedRuns: recovery competes with live
+// work for the same model and tool budgets, so the periodic form must not
+// become a parallel burst either.
+func (r *Runtime) recoveryLoop(ctx context.Context) {
+	sweep := func(startup bool) {
+		stats, err := r.RecoverInterruptedRuns(ctx)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			r.logger.Warn("run recovery stopped early", slog.String("error", err.Error()))
+		}
+		did := stats.DeadLettered + stats.Resumed + stats.Completed + stats.Escalated + stats.Failed
+		if startup || did > 0 || err != nil {
+			r.logger.Info("run recovery finished",
+				slog.Int("dead_lettered", stats.DeadLettered), slog.Int("resumed", stats.Resumed),
+				slog.Int("completed", stats.Completed), slog.Int("escalated", stats.Escalated), slog.Int("failed", stats.Failed))
+		}
+	}
+	sweep(true)
+	base := r.cfg.RecoveryInterval
+	if base == 0 {
+		base = defaultRecoveryInterval
+	}
+	if base < 0 {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(jitterRecoveryInterval(base)):
+		}
+		sweep(false)
+	}
 }
 
 // Store exposes the session/run store for read-only consumers such as the
@@ -580,6 +641,24 @@ func (r *Runtime) TicketPoller() *TicketPoller {
 //
 //nolint:gocritic // hugeParam: the TicketWorker contract takes the ticket by value
 func (r *Runtime) runTicketWork(ctx context.Context, ticket controlplane.Ticket) (string, error) {
+	// One run per ticket: an earlier attempt for this ticket may still be
+	// resumable (a lost run-store lease abandons the attempt, not the run).
+	// Resuming it continues the durable work instead of forking a second
+	// run that races the first to the finish write and the board report.
+	if prev, ferr := r.store.FindInterruptedRunByTicket(ctx, ticket.ID); ferr != nil {
+		r.logger.Warn("looking for an interrupted run of this ticket failed; starting a fresh run",
+			slog.String("ticket", ticket.ID), slog.String("error", ferr.Error()))
+	} else if prev != nil {
+		r.logger.Info("ticket has an interrupted run; resuming it instead of starting a second",
+			slog.String("ticket", ticket.ID), slog.String("run_id", prev.ID))
+		res, rerr := r.agent.Resume(ctx, prev.ID)
+		final := ""
+		if res != nil {
+			final = res.FinalContent
+		}
+		r.persistTicketMemory(ctx, ticket, final, rerr)
+		return final, rerr
+	}
 	sess, err := r.store.CreateSession(ctx, r.cfg.AgentID, map[string]string{
 		"channel":   "ticket",
 		"ticket_id": ticket.ID,

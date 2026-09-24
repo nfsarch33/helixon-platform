@@ -10,11 +10,10 @@ import (
 	"github.com/nfsarch33/helixon-platform/internal/helixon/controlplane"
 )
 
-// v18860-1 run-lease-transient-timeout, poller half. When the agent's own
-// run-store lease is lost or lapses under it, the run is resumable and the
-// recovery sweep will finish it and report through ReportRecovered.
-// Escalating the ticket here would strand work that is still alive - the
-// exact defect in the 2026-09-23 10:59 fleet log.
+// When the agent's own run-store lease is lost or lapses under it, the run
+// is resumable and the recovery sweep will finish it and report through
+// ReportRecovered. Escalating the ticket here would strand work that is
+// still alive - the
 func TestRunTicketAgentLeaseLostAbandonsWithoutEscalating(t *testing.T) {
 	board := newFakeBoard(controlplane.Ticket{ID: "t-lease", Title: "run lease lost"})
 	srv := board.server(t)
