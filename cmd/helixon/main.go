@@ -362,13 +362,18 @@ func startServeDashboard(rt *helixon.Runtime, dashboardAddr string, out io.Write
 	// running agent (v18848 §3.3). The fetchers default to the live board
 	// port; HLXN_SPRINTBOARD_URL overrides.
 	dcfg := dashboard.DashboardConfig{SprintboardURL: os.Getenv("HLXN_SPRINTBOARD_URL")}
+	// One bearer source for every board-facing surface: the operator-verb
+	// proxy below and the sprint/agents fetchers above present the same
+	// credential, so a board running with required auth answers both.
+	boardBearer := os.Getenv("SPRINTBOARD_API_TOKEN")
+	dcfg.SprintboardToken = boardBearer
 	dashboard.MountAll(mux, runtimeView{rt: rt}, dcfg)
 	// The operator verbs for the console's board page (v18850): same-origin
 	// proxy to the board. Claim/complete are not proxied -- agents talk to the
 	// board directly.
 	// The board's shared bearer (bootstrap/required auth, v18836/v18851); empty
 	// when unprovisioned, and then no Authorization header is sent.
-	dashboard.MountBoardProxy(mux, dcfg.SprintboardURL, os.Getenv("SPRINTBOARD_API_TOKEN"))
+	dashboard.MountBoardProxy(mux, dcfg.SprintboardURL, boardBearer)
 	// The console's launch button (v18851): wake the ticket poller's idle
 	// backoff so operator-created/requeued work is picked up in seconds, not
 	// after a backoff that doubles to minutes. Nil when polling is off, which

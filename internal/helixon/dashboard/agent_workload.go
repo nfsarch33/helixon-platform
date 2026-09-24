@@ -31,16 +31,18 @@ type AgentWorkloadResponse struct {
 type AgentWorkloadFetcher struct {
 	sprintboardURL string
 	tenantID       string // optional: when set, forwarded as tenant_id query param (v18685-1)
+	token          string // the board's shared bearer; empty means the board runs unauthenticated
 	client         *http.Client
 }
 
 // NewAgentWorkloadFetcher creates a fetcher that queries the SprintBoard API.
-func NewAgentWorkloadFetcher(sprintboardURL string) *AgentWorkloadFetcher {
+func NewAgentWorkloadFetcher(sprintboardURL, token string) *AgentWorkloadFetcher {
 	if sprintboardURL == "" {
 		sprintboardURL = "http://127.0.0.1:9400"
 	}
 	return &AgentWorkloadFetcher{
 		sprintboardURL: sprintboardURL,
+		token:          token,
 		client:         &http.Client{Timeout: 5 * time.Second},
 	}
 }
@@ -48,8 +50,8 @@ func NewAgentWorkloadFetcher(sprintboardURL string) *AgentWorkloadFetcher {
 // NewAgentWorkloadFetcherWithTenant creates a fetcher that scopes requests
 // to a specific tenant. Use this in v18685-1+ when the dashboard serves
 // per-tenant views.
-func NewAgentWorkloadFetcherWithTenant(sprintboardURL, tenantID string) *AgentWorkloadFetcher {
-	f := NewAgentWorkloadFetcher(sprintboardURL)
+func NewAgentWorkloadFetcherWithTenant(sprintboardURL, token, tenantID string) *AgentWorkloadFetcher {
+	f := NewAgentWorkloadFetcher(sprintboardURL, token)
 	f.tenantID = tenantID
 	return f
 }
@@ -64,6 +66,9 @@ func (f *AgentWorkloadFetcher) Fetch(ctx context.Context) (*AgentWorkloadRespons
 	if err != nil {
 		return nil, fmt.Errorf("agent workload: build request: %w", err)
 	}
+	if f.token != "" {
+		req.Header.Set("Authorization", "Bearer "+f.token)
+	}
 
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -76,6 +81,9 @@ func (f *AgentWorkloadFetcher) Fetch(ctx context.Context) (*AgentWorkloadRespons
 		return nil, fmt.Errorf("agent workload: read body: %w", err)
 	}
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("agent workload: %s %s: %w", http.MethodGet, "/api/v1/agents", ErrBoardUnauthorized)
+	}
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("agent workload: status %d: %s", resp.StatusCode, string(data))
 	}
@@ -138,7 +146,7 @@ func TenantAgentWorkloadHandler(fetcher *AgentWorkloadFetcher) http.Handler {
 		tenantID := r.Header.Get("X-Tenant-ID")
 		f := fetcher
 		if tenantID != "" {
-			f = NewAgentWorkloadFetcherWithTenant(fetcher.sprintboardURL, tenantID)
+			f = NewAgentWorkloadFetcherWithTenant(fetcher.sprintboardURL, fetcher.token, tenantID)
 		}
 		resp, err := f.Fetch(r.Context())
 		if err != nil {

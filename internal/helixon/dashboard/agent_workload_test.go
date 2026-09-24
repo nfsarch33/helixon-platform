@@ -25,7 +25,7 @@ func TestAgentWorkloadFetcher_Success(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	fetcher := NewAgentWorkloadFetcher(srv.URL)
+	fetcher := NewAgentWorkloadFetcher(srv.URL, "")
 	resp, err := fetcher.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
@@ -51,7 +51,7 @@ func TestAgentWorkloadFetcher_WrappedResponse(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	fetcher := NewAgentWorkloadFetcher(srv.URL)
+	fetcher := NewAgentWorkloadFetcher(srv.URL, "")
 	resp, err := fetcher.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
@@ -69,7 +69,7 @@ func TestAgentWorkloadFetcher_ServerError(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	fetcher := NewAgentWorkloadFetcher(srv.URL)
+	fetcher := NewAgentWorkloadFetcher(srv.URL, "")
 	_, err := fetcher.Fetch(context.Background())
 	if err == nil {
 		t.Fatal("expected error on 500")
@@ -83,7 +83,7 @@ func TestAgentWorkloadHandler_GET(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	handler := AgentWorkloadHandler(NewAgentWorkloadFetcher(srv.URL))
+	handler := AgentWorkloadHandler(NewAgentWorkloadFetcher(srv.URL, ""))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/agents", nil))
 	if rec.Code != http.StatusOK {
@@ -101,7 +101,7 @@ func TestAgentWorkloadHandler_GET(t *testing.T) {
 
 func TestAgentWorkloadHandler_RejectsNonGET(t *testing.T) {
 	t.Parallel()
-	handler := AgentWorkloadHandler(NewAgentWorkloadFetcher("http://nowhere"))
+	handler := AgentWorkloadHandler(NewAgentWorkloadFetcher("http://nowhere", ""))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/agents", nil))
 	if rec.Code != http.StatusMethodNotAllowed {

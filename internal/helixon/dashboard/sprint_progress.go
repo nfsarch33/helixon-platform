@@ -25,18 +25,20 @@ type SprintProgressResponse struct {
 // SprintProgressFetcher queries SprintBoard for sprint completion data.
 type SprintProgressFetcher struct {
 	sprintboardURL string
+	token          string // the board's shared bearer; empty means the board runs unauthenticated
 	client         *http.Client
 }
 
 // NewSprintProgressFetcher creates a fetcher for sprint progress data.
 // The default is the live board API port (verified 2026-09-19: the API
 // listens on 9400; the old 8585 default pointed at nothing).
-func NewSprintProgressFetcher(sprintboardURL string) *SprintProgressFetcher {
+func NewSprintProgressFetcher(sprintboardURL, token string) *SprintProgressFetcher {
 	if sprintboardURL == "" {
 		sprintboardURL = "http://127.0.0.1:9400"
 	}
 	return &SprintProgressFetcher{
 		sprintboardURL: sprintboardURL,
+		token:          token,
 		client:         &http.Client{Timeout: 5 * time.Second},
 	}
 }
@@ -146,6 +148,9 @@ func (f *SprintProgressFetcher) getJSON(ctx context.Context, path string, newTar
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
+	if f.token != "" {
+		req.Header.Set("Authorization", "Bearer "+f.token)
+	}
 
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -156,6 +161,9 @@ func (f *SprintProgressFetcher) getJSON(ctx context.Context, path string, newTar
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("sprint progress: %s %s: %w", http.MethodGet, path, ErrBoardUnauthorized)
 	}
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, string(data))

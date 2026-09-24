@@ -5,9 +5,13 @@ import "net/http"
 // DashboardConfig holds the configuration for the dashboard endpoints.
 type DashboardConfig struct {
 	SprintboardURL string
-	GitLabURL      string
-	GitLabToken    string
-	GitLabProject  string
+	// SprintboardToken is the board's shared bearer, the same credential
+	// the operator-verb proxy presents; empty means the board runs
+	// unauthenticated and no Authorization header is sent.
+	SprintboardToken string
+	GitLabURL        string
+	GitLabToken      string
+	GitLabProject    string
 }
 
 // MountAll registers all dashboard endpoints on the given mux:
@@ -21,7 +25,7 @@ func MountAll(mux *http.ServeMux, rv RuntimeView, cfg DashboardConfig) {
 	}
 	Mount(mux, rv)
 
-	agentFetcher := NewAgentWorkloadFetcher(cfg.SprintboardURL)
+	agentFetcher := NewAgentWorkloadFetcher(cfg.SprintboardURL, cfg.SprintboardToken)
 	mux.Handle("/api/v1/agents", AgentWorkloadHandler(agentFetcher))
 
 	cicdFetcher := NewCICDStatusFetcher(CICDConfig{
@@ -31,6 +35,6 @@ func MountAll(mux *http.ServeMux, rv RuntimeView, cfg DashboardConfig) {
 	})
 	mux.Handle("/api/v1/cicd", CICDStatusHandler(cicdFetcher))
 
-	sprintFetcher := NewSprintProgressFetcher(cfg.SprintboardURL)
+	sprintFetcher := NewSprintProgressFetcher(cfg.SprintboardURL, cfg.SprintboardToken)
 	mux.Handle("/api/v1/sprint", SprintProgressHandler(sprintFetcher))
 }
