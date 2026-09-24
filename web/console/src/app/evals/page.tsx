@@ -10,19 +10,21 @@ export default function EvalsPage() {
   if (error) return <ErrorState error={error} />;
   if (!data) return <Loading />;
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <Panel title="Scoreboard (published metrics)">
         {data.metrics_error ? <ErrorState error={data.metrics_error} /> : data.metrics.length === 0 ? (
           <EmptyState title="No published metrics" hint={`Looked in ${data.textfile_dir}. The nightly and weekly eval gates publish hlxn_* samples here.`} />
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-slate-500"><tr><th className="py-1 pr-3">Metric</th><th className="py-1 pr-3">Labels</th><th className="py-1 pr-3">Value</th><th className="py-1">File</th></tr></thead>
+            <thead className="text-slate-600 dark:text-slate-400"><tr><th scope="col" className="py-1 pr-3">Metric</th><th scope="col" className="py-1 pr-3">Labels</th><th scope="col" className="py-1 pr-3">Value</th><th scope="col" className="py-1">File</th></tr></thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.metrics.map((m, i) => (
-                <tr key={`${m.name}-${i}`}><td className="py-1 pr-3 font-mono">{m.name}</td><td className="py-1 pr-3 font-mono text-xs">{Object.entries(m.labels ?? {}).map(([k, v]) => `${k}=${v}`).join(" ")}</td><td className="py-1 pr-3">{m.value}</td><td className="py-1 text-slate-500">{m.file}</td></tr>
+              {data.metrics.map((m) => (
+                <tr key={`${m.file}:${m.name}:${JSON.stringify(m.labels ?? {})}`}><td className="py-1 pr-3 font-mono">{m.name}</td><td className="py-1 pr-3 font-mono text-xs wrap-anywhere">{Object.entries(m.labels ?? {}).map(([k, v]) => `${k}=${v}`).join(" ")}</td><td className="py-1 pr-3">{m.value}</td><td className="py-1 text-slate-600 dark:text-slate-400">{m.file}</td></tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Panel>
       <Panel title="Cycle ledger (newest first)">
@@ -31,13 +33,13 @@ export default function EvalsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-slate-500"><tr><th className="py-1 pr-3">#</th><th className="py-1 pr-3">Status</th><th className="py-1 pr-3">Finished</th><th className="py-1 pr-3">Stick</th><th className="py-1">Verdict</th></tr></thead>
+              <thead className="text-slate-600 dark:text-slate-400"><tr><th scope="col" className="py-1 pr-3">#</th><th scope="col" className="py-1 pr-3">Status</th><th scope="col" className="py-1 pr-3">Finished</th><th scope="col" className="py-1 pr-3">Stick</th><th scope="col" className="py-1">Verdict</th></tr></thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {data.ledger.map((r, i) => (
-                  <tr key={str(r.cycle_id) || i}>
+                  <tr key={str(r.cycle_id) || `seq-${str(r.seq)}-${i}`}>
                     <td className="py-1 pr-3">{str(r.seq)}</td>
                     <td className="py-1 pr-3">{str(r.status)}</td>
-                    <td className="py-1 pr-3 text-slate-500">{fmtTime(str(r.finished_at))}</td>
+                    <td className="py-1 pr-3 text-slate-600 dark:text-slate-400">{fmtTime(str(r.finished_at))}</td>
                     <td className="py-1 pr-3 font-mono text-xs">{str(r.rubric_version)} {str(r.corpus_version)}</td>
                     <td className="py-1 font-mono text-xs">{str(r.eval_ab) || str(r.proposal)}</td>
                   </tr>

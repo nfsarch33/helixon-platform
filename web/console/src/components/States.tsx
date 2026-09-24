@@ -23,7 +23,12 @@ export function ErrorState({ error }: { error: unknown }) {
 }
 
 export function Loading({ label = "Loading" }: { label?: string }) {
-  return <p role="status" aria-live="polite" className="text-sm text-slate-500">{label}…</p>;
+  return <p role="status" aria-live="polite" className="text-sm text-slate-600 dark:text-slate-400">{label}…</p>;
+}
+
+// NotRecorded marks a value the API did not return, so an absent value never looks like a real "0" or a blank.
+export function NotRecorded() {
+  return <span aria-label="not recorded" className="text-slate-500 dark:text-slate-400">—</span>;
 }
 
 // A DOM id cannot contain whitespace, so a title of more than one word used
@@ -36,9 +41,9 @@ function panelId(title: string) {
 export function Panel({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
   const id = panelId(title);
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby={id}>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 id={id} className="text-base font-semibold">{title}</h2>
+    <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby={id}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 id={id} className="min-w-0 text-base font-semibold wrap-anywhere">{title}</h2>
         {actions}
       </div>
       {children}

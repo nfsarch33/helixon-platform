@@ -54,9 +54,9 @@ export default function BoardPage() {
   const tickets = useBoardTickets(sprintID);
 
   return (
-    <main className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="space-y-4">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Ticket board</h1>
+        <h2 className="text-xl font-semibold">Ticket board</h2>
         <PollNowButton />
       </header>
 
@@ -87,7 +87,7 @@ export default function BoardPage() {
           <TicketTable tickets={tickets.data.tickets} onChanged={tickets.mutate} />
         )}
       </Panel>
-    </main>
+    </div>
   );
 }
 
@@ -96,7 +96,7 @@ function TicketTable({ tickets, onChanged }: { tickets: BoardTicket[]; onChanged
     () =>
       [...tickets].sort((a, b) => {
         const d = statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
-        return d !== 0 ? d : b.priority - a.priority || a.id.localeCompare(b.id);
+        return d !== 0 ? d : a.priority - b.priority || a.id.localeCompare(b.id);
       }),
     [tickets],
   );
@@ -108,7 +108,7 @@ function TicketTable({ tickets, onChanged }: { tickets: BoardTicket[]; onChanged
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
         {tickets.length} tickets · {Object.entries(tally).map(([k, v]) => `${v} ${k}`).join(" · ")}
       </p>
       <ul className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -142,18 +142,19 @@ function TicketRow({ ticket, onChanged }: { ticket: BoardTicket; onChanged: () =
   }
 
   return (
-    <li className="flex flex-wrap items-start justify-between gap-2 py-2">
-      <div className="min-w-0 grow">
-        <p className="truncate font-medium">
-          <span className="font-mono text-sm text-slate-500">{ticket.id}</span> {ticket.title}
+    <li className="flex flex-col gap-2 py-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 font-medium wrap-anywhere">
+          <span className="font-mono text-sm text-slate-600 dark:text-slate-400">{ticket.id}</span> {ticket.title}
         </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
           <StatusBadge status={ticket.status} />
           {ticket.claimed_by ? <span>claimed by {ticket.claimed_by}</span> : null}
-          {ticket.acceptance_criteria ? <span className="truncate" title={ticket.acceptance_criteria}>AC: {ticket.acceptance_criteria}</span> : null}
+          {ticket.acceptance_criteria ? <span className="min-w-0 max-w-full truncate" title={ticket.acceptance_criteria}>AC: {ticket.acceptance_criteria}</span> : null}
           {ticket.updated_at ? <span>{fmtTime(ticket.updated_at)}</span> : null}
-          {ticket.resolved_by ? <span title={ticket.resolution_reason}>resolved by {ticket.resolved_by}</span> : null}
+          {ticket.resolved_by ? <span>resolved by {ticket.resolved_by}</span> : null}
         </p>
+        {ticket.resolution_reason ? <p className="mt-1 max-w-[80ch] text-sm wrap-anywhere"><span className="font-medium">Answer: </span>{ticket.resolution_reason}</p> : null}
         {err ? <p role="alert" className="mt-1 text-xs text-rose-700 dark:text-rose-300">{err}</p> : null}
         <CommentsSection ticket={ticket} />
       </div>
@@ -196,20 +197,20 @@ function CommentsSection({ ticket }: { ticket: BoardTicket }) {
         Comments {data ? `(${data.comments.length})` : ""} — hide
       </button>
       {error ? <ErrorState error={error} /> : !data ? <Loading label="Loading comments" /> : data.comments.length === 0 ? (
-        <p className="mt-1 text-xs text-slate-500">No comments — nothing was escalated on this ticket.</p>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">No comments — nothing was escalated on this ticket.</p>
       ) : (
         <ul className="mt-1 space-y-1">
           {data.comments.map((c) => (
             <li key={c.id} className="rounded bg-slate-50 p-2 text-xs dark:bg-slate-800">
               <p className="font-medium text-slate-600 dark:text-slate-300">
-                {c.author} <span className="font-normal text-slate-400">{fmtTime(c.created_at)}</span>
+                {c.author} <span className="font-normal text-slate-500 dark:text-slate-400">{fmtTime(c.created_at)}</span>
               </p>
-              <pre className="mt-0.5 whitespace-pre-wrap break-words font-sans">{c.body}</pre>
+              <pre className="mt-0.5 max-w-[80ch] whitespace-pre-wrap wrap-anywhere font-sans leading-relaxed">{c.body}</pre>
             </li>
           ))}
         </ul>
       )}
-      <button type="button" onClick={() => mutate()} className="mt-1 text-xs text-slate-500 hover:underline">
+      <button type="button" onClick={() => mutate()} className="mt-1 text-xs text-slate-600 dark:text-slate-400 hover:underline">
         refresh
       </button>
     </div>

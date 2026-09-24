@@ -1,26 +1,8 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+/*
+ * Tailwind's own font stacks and the body utilities in layout.tsx carry the theme.
+ * This file used to point --font-sans/--font-mono at Geist variables that were never loaded (so every font-mono
+ * id, tool name and error rendered in Arial) and set an unlayered body background/colour/font that overrode the
+ * layout's slate palette.
+ */

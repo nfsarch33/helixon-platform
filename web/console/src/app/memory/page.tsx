@@ -22,8 +22,8 @@ export default function MemoryPage() {
       ) : (
         <ol className="space-y-2 text-sm">
           {data.results.map((r, i) => (
-            <li key={i} className="rounded border border-slate-200 p-2 dark:border-slate-800">
-              <pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(r, null, 1)}</pre>
+            <li key={`${i}-${JSON.stringify(r).slice(0, 64)}`} className="rounded border border-slate-200 p-2 dark:border-slate-800">
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap wrap-anywhere text-xs">{JSON.stringify(r, null, 1)}</pre>
             </li>
           ))}
         </ol>

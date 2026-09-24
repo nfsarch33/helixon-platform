@@ -52,7 +52,7 @@ this - it compiles without the console and serves an explanatory 404 at
     npm run typecheck      # tsc --noEmit
     npm run lint           # eslint (next lint is gone in Next 16)
     npm test               # vitest, with coverage thresholds enabled
-    npm run e2e            # playwright, against a served build
+    CONSOLE_URL=http://127.0.0.1:9410 npm run e2e   # playwright against a RUNNING console: no horizontal overflow at 375-2560 px on every route
 
 CI runs all of these plus `go test -tags console ./cmd/helixon/consolefs/`,
 which serves the freshly built export through the Go handler and asserts the

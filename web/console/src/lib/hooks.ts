@@ -9,7 +9,9 @@ export function useRuns(status: RunStatus | "" = "", limit = 100) {
   return useSWR(["runs", status, limit], () => api.runs(status, limit), { refreshInterval: 3000 });
 }
 export function useRun(id: string | null) {
-  return useSWR(id ? ["run", id] : null, () => api.run(id as string), { refreshInterval: 2000 });
+  return useSWR(id ? ["run", id] : null, () => api.run(id as string), {
+    refreshInterval: (d) => (d?.run.status === "completed" || d?.run.status === "failed" ? 0 : d?.run.status === "needs_human" ? 10000 : 2000),
+  });
 }
 export function useCosts() { return useSWR("costs", api.costs, { refreshInterval: 10000 }); }
 export function useEvals(limit = 20) { return useSWR(["evals", limit], () => api.evals(limit), { refreshInterval: 30000 }); }

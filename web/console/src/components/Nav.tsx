@@ -22,7 +22,7 @@ export function Nav() {
             key={it.href}
             href={it.href}
             aria-current={active ? "page" : undefined}
-            className={`rounded px-3 py-1.5 text-sm ${active ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"}`}
+            className={`inline-flex min-h-9 items-center rounded px-3 py-1.5 text-sm ${active ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"}`}
           >
             {it.label}
           </Link>
