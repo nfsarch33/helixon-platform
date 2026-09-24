@@ -288,8 +288,22 @@ type renewState struct {
 // (after in-tick retries) before the run is canceled. Ticks fire at a third
 // of the TTL: after the second missed tick the remaining lease cannot span
 // the next one, so a third tick would fire on an expired lease - that is the
-// "TTL would actually lapse" boundary (v18860-1 run-lease-transient-timeout).
+// "TTL would actually lapse" boundary.
 const renewMissesBudget = 2
+
+// renewAttemptTimeout bounds one renewal attempt so the whole tick — up to
+// three attempts plus their backoff — finishes inside a third of the lease
+// TTL, the interval the renewal ticker fires on. A tick that could outrun
+// its own period would renew an already-expired lease and still report the
+// run healthy. Long leases keep the 5s per-attempt ceiling; a tiny test
+// lease gets a proportionally tiny attempt.
+func renewAttemptTimeout(ttl time.Duration) time.Duration {
+	t := ttl / 12
+	if t <= 0 || t > 5*time.Second {
+		return 5 * time.Second
+	}
+	return t
+}
 
 // startRenewal renews the lease at a third of the TTL until stop is called.
 // The goroutine is joined by stop, so the package's goleak check sees it end.
@@ -333,7 +347,7 @@ func (a *Agent) renewOnce(ctx context.Context, cancel context.CancelFunc, runID 
 		err error
 	)
 	for i := 0; i < attempts; i++ {
-		renewCtx, rcancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		renewCtx, rcancel := context.WithTimeout(context.WithoutCancel(ctx), renewAttemptTimeout(a.cfg.LeaseTTL))
 		ok, err = a.renewals.RenewRun(renewCtx, runID, a.owner, a.cfg.LeaseTTL)
 		rcancel()
 		if err == nil || i == attempts-1 {
@@ -387,6 +401,17 @@ func (a *Agent) unmarkActive(runID string) {
 	a.activeMu.Lock()
 	delete(a.active, runID)
 	a.activeMu.Unlock()
+}
+
+// Active reports whether this process is executing the run right now. The
+// periodic recovery sweep consults it so a tick that lists a run whose lease
+// is still being renewed (the listing races the renewal) never calls Resume
+// on work that is already in flight here.
+func (a *Agent) Active(runID string) bool {
+	a.activeMu.Lock()
+	_, busy := a.active[runID]
+	a.activeMu.Unlock()
+	return busy
 }
 
 // newOwner identifies this Agent instance as a lease owner.

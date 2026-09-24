@@ -11,16 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// v18860-1 run-lease-transient-timeout. Evidence (fleet-agent.log 2026-09-23
-// 10:58-10:59 AEST): ONE run-store renew hit "context deadline exceeded"
-// (slow fsync, two concurrent runs on one SQLite), the renewer canceled the
-// healthy run, the run was left resumable - and the ticket was escalated
-// anyway, so the resumable run was never resumed. The renewer must classify:
+// One full-blown scenario this pins: a run-store renew hit
+// "context deadline exceeded" (slow fsync, two concurrent runs on one
+// SQLite), the renewer canceled the healthy run, the run was left resumable
+// - and the ticket was escalated anyway, so the resumable run was never
+// resumed. The renewer must classify:
 // a transient store error is retried and only ends the run when enough
 // consecutive ticks have failed that the lease would actually lapse; a
 // definitive refusal (another owner) cancels immediately; and a
 // lease-canceled run surfaces ErrLeaseLost so the poller abandons the ticket
 // instead of escalating it.
+
+// TestRenewAttemptTimeoutBoundsTickInsideTTLThird pins the per-attempt
+// bound: three attempts plus backoff must fit inside a renewal tick (a
+// third of the TTL), while long leases keep the 5s ceiling.
+func TestRenewAttemptTimeoutBoundsTickInsideTTLThird(t *testing.T) {
+	assert.Equal(t, 2500*time.Millisecond, renewAttemptTimeout(30*time.Second))
+	assert.Equal(t, 5*time.Second, renewAttemptTimeout(time.Minute))
+	assert.Equal(t, 5*time.Second, renewAttemptTimeout(0))
+	assert.Equal(t, 250*time.Millisecond, renewAttemptTimeout(3*time.Second))
+}
 
 // faultRenewStore stages RenewRun outcomes in order; once the script is
 // spent it repeats the last outcome.

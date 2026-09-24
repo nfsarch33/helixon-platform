@@ -111,7 +111,7 @@ type Agent struct {
 
 // renewStore is the slice of SessionStore the lease renewer needs, as an
 // interface so the renewer's transient-vs-lost policy is testable at the
-// unit level (v18860-1 run-lease-transient-timeout).
+// unit level.
 type renewStore interface {
 	RenewRun(ctx context.Context, id, owner string, ttl time.Duration) (bool, error)
 }
