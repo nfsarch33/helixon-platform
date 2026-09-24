@@ -21,7 +21,7 @@ func TestSprintProgressFetcher_ServerError(t *testing.T) {
 	}))
 	defer func() { srv.Close() }()
 
-	fetcher := NewSprintProgressFetcher(srv.URL)
+	fetcher := NewSprintProgressFetcher(srv.URL, "")
 	if _, err := fetcher.Fetch(context.Background()); err == nil {
 		t.Fatal("expected error on 404")
 	}
@@ -33,7 +33,7 @@ func TestSprintProgressHandler_GET(t *testing.T) {
 	srv := newBoardServer(t, &requests)
 	defer srv.Close()
 
-	handler := SprintProgressHandler(NewSprintProgressFetcher(srv.URL))
+	handler := SprintProgressHandler(NewSprintProgressFetcher(srv.URL, ""))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/sprint", nil))
 	if rec.Code != http.StatusOK {
@@ -43,7 +43,7 @@ func TestSprintProgressHandler_GET(t *testing.T) {
 
 func TestSprintProgressHandler_RejectsNonGET(t *testing.T) {
 	t.Parallel()
-	handler := SprintProgressHandler(NewSprintProgressFetcher("http://nowhere"))
+	handler := SprintProgressHandler(NewSprintProgressFetcher("http://nowhere", ""))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", nil))
 	if rec.Code != http.StatusMethodNotAllowed {

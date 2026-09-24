@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,12 @@ type BoardProxy struct {
 	token   string
 	client  *http.Client
 }
+
+// ErrBoardUnauthorized marks a board fetch the board refused with 401: the
+// board requires a bearer and this surface did not present a valid one.
+// Named so a caller (and a test) can tell a missing credential from a
+// broken route or a dead board.
+var ErrBoardUnauthorized = errors.New("dashboard: board refused the request (401): missing or invalid bearer")
 
 // NewBoardProxy creates a proxy for the board at baseURL. token is the
 // board's shared bearer (SPRINTBOARD_API_TOKEN); empty means the board is

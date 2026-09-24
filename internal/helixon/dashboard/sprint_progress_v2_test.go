@@ -52,7 +52,7 @@ func TestSprintProgressFetcher_UsesActiveSprintAndRealRoutes(t *testing.T) {
 	srv := newBoardServer(t, &requests)
 	defer srv.Close()
 
-	got, err := NewSprintProgressFetcher(srv.URL).Fetch(context.Background())
+	got, err := NewSprintProgressFetcher(srv.URL, "").Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestSprintProgressFetcher_NoActiveSprintFallsBackToNewest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := NewSprintProgressFetcher(srv.URL).Fetch(context.Background())
+	got, err := NewSprintProgressFetcher(srv.URL, "").Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -121,14 +121,14 @@ func TestSprintProgressFetcher_NoSprintsIsHonestError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, err := NewSprintProgressFetcher(srv.URL).Fetch(context.Background()); err == nil {
+	if _, err := NewSprintProgressFetcher(srv.URL, "").Fetch(context.Background()); err == nil {
 		t.Fatal("Fetch with zero sprints = nil error; an empty board must be an honest error, not a zeroed success")
 	}
 }
 
 func TestSprintProgressFetcher_DefaultURLIsLiveBoardPort(t *testing.T) {
 	t.Parallel()
-	f := NewSprintProgressFetcher("")
+	f := NewSprintProgressFetcher("", "")
 	if f.sprintboardURL != "http://127.0.0.1:9400" {
 		t.Fatalf("default sprintboardURL = %q, want the live board port http://127.0.0.1:9400", f.sprintboardURL)
 	}
@@ -136,7 +136,7 @@ func TestSprintProgressFetcher_DefaultURLIsLiveBoardPort(t *testing.T) {
 
 func TestAgentWorkloadFetcher_DefaultURLIsLiveBoardPort(t *testing.T) {
 	t.Parallel()
-	f := NewAgentWorkloadFetcher("")
+	f := NewAgentWorkloadFetcher("", "")
 	if f.sprintboardURL != "http://127.0.0.1:9400" {
 		t.Fatalf("default sprintboardURL = %q, want the live board port http://127.0.0.1:9400", f.sprintboardURL)
 	}

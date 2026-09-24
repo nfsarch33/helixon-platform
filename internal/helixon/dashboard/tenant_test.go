@@ -30,7 +30,7 @@ func TestTenant_AgentWorkloadFetcher_PassesTenantFilterQuery(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := NewAgentWorkloadFetcherWithTenant(srv.URL, "tenant-x")
+	f := NewAgentWorkloadFetcherWithTenant(srv.URL, "", "tenant-x")
 	if _, err := f.Fetch(context.Background()); err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -74,8 +74,8 @@ func TestTenant_AgentWorkloadFetcher_TwoTenantsDoNotLeak(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	fA := NewAgentWorkloadFetcherWithTenant(srv.URL, "tenant-a")
-	fB := NewAgentWorkloadFetcherWithTenant(srv.URL, "tenant-b")
+	fA := NewAgentWorkloadFetcherWithTenant(srv.URL, "", "tenant-a")
+	fB := NewAgentWorkloadFetcherWithTenant(srv.URL, "", "tenant-b")
 
 	respA, err := fA.Fetch(context.Background())
 	if err != nil {
@@ -124,7 +124,7 @@ func TestTenant_AgentWorkloadHandler_PassesTenantFilterQuery(t *testing.T) {
 	defer srv.Close()
 
 	// Build a fetcher that reads X-Tenant-ID from the incoming request.
-	f := NewAgentWorkloadFetcher(srv.URL)
+	f := NewAgentWorkloadFetcher(srv.URL, "")
 	h := TenantAgentWorkloadHandler(f)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/agents", nil)
