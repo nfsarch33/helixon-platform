@@ -483,9 +483,10 @@ var commandNameRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]*$`)
 // contains the damage; this keeps the shell tool honest at the host boundary
 // too, which matters for the AllowUnsandboxedHostExecution path.
 var deniedFlags = map[string][]string{
-	"find": {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"},
-	"grep": {"-f", "--file"},
-	"sort": {"-o", "--output"},
+	"find":  {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"},
+	"grep":  {"-f", "--file"},
+	"sort":  {"-o", "--output"},
+	"gofmt": {"-w", "-r", "-cpuprofile"},
 }
 
 // ValidateArgv rejects a command name or argument vector that the tool layer

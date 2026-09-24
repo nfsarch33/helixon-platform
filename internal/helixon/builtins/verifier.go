@@ -75,7 +75,7 @@ func DefaultVerifierChecks() []VerifierCheck {
 			Description: "run go vet (default ./...; pass a package pattern to scope it)"},
 		{Name: "gofmt_check", Command: "gofmt", Args: []string{"-l"}, DefaultScope: []string{"."},
 			AllowExtraArgs: true, ScopeArgs: GofmtScopeArgs, RequireEmptyOutput: true,
-			Description: "FAIL if any file is not gofmt-formatted (default the whole tree; pass package paths or files to scope it — ./pkg/... means the pkg directory)"},
+			Description: "FAIL if any file is not gofmt-formatted (default the whole tree; pass package paths or files to scope it — ./pkg/... or pkg means the pkg directory, and a bare directory is recursive)"},
 		{Name: "file_exists", Command: "test", Args: []string{"-e"}, AllowExtraArgs: true, PathArgs: true, MinExtraArgs: 1, Description: "assert a workspace file exists"},
 		{Name: "file_contains", Command: "grep", Args: []string{"-q", "--"}, AllowExtraArgs: true, MinExtraArgs: 2, Description: "assert a workspace file contains a pattern (args: pattern, path)"},
 	}
@@ -214,7 +214,16 @@ func VerifierTool(cfg VerifierConfig) tooldispatch.ToolDef {
 				report(VerifierOutcomeError)
 				return "", err
 			}
-			argv, err := buildVerifierArgv(check, extra, cfg.Runner.Config().WorkspaceMount)
+			// Scopes resolve against the HOST workspace — the directory the
+			// sandbox.Container actually mounts — because GofmtScopeArgs stats
+			// what it is given. The argv it returns stays workspace-relative
+			// and lands in the container, which runs with --workdir=WorkspaceMount.
+			// Passing WorkspaceMount here made every scoped gofmt_check stat
+			// /workspace on the host and get refused: scoped checks were dead
+			// in production while the unit tests, fed the host dir as the
+			// "mount", stayed green.
+			rc := cfg.Runner.Config()
+			argv, err := buildVerifierArgv(check, extra, rc.Workspace, rc.WorkspaceMount)
 			if err != nil {
 				report(VerifierOutcomeError)
 				return "", err
@@ -352,8 +361,15 @@ func verifierExtraArgs(args map[string]any) ([]string, error) {
 // value so a handler cannot mutate the shared check table under a concurrent
 // call.
 //
+// hostWorkspace is the host directory the sandbox mounts (scopes are resolved
+// and stat'ed there); workspaceMount is the in-container path for it (PathArgs
+// checks canonicalize lexically against it, matching what the container sees).
+// The two differ in every sandboxed deployment — DefaultWorkspaceMount is
+// /workspace — so conflating them is exactly the bug that killed scoped
+// gofmt_check in production.
+//
 //nolint:gocritic // hugeParam: value semantics are deliberate, see above
-func buildVerifierArgv(check VerifierCheck, extra []string, workspaceMount string) ([]string, error) {
+func buildVerifierArgv(check VerifierCheck, extra []string, hostWorkspace, workspaceMount string) ([]string, error) {
 	if len(extra) > 0 && !check.AllowExtraArgs {
 		return nil, fmt.Errorf("verifier_run: check %q does not accept extra arguments", check.Name)
 	}
@@ -366,7 +382,7 @@ func buildVerifierArgv(check VerifierCheck, extra []string, workspaceMount strin
 		}
 	}
 	if check.ScopeArgs != nil {
-		argv, err := check.ScopeArgs(extra, workspaceMount)
+		argv, err := check.ScopeArgs(extra, hostWorkspace)
 		if err != nil {
 			return nil, fmt.Errorf("verifier_run: check %q: %w", check.Name, err)
 		}

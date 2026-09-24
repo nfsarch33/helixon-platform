@@ -45,8 +45,9 @@ var ErrBadScope = errors.New("gofmt_check: bad scope argument")
 //     unscoped default keeps today's exact argv.
 //   - every scope must resolve inside workspaceRoot (symlink-aware, via
 //     sandbox.Contains) and match at least one .go file — file or
-//     directory contents — so an empty or docs-only scope cannot buy a
-//     vacuous pass.
+//     directory contents, skipping dot- and underscore-prefixed names the
+//     way gofmt's own walk does — so an empty, docs-only or hidden-files-
+//     only scope cannot buy a vacuous pass.
 //
 // The input slice is not modified.
 func GofmtScopeArgs(scope []string, workspaceRoot string) ([]string, error) {
@@ -86,7 +87,9 @@ func GofmtScopeArgs(scope []string, workspaceRoot string) ([]string, error) {
 		if workspaceRoot != "" {
 			canon, err := sandbox.Contains(workspaceRoot, cleaned)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %q: %v", ErrBadScope, entry, err)
+				// %w on both: callers (and the mutant pin) assert the chain
+				// ErrBadScope -> sandbox.ErrPathEscape, not the string alone.
+				return nil, fmt.Errorf("%w: %q: %w", ErrBadScope, entry, err)
 			}
 			if err := scopeMatchesGoFiles(filepath.FromSlash(canon), cleaned); err != nil {
 				return nil, err
@@ -101,6 +104,9 @@ func GofmtScopeArgs(scope []string, workspaceRoot string) ([]string, error) {
 // scopeMatchesGoFiles refuses scopes that cannot run the gate: a file
 // scope must be an existing .go file; a directory scope must hold at
 // least one .go file anywhere under it. Symlinks are not followed.
+// File selection mirrors gofmt's own walk — dot- and underscore-prefixed
+// names are skipped — so a scope whose only .go files are ones gofmt would
+// never look at cannot buy a vacuous pass.
 func scopeMatchesGoFiles(absPath, display string) error {
 	fi, err := os.Stat(absPath)
 	if err != nil {
@@ -114,14 +120,21 @@ func scopeMatchesGoFiles(absPath, display string) error {
 	}
 	found := false
 	//nolint:gosec // G304: absPath is sandbox-contained above
-	err = filepath.WalkDir(absPath, func(_ string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(absPath, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if found {
 			return filepath.SkipAll
 		}
-		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".go") {
+		if d.IsDir() {
+			// gofmt's walk skips hidden and underscore directories wholesale.
+			if p != absPath && isSkippedName(d.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".go") && !isSkippedName(d.Name()) {
 			found = true
 			return filepath.SkipAll
 		}
@@ -134,4 +147,10 @@ func scopeMatchesGoFiles(absPath, display string) error {
 		return fmt.Errorf("%w: %q matched no Go files", ErrBadScope, display)
 	}
 	return nil
+}
+
+// isSkippedName reports whether gofmt itself would never process a file or
+// directory with this name: names beginning with "." or "_".
+func isSkippedName(name string) bool {
+	return strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
 }

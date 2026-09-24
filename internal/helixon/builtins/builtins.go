@@ -542,7 +542,8 @@ func FileWriteTool(cfg FileWriteConfig) tooldispatch.ToolDef {
 			"so send the complete intended content: anything you leave out is deleted. " +
 			"Go files must already be gofmt-formatted when you write them, trailing newline included — " +
 			"gofmt_check fails a ticket by listing files it would reformat, and reformatting afterwards costs an iteration. " +
-			"It accepts a scope in args: gofmt_check ./pkg/... checks only the pkg directory.",
+			"The gofmt_check VERIFIER accepts a scope in its args: gofmt_check ./pkg/... checks only the pkg directory " +
+			"(a bare directory is recursive).",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"required": ["path", "content"],

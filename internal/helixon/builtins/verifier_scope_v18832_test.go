@@ -41,7 +41,7 @@ func TestScopeReplacesDefaultRatherThanAppending(t *testing.T) {
 			t.Parallel()
 			check := checkByName(t, name)
 
-			bare, err := buildVerifierArgv(check, nil, sandbox.DefaultWorkspaceMount)
+			bare, err := buildVerifierArgv(check, nil, "", sandbox.DefaultWorkspaceMount)
 			if err != nil {
 				t.Fatalf("buildVerifierArgv(no args): %v", err)
 			}
@@ -49,7 +49,7 @@ func TestScopeReplacesDefaultRatherThanAppending(t *testing.T) {
 				t.Fatalf("unscoped argv = %q, want the default scope ./...", got)
 			}
 
-			scoped, err := buildVerifierArgv(check, []string{"./internal/foo/..."}, sandbox.DefaultWorkspaceMount)
+			scoped, err := buildVerifierArgv(check, []string{"./internal/foo/..."}, "", sandbox.DefaultWorkspaceMount)
 			if err != nil {
 				t.Fatalf("buildVerifierArgv(scoped): %v", err)
 			}
@@ -71,7 +71,7 @@ func TestScopeReplacesDefaultRatherThanAppending(t *testing.T) {
 // keeps the no-argument default exactly the whole tree.
 func TestGofmtCheckArgvIsUnchanged(t *testing.T) {
 	t.Parallel()
-	got, err := buildVerifierArgv(checkByName(t, "gofmt_check"), nil, sandbox.DefaultWorkspaceMount)
+	got, err := buildVerifierArgv(checkByName(t, "gofmt_check"), nil, "", sandbox.DefaultWorkspaceMount)
 	if err != nil {
 		t.Fatalf("buildVerifierArgv: %v", err)
 	}

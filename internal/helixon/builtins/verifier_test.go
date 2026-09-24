@@ -72,7 +72,7 @@ func TestBuildVerifierArgv_TableDriven(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := buildVerifierArgv(tt.check, append([]string(nil), tt.extra...), sandbox.DefaultWorkspaceMount)
+			got, err := buildVerifierArgv(tt.check, append([]string(nil), tt.extra...), sandbox.DefaultWorkspaceMount, sandbox.DefaultWorkspaceMount)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("buildVerifierArgv() = %v, want an error containing %q", err, tt.wantErr)
