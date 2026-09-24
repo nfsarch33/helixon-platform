@@ -952,9 +952,11 @@ Read the ` + "`pass`" + ` field, never the exit code. gofmt_check reports failur
 PRINTING filenames while exiting 0; when a verdict is not what the exit code
 suggests, the ` + "`note`" + ` field says why.
 
-Scope go_build, go_test and go_vet to the package this ticket names by passing it
-in ` + "`args`" + `. It replaces the default ./... rather than adding to it, so other
-unfinished work in this workspace cannot fail your run.
+Scope go_build, go_test, go_vet and gofmt_check to the package this ticket names
+by passing it in ` + "`args`" + `. It replaces the default whole-tree run rather than
+adding to it, so other unfinished work in this workspace cannot fail your run.
+gofmt_check takes package paths or files: gofmt_check ./pkg/... checks only the
+pkg directory (the /... suffix is dropped; a file stays a file).
 
 If a check fails, read output_excerpt and note before changing anything. A test
 YOU wrote that disagrees with your implementation is a hypothesis, not a verdict:

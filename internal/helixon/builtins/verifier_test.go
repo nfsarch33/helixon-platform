@@ -37,7 +37,9 @@ func TestBuildVerifierArgv_TableDriven(t *testing.T) {
 			name: "a package pattern REPLACES the default scope", check: checks["go_test"],
 			extra: []string{"./internal/..."}, want: []string{"test", "./internal/..."},
 		},
-		{name: "gofmt_check refuses extras", check: checks["gofmt_check"], extra: []string{"."}, wantErr: "does not accept extra arguments"},
+		// gofmt_check accepts scope args (normalized by GofmtScopeArgs);
+		// a flag in them is still refused, before any normalization.
+		{name: "gofmt_check refuses flags in scope", check: checks["gofmt_check"], extra: []string{"-w"}, wantErr: "may not be a flag"},
 		{
 			// -toolexec runs an arbitrary binary for every compile; a check
 			// that accepted "extra arguments" without this rule would be a
@@ -70,7 +72,7 @@ func TestBuildVerifierArgv_TableDriven(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := buildVerifierArgv(tt.check, append([]string(nil), tt.extra...), sandbox.DefaultWorkspaceMount)
+			got, err := buildVerifierArgv(tt.check, append([]string(nil), tt.extra...), sandbox.DefaultWorkspaceMount, sandbox.DefaultWorkspaceMount)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("buildVerifierArgv() = %v, want an error containing %q", err, tt.wantErr)
