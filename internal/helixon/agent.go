@@ -484,11 +484,12 @@ func (r *Runtime) RecoverInterruptedRuns(ctx context.Context) (RecoveryStats, er
 		if r.agent.Active(run.ID) {
 			continue
 		}
+		tid := run.Meta["ticket_id"]
 		// Board guard before resuming a ticket run: if the claim was swept
 		// or taken while this process was down, resuming would complete
 		// someone else's ticket. Terminalise the run instead - the 409 is
 		// definitive, and whoever holds the ticket now decides it.
-		if tid := run.Meta["ticket_id"]; tid != "" && r.sprintCtl != nil {
+		if tid != "" && r.sprintCtl != nil {
 			if rerr := r.sprintCtl.RenewClaim(ctx, tid); errors.Is(rerr, controlplane.ErrTicketNotClaimedBy) {
 				termErr := fmt.Errorf("board claim lost while the worker was down: %w", rerr)
 				if _, ferr := r.store.FinishRun(ctx, run.ID, run.Owner, agent.RunFailed,
@@ -502,9 +503,15 @@ func (r *Runtime) RecoverInterruptedRuns(ctx context.Context) (RecoveryStats, er
 				continue
 			}
 		}
+		// The board claim must stay alive for the whole resumed attempt:
+		// the recovery sweep, not the poller, drove this resume, so nothing
+		// else renews it, and the board's stale-claim sweeper would release
+		// the ticket mid-attempt.
+		stopKeep := r.keepTicketClaim(ctx, tid)
 		res, runErr := r.agent.Resume(ctx, run.ID)
-		if errors.Is(runErr, agent.ErrLeaseHeld) || errors.Is(runErr, agent.ErrRunFinished) {
-			continue // another worker took it, or finished it, between the listing and the claim
+		stopKeep()
+		if errors.Is(runErr, agent.ErrLeaseHeld) || errors.Is(runErr, agent.ErrRunActive) || errors.Is(runErr, agent.ErrRunFinished) {
+			continue // another worker took it or finished it; or this process is already executing it
 		}
 		st.Resumed++
 		final := ""
@@ -577,6 +584,53 @@ func (r *Runtime) recoveryLoop(ctx context.Context) {
 	}
 }
 
+// keepTicketClaim renews a ticket's board claim for the duration of a
+// recovery-resumed attempt. The poller renews claims for the runs it drives
+// itself; a run resumed by the recovery sweep has no such owner, and without
+// renewal the board's stale-claim sweeper would release the ticket
+// mid-attempt. The first renewal happens immediately, so even a fast resume
+// stamps the claim; the returned stop function joins the goroutine.
+func (r *Runtime) keepTicketClaim(ctx context.Context, ticketID string) func() {
+	if r.sprintCtl == nil {
+		return func() {}
+	}
+	interval := r.cfg.Tickets.ClaimRenewInterval
+	if interval == 0 {
+		interval = DefaultClaimRenewInterval
+	}
+	if interval < 0 {
+		return func() {} // renewal disabled by configuration
+	}
+	done := make(chan struct{})
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		renew := func() {
+			if err := r.sprintCtl.RenewClaim(ctx, ticketID); err != nil && !errors.Is(err, context.Canceled) {
+				r.logger.Warn("claim renewal during a recovery resume failed",
+					slog.String("ticket", ticketID), slog.String("error", err.Error()))
+			}
+		}
+		renew()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				renew()
+			}
+		}
+	}()
+	return func() {
+		close(done)
+		<-finished
+	}
+}
+
 // Store exposes the session/run store for read-only consumers such as the
 // operator console. Nil before Init.
 func (r *Runtime) Store() *agent.SessionStore { return r.store }
@@ -641,11 +695,12 @@ func (r *Runtime) TicketPoller() *TicketPoller {
 //
 //nolint:gocritic // hugeParam: the TicketWorker contract takes the ticket by value
 func (r *Runtime) runTicketWork(ctx context.Context, ticket controlplane.Ticket) (string, error) {
-	// One run per ticket: an earlier attempt for this ticket may still be
-	// resumable (a lost run-store lease abandons the attempt, not the run).
-	// Resuming it continues the durable work instead of forking a second
-	// run that races the first to the finish write and the board report.
-	if prev, ferr := r.store.FindInterruptedRunByTicket(ctx, ticket.ID); ferr != nil {
+	// One run per ticket: ANY live run of this ticket owns it - running
+	// here, running elsewhere, or lapsed and resumable (a lost run-store
+	// lease abandons the attempt, not the run). Resuming it continues the
+	// durable work instead of forking a second run that races the first to
+	// the finish write and the board report.
+	if prev, ferr := r.store.FindRunByTicket(ctx, ticket.ID); ferr != nil {
 		r.logger.Warn("looking for an interrupted run of this ticket failed; starting a fresh run",
 			slog.String("ticket", ticket.ID), slog.String("error", ferr.Error()))
 	} else if prev != nil {

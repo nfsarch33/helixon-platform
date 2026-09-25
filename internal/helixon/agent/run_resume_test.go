@@ -453,9 +453,9 @@ func TestRunDurable_ConcurrentSameIDIsRefused(t *testing.T) {
 	}
 
 	_, err := a.RunDurable(ctx, "run-1", sid, "q", nil)
-	assert.ErrorIs(t, err, ErrLeaseHeld, "a second loop on a run this process is already executing")
+	assert.ErrorIs(t, err, ErrRunActive, "a second loop on a run this process is already executing")
 	_, err = a.Resume(ctx, "run-1")
-	assert.ErrorIs(t, err, ErrLeaseHeld)
+	assert.ErrorIs(t, err, ErrRunActive)
 
 	close(gate.release)
 	select {

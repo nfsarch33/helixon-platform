@@ -45,6 +45,10 @@ var (
 	ErrLeaseLost = errors.New("agent: run lease lost during execution")
 	// ErrRunFinished wraps the stored error of a run that already ended.
 	ErrRunFinished = errors.New("agent: run already finished")
+	// ErrRunActive reports that THIS process is already executing the run;
+	// distinct from ErrLeaseHeld (another worker holds it) so a caller can
+	// skip its own in-flight work instead of reading a conflict.
+	ErrRunActive = errors.New("agent: run is already executing in this process")
 	// ErrInterruptedMutation stops a resumed run whose last mutating tool call
 	// was dispatched but never recorded an outcome.
 	ErrInterruptedMutation = errors.New("agent: a mutating tool call was interrupted before its outcome was recorded; stopping for human approval")
@@ -96,7 +100,7 @@ func (a *Agent) execute(ctx context.Context, run *RunRecord, claimed bool) (*Run
 		return storedResult(run)
 	}
 	if !a.markActive(run.ID) {
-		return nil, ErrLeaseHeld
+		return nil, ErrRunActive
 	}
 	defer a.unmarkActive(run.ID)
 	if !claimed {

@@ -2,7 +2,9 @@ package helixon
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,19 +20,14 @@ import (
 
 // newTickRuntime is newRecoveryRuntime with a configurable recovery
 // interval, so the tests can shrink the sweep period to milliseconds.
-var tickDBSeq int
-
 func newTickRuntime(t *testing.T, interval time.Duration) (*Runtime, *fakeBoard, *recordingProvider) {
 	t.Helper()
 	board := newFakeBoard()
 	srv := board.server(t)
 	t.Cleanup(srv.Close)
-	// A unique in-memory DSN per runtime: a shared cache name would couple
-	// every test's runs into one database and make -count>1 collide with
-	// itself.
-	tickDBSeq++
-	cfg0 := fmt.Sprintf("file:tickdb%d?mode=memory&cache=shared", tickDBSeq)
-	_ = cfg0
+	// File DSN under t.TempDir(): shared-cache in-memory DSNs lose their
+	// tables across runs in one process (-count/-shuffle proof).
+	cfg0 := filepath.Join(t.TempDir(), "tick.db")
 	client := controlplane.NewSprintboardClient(controlplane.SprintboardConfig{
 		BaseURL: srv.URL, AgentName: "recovery-agent",
 	}, quietLogger())
@@ -115,7 +112,16 @@ func TestRecoveryLoopResumesAbandonedRunExactlyOnce(t *testing.T) {
 	board.mu.Lock()
 	n := board.completions["T-TICK"]
 	ev := board.completed["T-TICK"]
+	renewed := false
+	for _, r := range board.renewals {
+		if strings.HasPrefix(r, "T-TICK ") {
+			renewed = true
+		}
+	}
 	board.mu.Unlock()
+	if !renewed {
+		t.Fatalf("the recovery resume never renewed the board claim (renewals: %v)", board.renewals)
+	}
 	if n != 1 {
 		t.Fatalf("ticket completed %d times, want exactly 1", n)
 	}
@@ -161,10 +167,49 @@ func TestRunTicketWorkResumesInterruptedRunPerTicket(t *testing.T) {
 	}
 	// No second run for the ticket: nothing left interrupted, and the model
 	// was never consulted (a fresh run would have called it).
-	if prev, ferr := rt.store.FindInterruptedRunByTicket(ctx, "T-PREV"); ferr != nil || prev != nil {
+	if prev, ferr := rt.store.FindRunByTicket(ctx, "T-PREV"); ferr != nil || prev != nil {
 		t.Fatalf("interrupted run for T-PREV after the ticket path: %v, %v; want none", prev, ferr)
 	}
 	if got := modelCalls(prov); got != 0 {
 		t.Fatalf("provider called %d times; the ticket path resumed instead of starting a run", got)
 	}
+}
+
+// TestRunTicketWorkDoesNotForkALiveRunOfTheTicket: the guard's "any
+// non-terminal run" rule. A run whose lease is still alive - executing in
+// another process - is the ticket's run; the ticket path finds it, is
+// refused by the foreign lease, and never starts a second run beside it.
+func TestRunTicketWorkDoesNotForkALiveRunOfTheTicket(t *testing.T) {
+	rt, _, prov := newTickRuntime(t, -1) // no periodic sweep; the guard is under test directly
+	ctx := context.Background()
+	sid := seedTicketRun(t, rt, "run-live", "T-LIVE")
+	if _, err := rt.store.AppendTurn(ctx, sid, agent.RoleAssistant, "work in flight elsewhere", nil, "", 10, 5); err != nil {
+		t.Fatalf("AppendTurn: %v", err)
+	}
+	ok, err := rt.store.ClaimRun(ctx, "run-live", "another-worker", time.Hour)
+	if err != nil || !ok {
+		t.Fatalf("ClaimRun by the other worker: ok=%v err=%v", ok, err)
+	}
+
+	if _, rerr := rt.runTicketWork(ctx, controlplane.Ticket{ID: "T-LIVE", Title: "re-claimed while live"}); !errors.Is(rerr, agent.ErrLeaseHeld) {
+		t.Fatalf("runTicketWork err = %v, want ErrLeaseHeld (the live run belongs to another worker)", rerr)
+	}
+	runs, lerr := rt.store.ListRunningRuns(ctx)
+	if lerr != nil {
+		t.Fatalf("ListRunningRuns: %v", lerr)
+	}
+	if len(runs) != 1 || runs[0].ID != "run-live" {
+		t.Fatalf("runs of the ticket after the ticket path = %v, want exactly the original live run", ids(runs))
+	}
+	if got := modelCalls(prov); got != 0 {
+		t.Fatalf("provider called %d times; no second run may start beside a live one", got)
+	}
+}
+
+func ids(runs []agent.RunRecord) []string {
+	out := make([]string, len(runs))
+	for i := range runs {
+		out[i] = runs[i].ID
+	}
+	return out
 }

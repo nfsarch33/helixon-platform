@@ -377,22 +377,41 @@ func (s *SessionStore) ListInterruptedRuns(ctx context.Context) ([]RunRecord, er
 	return out, rows.Err()
 }
 
-// FindInterruptedRunByTicket returns the oldest interrupted run bound to a
-// ticket, or nil when there is none. It is the one-run-per-ticket guard's
+// ListRunningRuns returns every run in the running state, oldest first,
+// regardless of lease state: running here, running in another process, or
+// lapsed and resumable are all one live run of their ticket.
+func (s *SessionStore) ListRunningRuns(ctx context.Context) ([]RunRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+runColumns+` FROM runs WHERE status = ? ORDER BY created_at ASC, rowid ASC`,
+		string(RunRunning))
+	if err != nil {
+		return nil, fmt.Errorf("list running runs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []RunRecord
+	for rows.Next() {
+		r, err := scanRun(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan run: %w", err)
+		}
+		out = append(out, *r)
+	}
+	return out, rows.Err()
+}
+
+// FindRunByTicket returns the ticket's oldest non-terminal run - any lease
+// state - or nil when there is none. It is the one-run-per-ticket guard's
 // read: before a worker starts a fresh run for a claimed ticket, it asks
-// whether an earlier attempt for the same ticket is still resumable, so a
-// re-claimed ticket continues its interrupted run instead of forking a
-// second one that races the first to the finish write.
-//
-// The filter runs over the interrupted set rather than a dedicated index:
-// the resumable population is small by construction (it is bounded by the
-// tickets this fleet is actually working), and reusing ListInterruptedRuns
-// keeps one definition of "interrupted".
-func (s *SessionStore) FindInterruptedRunByTicket(ctx context.Context, ticketID string) (*RunRecord, error) {
+// whether ANY live run of the ticket exists, not only one whose lease has
+// lapsed, so a second run can never fork while the first is still going
+// somewhere else.
+func (s *SessionStore) FindRunByTicket(ctx context.Context, ticketID string) (*RunRecord, error) {
 	if ticketID == "" {
 		return nil, nil
 	}
-	runs, err := s.ListInterruptedRuns(ctx)
+	runs, err := s.ListRunningRuns(ctx)
 	if err != nil {
 		return nil, err
 	}
