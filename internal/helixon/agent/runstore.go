@@ -377,6 +377,52 @@ func (s *SessionStore) ListInterruptedRuns(ctx context.Context) ([]RunRecord, er
 	return out, rows.Err()
 }
 
+// ListRunningRuns returns every run in the running state, oldest first,
+// regardless of lease state: running here, running in another process, or
+// lapsed and resumable are all one live run of their ticket.
+func (s *SessionStore) ListRunningRuns(ctx context.Context) ([]RunRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+runColumns+` FROM runs WHERE status = ? ORDER BY created_at ASC, rowid ASC`,
+		string(RunRunning))
+	if err != nil {
+		return nil, fmt.Errorf("list running runs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []RunRecord
+	for rows.Next() {
+		r, err := scanRun(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan run: %w", err)
+		}
+		out = append(out, *r)
+	}
+	return out, rows.Err()
+}
+
+// FindRunByTicket returns the ticket's oldest non-terminal run - any lease
+// state - or nil when there is none. It is the one-run-per-ticket guard's
+// read: before a worker starts a fresh run for a claimed ticket, it asks
+// whether ANY live run of the ticket exists, not only one whose lease has
+// lapsed, so a second run can never fork while the first is still going
+// somewhere else.
+func (s *SessionStore) FindRunByTicket(ctx context.Context, ticketID string) (*RunRecord, error) {
+	if ticketID == "" {
+		return nil, nil
+	}
+	runs, err := s.ListRunningRuns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range runs {
+		if runs[i].Meta["ticket_id"] == ticketID {
+			return &runs[i], nil
+		}
+	}
+	return nil, nil
+}
+
 // BeginStep records that a tool call is about to be dispatched. It is
 // idempotent on (run, iteration, tool_call_id): a step that already exists is
 // returned with created = false, which is how a resumed run learns a tool

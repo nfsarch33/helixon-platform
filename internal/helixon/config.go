@@ -36,15 +36,19 @@ import (
 //	timeout: "5m"
 //	heartbeat_every: "60s"
 type FileConfig struct {
-	AgentID        string                `yaml:"agent_id"`
-	SystemPrompt   string                `yaml:"system_prompt"`
-	SessionDSN     string                `yaml:"session_dsn"`
-	MaxIterations  int                   `yaml:"max_iterations"`
-	MaxTokens      int                   `yaml:"max_tokens"`
-	Timeout        string                `yaml:"timeout"`
-	HeartbeatEvery string                `yaml:"heartbeat_every"`
-	Provider       ProviderConfig        `yaml:"provider"`
-	Sprintboard    SprintboardFileConfig `yaml:"sprintboard"`
+	AgentID        string `yaml:"agent_id"`
+	SystemPrompt   string `yaml:"system_prompt"`
+	SessionDSN     string `yaml:"session_dsn"`
+	MaxIterations  int    `yaml:"max_iterations"`
+	MaxTokens      int    `yaml:"max_tokens"`
+	Timeout        string `yaml:"timeout"`
+	HeartbeatEvery string `yaml:"heartbeat_every"`
+	// RecoveryIntervalString is the yaml spelling of the periodic
+	// interrupted-run sweep period; empty means the default (2m), a
+	// negative value keeps only the start-up sweep.
+	RecoveryIntervalString string                `yaml:"recovery_interval"`
+	Provider               ProviderConfig        `yaml:"provider"`
+	Sprintboard            SprintboardFileConfig `yaml:"sprintboard"`
 	// Registra mirrors the block that the live fleet-agent config and the
 	// shipped example have both carried since v14571. It was never a field,
 	// so non-strict decoding threw it away on every load; declaring it is
@@ -351,6 +355,13 @@ func (fc FileConfig) ToRuntimeConfig() (RuntimeConfig, error) {
 		return RuntimeConfig{}, err
 	}
 	cfg.LoopGuard = lg
+	if fc.RecoveryIntervalString != "" {
+		d, err := time.ParseDuration(fc.RecoveryIntervalString)
+		if err != nil {
+			return RuntimeConfig{}, fmt.Errorf("helixon: parse recovery_interval %q: %w", fc.RecoveryIntervalString, err)
+		}
+		cfg.RecoveryInterval = d
+	}
 	cfg.Agentrace = fc.Agentrace.toConfig()
 	cfg.Completion = fc.Completion.toPolicy()
 	tk, err := fc.Tickets.toConfig()

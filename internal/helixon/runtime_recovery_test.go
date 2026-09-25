@@ -3,6 +3,7 @@ package helixon
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -22,8 +23,12 @@ func newRecoveryRuntime(t *testing.T) (*Runtime, *fakeBoard, *recordingProvider)
 		BaseURL: srv.URL, AgentName: "recovery-agent",
 	}, quietLogger())
 	cfg := RuntimeConfig{
-		AgentID:    "recovery-agent",
-		SessionDSN: "file::memory:?cache=shared",
+		AgentID: "recovery-agent",
+		// A file DSN under t.TempDir(): a shared-cache in-memory DSN loses
+		// its tables across runs in one process (the -count/-shuffle
+		// fixture class), and every runtime here needs its own durable
+		// store anyway.
+		SessionDSN: filepath.Join(t.TempDir(), "runs.db"),
 		Timeout:    5 * time.Second,
 		Logger:     quietLogger(),
 		Tickets: TicketPollerConfig{

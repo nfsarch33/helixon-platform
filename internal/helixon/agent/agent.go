@@ -103,6 +103,17 @@ type Agent struct {
 	// exists to prevent.
 	activeMu sync.Mutex
 	active   map[string]struct{}
+	// renewals is the seam the durable loop's lease renewer talks through.
+	// It is the session store in production; tests swap it to stage transient
+	// store failures (deadline, SQLITE_BUSY) without fault-injecting SQLite.
+	renewals renewStore
+}
+
+// renewStore is the slice of SessionStore the lease renewer needs, as an
+// interface so the renewer's transient-vs-lost policy is testable at the
+// unit level.
+type renewStore interface {
+	RenewRun(ctx context.Context, id, owner string, ttl time.Duration) (bool, error)
 }
 
 // New creates an Agent wired to the given provider, tool executor, and session store.
@@ -116,6 +127,7 @@ func New(provider llm.Provider, tools ToolExecutor, store *SessionStore, cfg Con
 		logger:   cfg.Logger.With(slog.String("component", "helixon.agent")),
 		owner:    newOwner(),
 		active:   map[string]struct{}{},
+		renewals: store,
 	}
 }
 
